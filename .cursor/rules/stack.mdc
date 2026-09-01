@@ -1326,7 +1326,28 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2032 nodes, 2155 edges, 296 communities (graphify update 2026-08-31 post-§76).
+**Graphify stats:** 2032 nodes, 2155 edges, 296 communities (graphify update 2026-09-01 post-§77).
+
+---
+
+## 77. Logo Transparent Background (2026-09-01)
+
+**Scope:** фикс белого квадрата вокруг круглого логотипа на тёмной теме.
+
+**Graphify:** `Logo()` → `public/assets/logo.png`; consumers: `MobileHeader`, `BottomNav`, auth pages, `PublicLandingContent`.
+
+### Root cause (✅)
+
+- `logo.png` — RGB без alpha; белый фон в углах квадратного canvas (1200×1200) виден на тёмном фоне приложения.
+
+### Fix (✅)
+
+- `public/assets/logo.png` — flood-fill белого фона от краёв → прозрачный alpha; белые элементы внутри круга (диван, текст) сохранены.
+- `Logo.tsx` без изменений — `object-contain`, единственный источник `/assets/logo.png`.
+
+### Tests
+
+Без новых тестов (asset-only fix).
 
 ---
 

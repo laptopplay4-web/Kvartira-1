@@ -310,8 +310,8 @@
     "semantic_hash": ""
   },
   "public/assets/logo.png": {
-    "mtime": 1786421633.2717884,
-    "ast_hash": "98d40503b155acc911d1d4bc6f4631d5",
+    "mtime": 1788254533.9189155,
+    "ast_hash": "c306eb052fd006f885bb639ff0b9d70c",
     "semantic_hash": ""
   },
   "public/favicon.svg": {
@@ -750,7 +750,7 @@
     "semantic_hash": ""
   },
   "src/services/progress/achievements.ts": {
-    "mtime": 1788170492.4500546,
+    "mtime": 1788251949.3940732,
     "ast_hash": "9a17a5498ecc6e5e9c3cd42403b1f717",
     "semantic_hash": ""
   },

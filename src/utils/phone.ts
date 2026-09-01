@@ -5,6 +5,8 @@ export const PHONE_STORAGE_REGEX = /^\+79\d{9}$/;
 
 export const PHONE_DISPLAY_PLACEHOLDER = '+7 (999) 999-99-99';
 
+export const PHONE_INCOMPLETE_MESSAGE = `Введите номер полностью: ${PHONE_DISPLAY_PLACEHOLDER}`;
+
 /** Extract and normalize digits from raw input or paste (8…, 9…, +7…). */
 export function extractPhoneDigits(input: string): string {
   let digits = input.replace(/\D/g, '');
@@ -46,7 +48,9 @@ export function digitsToStoredPhone(digits: string): string {
 }
 
 export function storedPhoneToDisplay(stored: string): string {
-  return formatPhoneDisplay(extractPhoneDigits(stored));
+  const digits = extractPhoneDigits(stored);
+  if (digits.length <= 1) return '';
+  return formatPhoneDisplay(digits);
 }
 
 export function isCompletePhone(stored: string): boolean {

@@ -23,7 +23,11 @@ onRecordAuthWithPasswordRequest((e) => {
 
   const record = e.record;
   if (record && e.password && !record.validatePassword(e.password)) {
-    auth.recordLoginAttempt($app, record.id, false, e);
+    try {
+      auth.recordLoginAttempt($app, record.id, false, e);
+    } catch (_) {
+      /* history write must not hide invalid credentials */
+    }
     throw new BadRequestError('Invalid login credentials.');
   }
 
@@ -31,12 +35,23 @@ onRecordAuthWithPasswordRequest((e) => {
 }, 'users');
 
 onRecordAuthRequest((e) => {
-  const auth = require(`${__hooks}/lib/kvartiraAuth.js`);
-  const securityAuth = require(`${__hooks}/lib/kvartiraSecurity.js`);
-
-  if (e.record && e.authMethod === 'password') {
-    auth.recordLoginAttempt($app, e.record.id, true, e);
-    securityAuth.recordSecuritySession($app, e.record.id, e);
+  try {
+    if (e.record && e.authMethod === 'password') {
+      const auth = require(`${__hooks}/lib/kvartiraAuth.js`);
+      const securityAuth = require(`${__hooks}/lib/kvartiraSecurity.js`);
+      try {
+        auth.recordLoginAttempt($app, e.record.id, true, e);
+      } catch (_) {
+        /* login must succeed even if history write fails */
+      }
+      try {
+        securityAuth.recordSecuritySession($app, e.record.id, e);
+      } catch (_) {
+        /* login must succeed even if session write fails */
+      }
+    }
+  } catch (_) {
+    /* never fail auth because of side-effect hooks */
   }
   e.next();
 }, 'users');

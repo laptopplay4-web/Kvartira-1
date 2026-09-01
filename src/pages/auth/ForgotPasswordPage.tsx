@@ -1,20 +1,18 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 import { Logo } from '@/components/ui/Logo';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
+import { PHONE_INCOMPLETE_MESSAGE, PHONE_STORAGE_REGEX } from '@/utils/phone';
 
 const schema = z.object({
-  phone: z
-    .string()
-    .min(12, 'Введите номер в формате +79XXXXXXXXX')
-    .regex(/^\+79\d{9}$/, 'Формат: +79XXXXXXXXX'),
+  phone: z.string().regex(PHONE_STORAGE_REGEX, PHONE_INCOMPLETE_MESSAGE),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -25,8 +23,8 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const {
-    register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -61,12 +59,19 @@ export default function ForgotPasswordPage() {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
-          <Input
-            label="Телефон"
-            type="tel"
-            placeholder="+79001234567"
-            error={errors.phone?.message}
-            {...register('phone')}
+          <Controller
+            name="phone"
+            control={control}
+            render={({ field }) => (
+              <PhoneInput
+                label="Телефон"
+                error={errors.phone?.message}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                name={field.name}
+              />
+            )}
           />
 
           {!isOnline && (

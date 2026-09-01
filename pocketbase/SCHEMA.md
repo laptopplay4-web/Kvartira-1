@@ -88,7 +88,7 @@ Hook `onRecordAuthWithPasswordRequest` подставляет запись по 
 
 **Регистрация:** `POST /api/collections/users/records` с `phone`, `password`, `passwordConfirm`, `firstName`, `lastName` — hook выставляет `role=student` и email `{digits}@kvartira.local`.
 
-**История входов:** `onRecordAuthRequest` → коллекция `login_history`; неверный пароль → `success: false` + `security_alerts.failed_login`.
+**История входов:** `onRecordAuthRequest` → коллекция `login_history`; ошибка записи истории/сессии **не блокирует** вход; неверный пароль → `success: false` + уведомление. Миграция `1789190400_kvartira_login_history_bool.js` — `login_history.success` optional (JSVM `false` = blank).
 
 ## RBAC (ROADMAP 1.4 ✅)
 

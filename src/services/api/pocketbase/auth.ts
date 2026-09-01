@@ -13,6 +13,7 @@ import {
 import { mapUserRecord } from '@/services/api/pocketbase/mappers';
 import { withPbError } from '@/services/api/pocketbase/errors';
 import type { AuthSession } from '@/types';
+import { digitsToStoredPhone } from '@/utils/phone';
 
 function buildSession(): AuthSession | null {
   const pb = getPocketBase();
@@ -27,7 +28,8 @@ export const pocketbaseAuthApi: AuthApi = {
   async login(phone, password) {
     return withPbError(async () => {
       const pb = getPocketBase();
-      const authData = await pb.collection('users').authWithPassword(phone, password);
+      const identity = digitsToStoredPhone(phone);
+      const authData = await pb.collection('users').authWithPassword(identity, password);
       const session: AuthSession = {
         user: mapUserRecord(authData.record),
         token: authData.token,
@@ -45,14 +47,15 @@ export const pocketbaseAuthApi: AuthApi = {
   async register(phone, password, firstName, lastName) {
     return withPbError(async () => {
       const pb = getPocketBase();
+      const normalizedPhone = digitsToStoredPhone(phone);
       await pb.collection('users').create({
-        phone,
+        phone: normalizedPhone,
         password,
         passwordConfirm: password,
         firstName,
         lastName,
       });
-      return pocketbaseAuthApi.login(phone, password);
+      return pocketbaseAuthApi.login(normalizedPhone, password);
     });
   },
 

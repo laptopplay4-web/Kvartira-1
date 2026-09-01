@@ -116,14 +116,18 @@ module.exports = {
  * @param {string} [link]
  */
 function createNotificationForUser(app, userId, type, title, body, link) {
-  const col = app.findCollectionByNameOrId('notifications');
-  const record = new Record(col);
-  record.set('user', userId);
-  record.set('type', type);
-  record.set('title', title);
-  record.set('body', body);
-  if (link) {
-    record.set('link', link);
+  try {
+    const col = app.findCollectionByNameOrId('notifications');
+    const record = new Record(col);
+    record.set('user', userId);
+    record.set('type', type);
+    record.set('title', title);
+    record.set('body', body);
+    if (link) {
+      record.set('link', link);
+    }
+    app.save(record);
+  } catch (_) {
+    /* never fail login / booking / etc. because of a notification write */
   }
-  app.save(record);
 }

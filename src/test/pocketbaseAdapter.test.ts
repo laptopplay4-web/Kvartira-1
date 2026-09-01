@@ -265,6 +265,16 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(apiError.code).toBe('INVALID_CREDENTIALS');
   });
 
+  it('mapPocketBaseError maps generic hook failure to Russian message', () => {
+    const pbError = new ClientResponseError({
+      status: 400,
+      response: { message: 'Something went wrong while processing your request.' },
+    } as never);
+    const apiError = mapPocketBaseError(pbError);
+    expect(apiError.message).toContain('Не удалось войти');
+    expect(apiError.code).toBe('SERVER_ERROR');
+  });
+
   it('mapPocketBaseError maps unique slot conflict to SLOT_CONFLICT', () => {
     const pbError = new ClientResponseError({
       status: 409,

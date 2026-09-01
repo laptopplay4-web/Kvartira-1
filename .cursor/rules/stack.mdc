@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.90 Production Roadmap · 2026-09-02
+Версия: 1.91 Production Roadmap · 2026-09-02
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -425,6 +425,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `profile.test.ts` | profile validation, update name/phone, avatar upload/remove, crop helpers (18 tests) |
 | `audioPlayer.test.tsx` | formatAudioDuration, speed cycle, seek ratio, AudioPlayer UI (10 tests) |
 | `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md coverage (3 tests) |
+| `pocketbaseAuth.test.ts` | phone login hooks, findRecordsByFilter return value, login side-effects isolation, PhoneInput on auth pages (8 tests) |
 | `pocketbaseRbac.test.ts` | PB RBAC migration + kvmartiraRbac.js + RBAC.md coverage (8 tests) |
 | `pocketbaseSeed.test.ts` | PB seed script files, collections coverage, docs (5 tests) |
 | `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/progress/support/legal/security/notifications/schoolSettings/files/realtime, createApiClient pocketbase mode (47 tests) |
@@ -432,7 +433,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `webPush.test.ts` | push helpers, subscription API, delivery gating (6 tests) |
 | `authSessionSync.test.ts` | refreshSession API, syncSession cache clear, PB subscribe hook (5 tests) |
 
-**Итого:** 476 tests (37 files; 4 skipped when Progress UI hidden).
+**Итого:** 482 tests (37 files; 4 skipped when Progress UI hidden).
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -522,6 +523,8 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Assignments groups + content blocks | ✅ 2026-09-02, см. §92 |
 | Back nav outline style | ✅ 2026-09-02, см. §96 |
 | Admin school settings PB adapter | ✅ 2026-09-02, см. §97 |
+| Availability route lessons nav | ✅ 2026-09-02, см. §98 |
+| Production login hook + auth phone mask | ✅ 2026-09-02, см. §99 |
 | Production auth + backend | ⏳ |
 
 ---
@@ -1355,7 +1358,42 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2131 nodes, 2256 edges, 318 communities (graphify update 2026-09-02 post-§97).
+**Graphify stats:** 2139 nodes, 2265 edges, 318 communities (graphify update 2026-09-02 post-§99).
+
+---
+
+## 99. Production Login Hook + Auth Phone Mask (2026-09-02)
+
+**Scope:** вход в существующий аккаунт на сервере падал с `Something went wrong while processing your request`; маска телефона `+7 (999) 999-99-99` + вставка на login/register/forgot.
+
+**Graphify:** `LoginPage()` / `RegisterPage()` → `PhoneInput()` → `utils/phone.ts`; `pocketbaseAuthApi.login()` → `auth.pb.js` → `recordLoginAttempt()` / `recordSecuritySession()`.
+
+### Root cause (✅)
+
+- `findRecordsByFilter(..., rows)` — лишний output-массив (API 0.22+ возвращает массив) ломал запись `login_history` / `security_sessions` после верного пароля.
+- `login_history.success` required bool: JSVM `false` = blank → исключение на failed login.
+- Side-effect хуки не были изолированы: ошибка истории/сессии/уведомления роняла весь `auth-with-password`.
+
+### Hooks (✅)
+
+- `auth.pb.js`: try/catch вокруг history + session — вход не блокируется side-effects.
+- `kvartiraAuth.js` / `kvartiraSecurity.js`: `findRecordsByFilter` по return value; `requestInfo()` для IP/UA.
+- Миграция `1789190400_kvartira_login_history_bool.js` — `success` optional.
+- `createNotificationForUser` не бросает наружу.
+- Клиент: generic PB message → «Не удалось войти…»; identity нормализуется через `digitsToStoredPhone`.
+
+### UI (✅)
+
+- `PhoneInput` на `/login`, `/register`, `/forgot-password`, settings account.
+- Пустое поле показывает шаблон-placeholder `+7 (999) 999-99-99`; только цифры; paste `8…` / `+7 (…)` / `9…`.
+
+### Deploy
+
+Нужно выложить **фронт** и **`pb_hooks` + новая миграция** на сервер, затем перезапустить PocketBase.
+
+### Tests
+
+`pocketbaseAuth.test.ts` +4; `pocketbaseAdapter.test.ts` generic error map; `phone.test.ts` empty display → **482 passed | 4 skipped** (37 files).
 
 ---
 

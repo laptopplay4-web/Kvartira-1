@@ -125,13 +125,13 @@
     "semantic_hash": ""
   },
   "src/pages/auth/LoginPage.tsx": {
-    "mtime": 1788166407.1259878,
-    "ast_hash": "f9e70251d7eab1c68f346a235bb64f67",
+    "mtime": 1788295033.7711663,
+    "ast_hash": "b603e37331f3972106e12628d45944a2",
     "semantic_hash": ""
   },
   "src/pages/auth/RegisterPage.tsx": {
-    "mtime": 1788281473.4319632,
-    "ast_hash": "6314a962b31d31ec9b7b7c8051025551",
+    "mtime": 1788295036.508701,
+    "ast_hash": "176fe2d98de18563b50f6b9bd454a7d5",
     "semantic_hash": ""
   },
   "src/pages/events/EventDetailPage.tsx": {
@@ -1075,8 +1075,8 @@
     "semantic_hash": ""
   },
   "src/pages/auth/ForgotPasswordPage.tsx": {
-    "mtime": 1788166407.1782348,
-    "ast_hash": "addaa7448a36fe0fe2a8fa65d890bd3e",
+    "mtime": 1788295049.1477282,
+    "ast_hash": "9e500b9f7e53626c5ee677379672d155",
     "semantic_hash": ""
   },
   "src/pages/auth/ResetPasswordPage.tsx": {
@@ -1090,8 +1090,8 @@
     "semantic_hash": ""
   },
   "src/services/auth/validation.ts": {
-    "mtime": 1788166408.0784543,
-    "ast_hash": "3faa0f4ea1383f72004b74f3de512aad",
+    "mtime": 1788295081.6104484,
+    "ast_hash": "41f7ae820f8f9304a626ebbad2bdbe3e",
     "semantic_hash": ""
   },
   "src/services/profile/validation.ts": {
@@ -1100,8 +1100,8 @@
     "semantic_hash": ""
   },
   "src/test/profile.test.ts": {
-    "mtime": 1788166412.5339408,
-    "ast_hash": "649ded4610e3bb2db17f97667ced3024",
+    "mtime": 1788295082.9624357,
+    "ast_hash": "9bdb2c71c644596f766cfccb125c026a",
     "semantic_hash": ""
   },
   "src/components/profile/AvatarCropModal.tsx": {
@@ -1185,18 +1185,18 @@
     "semantic_hash": ""
   },
   "pocketbase/SCHEMA.md": {
-    "mtime": 1788178860.2722495,
-    "ast_hash": "04f62352faf7296496e965be0fd90278",
+    "mtime": 1788295115.4130855,
+    "ast_hash": "b700852f1a1b43745842f39644171673",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/auth.pb.js": {
-    "mtime": 1788181082.873068,
-    "ast_hash": "8ed6ab4392de7ae53786c7e52e2eacf7",
+    "mtime": 1788294984.6297882,
+    "ast_hash": "907effe3e33a13213dbc3747a6b34480",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/lib/kvartiraAuth.js": {
-    "mtime": 1788283618.0024557,
-    "ast_hash": "bfa416ba062430ca81cb348292640095",
+    "mtime": 1788295011.9268448,
+    "ast_hash": "2bcc3f77b9728410760fd1f9bb8c15a8",
     "semantic_hash": ""
   },
   "pocketbase/pb_migrations/1788235200_kvartira_auth_config.js": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "src/test/pocketbaseAuth.test.ts": {
-    "mtime": 1788166407.1782348,
-    "ast_hash": "8ec88ca031fdbd7edb76e8c4003afa8d",
+    "mtime": 1788295128.2766888,
+    "ast_hash": "c3991cf11f6aa359c53e8773747e255a",
     "semantic_hash": ""
   },
   "src/components/availability/AvailabilityIntervalModal.tsx": {
@@ -1280,8 +1280,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/auth.ts": {
-    "mtime": 1788282220.7920294,
-    "ast_hash": "bd8cd6e97806a9828574e7d56603f26c",
+    "mtime": 1788295177.7881918,
+    "ast_hash": "a17006820b4bfd873552aaec8dde7316",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/client.ts": {
@@ -1290,8 +1290,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/errors.ts": {
-    "mtime": 1788183343.6724844,
-    "ast_hash": "08fbbe7a34e60cc9dd038796a1456a96",
+    "mtime": 1788295017.611582,
+    "ast_hash": "e52c28ab51d73aa80b2609427bfdfc9b",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/index.ts": {
@@ -1310,8 +1310,8 @@
     "semantic_hash": ""
   },
   "src/test/pocketbaseAdapter.test.ts": {
-    "mtime": 1788291883.2860727,
-    "ast_hash": "ed4a4673d90f350f4447a213ec5b6b56",
+    "mtime": 1788295114.9986706,
+    "ast_hash": "c4c6fa4b5ea254dfcc252b85cbe84385",
     "semantic_hash": ""
   },
   "pocketbase/pb_migrations/1788499200_kvartira_lessons_adapter.js": {
@@ -1440,8 +1440,8 @@
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/lib/kvartiraSecurity.js": {
-    "mtime": 1788284256.6224046,
-    "ast_hash": "cda073ea5b02a1c6951a11489b7cb1b4",
+    "mtime": 1788295004.5642288,
+    "ast_hash": "bb52959e97c2a79c3dd0787ecfefebbd",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/security.pb.js": {
@@ -1455,8 +1455,8 @@
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/lib/kvartiraNotifications.js": {
-    "mtime": 1788283625.1602757,
-    "ast_hash": "b4be500e7f64515f200bd639aa747a19",
+    "mtime": 1788294992.0775235,
+    "ast_hash": "3e97cf0551e943d69df8beb40b4f2a3c",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/notifications.pb.js": {
@@ -1595,8 +1595,8 @@
     "semantic_hash": ""
   },
   "src/pages/profile/settings/AccountSettingsPage.tsx": {
-    "mtime": 1788269244.9862103,
-    "ast_hash": "5a8b8b0ab5781eb425d57d10e6689f52",
+    "mtime": 1788295058.1593716,
+    "ast_hash": "a86efba69dc69273516d13afa8c4b16d",
     "semantic_hash": ""
   },
   "src/pages/profile/settings/SettingsLayout.tsx": {
@@ -1615,18 +1615,18 @@
     "semantic_hash": ""
   },
   "src/components/ui/PhoneInput.tsx": {
-    "mtime": 1788281460.5317447,
-    "ast_hash": "9e7aaa371446d621aed71b593ede0ba1",
+    "mtime": 1788295017.611582,
+    "ast_hash": "06542812781fef8ba080e2db7507a96b",
     "semantic_hash": ""
   },
   "src/test/phone.test.ts": {
-    "mtime": 1788281465.302499,
-    "ast_hash": "bb010121c7448f92c7e7b7a078ae2876",
+    "mtime": 1788295088.5244603,
+    "ast_hash": "d627e8764e79e4ee269146f15977aa8f",
     "semantic_hash": ""
   },
   "src/utils/phone.ts": {
-    "mtime": 1788281454.7098782,
-    "ast_hash": "c1741d8e5c66db4d02c28ca7b5e43031",
+    "mtime": 1788295016.4988585,
+    "ast_hash": "8e0edf3fabab95a3c5c2a6e1ee454990",
     "semantic_hash": ""
   },
   "src/hooks/useAuthSessionSync.ts": {
@@ -1640,43 +1640,43 @@
     "semantic_hash": ""
   },
   "src/components/assignments/AssignmentContentEditor.tsx": {
-    "mtime": 1788288339.471267,
-    "ast_hash": "5679a8f228cd60db994668963ed24f01",
+    "mtime": 1788294461.3467133,
+    "ast_hash": "91d6883a6a268ee9d954765d65781c03",
     "semantic_hash": ""
   },
   "src/components/assignments/AssignmentContentView.tsx": {
-    "mtime": 1788288339.368723,
-    "ast_hash": "c4b62cd3a2955ee64a6aad71b39a3be2",
+    "mtime": 1788294461.2737396,
+    "ast_hash": "2a8deb164a7d07b3a336f9740c68039a",
     "semantic_hash": ""
   },
   "src/pages/assignments/AssignmentGroupDetailPage.tsx": {
-    "mtime": 1788289557.7813916,
-    "ast_hash": "7407c46e759d4e618e7ea652a6a32aea",
+    "mtime": 1788294461.3277192,
+    "ast_hash": "1f03d20365348ecbda001d824b8b0038",
     "semantic_hash": ""
   },
   "src/pages/assignments/AssignmentGroupsPage.tsx": {
-    "mtime": 1788289999.805048,
-    "ast_hash": "c47d4f8d01165bbaa052ec3f337b5231",
+    "mtime": 1788294461.3467133,
+    "ast_hash": "42884714c3d86e8207887d07c159a11c",
     "semantic_hash": ""
   },
   "src/services/api/mock/groups.ts": {
-    "mtime": 1788288941.6894698,
-    "ast_hash": "9c8e3c74190bcfbb3f64b1d5f125d713",
+    "mtime": 1788294461.2737396,
+    "ast_hash": "3684635657b5d4c0c3fefe987f581f9b",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/groups.ts": {
-    "mtime": 1788288339.3304527,
-    "ast_hash": "71eaf3d3195af6038f9b7a849e5a3115",
+    "mtime": 1788294461.3607087,
+    "ast_hash": "2f83eaf3e97f7d1b929ff806fd2a7147",
     "semantic_hash": ""
   },
   "src/services/assignments/groups/access.ts": {
-    "mtime": 1788288448.2667403,
-    "ast_hash": "79a61acc150c4ae7bc629dd7de3fe319",
+    "mtime": 1788294461.2737396,
+    "ast_hash": "032c48e0f52b7057c2fb12aee52fc37f",
     "semantic_hash": ""
   },
   "src/services/api/mock/userResolver.ts": {
-    "mtime": 1788288949.7787025,
-    "ast_hash": "3fa609740a144096d4f786f24985ff0d",
+    "mtime": 1788294461.3607087,
+    "ast_hash": "9b9fed0b2c4e3f073647ff00ea4f81cb",
     "semantic_hash": ""
   },
   "src/services/assignments/groups/helpers.ts": {
@@ -1692,6 +1692,11 @@
   "src/services/api/pocketbase/schoolSettings.ts": {
     "mtime": 1788292292.4853659,
     "ast_hash": "2b91a47e89b4e70379f14a810467a6cf",
+    "semantic_hash": ""
+  },
+  "pocketbase/pb_migrations/1789190400_kvartira_login_history_bool.js": {
+    "mtime": 1788295013.1809394,
+    "ast_hash": "2a97e631528b5078974bdc9ea3fb0880",
     "semantic_hash": ""
   }
 }

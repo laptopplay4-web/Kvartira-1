@@ -37,12 +37,33 @@ function phoneToEmail(phone) {
 
 /**
  * @param {AuthEvent} e
+ * @returns {{ headers?: Record<string, string>, remoteIP?: string } | null}
+ */
+function getRequestInfoSafe(e) {
+  try {
+    if (typeof e.requestInfo === 'function') {
+      return e.requestInfo() || null;
+    }
+  } catch (_) {
+    /* older event shape */
+  }
+  return null;
+}
+
+/**
+ * @param {AuthEvent} e
  * @returns {string}
  */
 function getClientIp(e) {
-  if (typeof e.realIP === 'function') {
-    const ip = e.realIP();
-    if (ip) return ip;
+  const info = getRequestInfoSafe(e);
+  if (info && info.remoteIP) return info.remoteIP;
+  try {
+    if (typeof e.realIP === 'function') {
+      const ip = e.realIP();
+      if (ip) return ip;
+    }
+  } catch (_) {
+    /* ignore */
   }
   return '0.0.0.0';
 }
@@ -52,7 +73,9 @@ function getClientIp(e) {
  * @returns {string}
  */
 function getDeviceLabel(e) {
-  const ua = e.request?.header?.get('User-Agent') || '';
+  const info = getRequestInfoSafe(e);
+  const headers = (info && info.headers) || {};
+  const ua = headers['user-agent'] || headers['User-Agent'] || '';
   if (!ua) return 'Unknown device';
   if (/Windows/i.test(ua)) return 'Browser · Windows';
   if (/Mac OS X|Macintosh/i.test(ua)) return 'Browser · macOS';
@@ -77,7 +100,10 @@ function recordLoginAttempt(app, userId, success, e) {
   entry.set('user', userId);
   entry.set('deviceLabel', deviceLabel);
   entry.set('ipAddress', ipAddress);
-  entry.set('success', success);
+  if (success) {
+    entry.set('success', true);
+  }
+  // Omit `success: false` — PB JSVM treats false as blank on required bool fields.
   app.save(entry);
 
   trimLoginHistory(app, userId);
@@ -101,18 +127,26 @@ function recordLoginAttempt(app, userId, success, e) {
  */
 function trimLoginHistory(app, userId) {
   /** @type {Record[]} */
-  const rows = [];
-  app.findRecordsByFilter(
-    'login_history',
-    'user = {:userId}',
-    '-id',
-    MAX_LOGIN_HISTORY + 1,
-    0,
-    { userId },
-    rows,
-  );
+  let rows = [];
+  try {
+    rows =
+      app.findRecordsByFilter(
+        'login_history',
+        'user = {:userId}',
+        '-id',
+        MAX_LOGIN_HISTORY + 1,
+        0,
+        { userId },
+      ) || [];
+  } catch (_) {
+    return;
+  }
   for (let i = MAX_LOGIN_HISTORY; i < rows.length; i++) {
-    app.delete(rows[i]);
+    try {
+      app.delete(rows[i]);
+    } catch (_) {
+      /* ignore */
+    }
   }
 }
 

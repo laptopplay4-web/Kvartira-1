@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   "src/app/router.tsx": {
-    "mtime": 1788286631.6318297,
-    "ast_hash": "6667a50164c5ca3bee2d4661f424ea4d",
+    "mtime": 1788292733.359064,
+    "ast_hash": "e57f5685a8d54ca2216eec5e17e866db",
     "semantic_hash": ""
   },
   "src/components/ui/Avatar.tsx": {
@@ -160,8 +160,8 @@
     "semantic_hash": ""
   },
   "src/pages/lessons/LessonsPage.tsx": {
-    "mtime": 1788167397.6272001,
-    "ast_hash": "1c6fb169b0a285cfe8c648454d5e060a",
+    "mtime": 1788292734.038666,
+    "ast_hash": "fc98c95b435a90684da27ca69b736d3b",
     "semantic_hash": ""
   },
   "src/pages/notifications/NotificationsPage.tsx": {
@@ -225,8 +225,8 @@
     "semantic_hash": ""
   },
   "src/test/routes.test.ts": {
-    "mtime": 1788286709.0130959,
-    "ast_hash": "ba23b45fa117765b46eefe6711059886",
+    "mtime": 1788292734.9044738,
+    "ast_hash": "6c72299688d1898d52a3adf7052ff5a0",
     "semantic_hash": ""
   },
   "src/test/setup.ts": {
@@ -330,8 +330,8 @@
     "semantic_hash": ""
   },
   "src/pages/profile/AvailabilityPage.tsx": {
-    "mtime": 1788260138.4678144,
-    "ast_hash": "3fd2d02afe3ff545e8cd788fe5943359",
+    "mtime": 1788292734.3681166,
+    "ast_hash": "fc01bb4546a1039b443f6cad6bed55f4",
     "semantic_hash": ""
   },
   "src/services/availability/formHelpers.ts": {
@@ -615,8 +615,8 @@
     "semantic_hash": ""
   },
   "src/test/nav.test.tsx": {
-    "mtime": 1788290918.0099256,
-    "ast_hash": "1cafae918cda5b0d9288a0bd62d7166e",
+    "mtime": 1788292738.0807538,
+    "ast_hash": "703d2611ee453a26fb247ca2e92ba295",
     "semantic_hash": ""
   },
   "src/test/routes.test.tsx": {

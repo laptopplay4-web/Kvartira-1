@@ -9,6 +9,7 @@ import { maskPhone } from '@/utils';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 
 export default function AccountSettingsPage() {
   const user = useCurrentUser()!;
@@ -141,17 +142,14 @@ export default function AccountSettingsPage() {
           <h2 className="text-body-sm font-medium">Телефон</h2>
           <p className="text-caption text-text-muted">Текущий: {maskPhone(user.phone)}</p>
           <form onSubmit={handleSavePhone} className="space-y-3">
-            <Input
+            <PhoneInput
               label="Новый номер"
-              type="tel"
               value={phone}
-              onChange={(e) => {
-                setPhone(e.target.value);
+              onChange={(value) => {
+                setPhone(value);
                 setPhoneError('');
               }}
               error={phoneError || undefined}
-              hint="Формат: +79XXXXXXXXX"
-              autoComplete="tel"
             />
             <Button
               type="submit"

@@ -18,6 +18,10 @@ const PB_MESSAGE_MAP: Record<string, { message: string; code: string }> = {
     message: 'Неверный текущий пароль',
     code: 'INVALID_CREDENTIALS',
   },
+  'Something went wrong while processing your request.': {
+    message: 'Не удалось войти. Проверьте телефон и пароль или попробуйте позже.',
+    code: 'SERVER_ERROR',
+  },
 };
 
 const PB_FIELD_MESSAGE_MAP: Record<string, string> = {

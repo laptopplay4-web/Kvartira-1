@@ -1,7 +1,7 @@
 # Graph Report - Kvartira 1  (2026-09-02)
 
 ## Corpus Check
-- 335 files · ~138,479 words
+- 335 files · ~138,520 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

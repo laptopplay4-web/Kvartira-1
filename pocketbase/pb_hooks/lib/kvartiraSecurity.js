@@ -26,16 +26,20 @@ function relId(value) {
  */
 function markOnlyCurrentSession(app, userId, currentSessionId) {
   /** @type {Record[]} */
-  const rows = [];
-  app.findRecordsByFilter(
-    'security_sessions',
-    'user = {:userId}',
-    '',
-    200,
-    0,
-    { userId },
-    rows,
-  );
+  let rows = [];
+  try {
+    rows =
+      app.findRecordsByFilter(
+        'security_sessions',
+        'user = {:userId}',
+        '',
+        200,
+        0,
+        { userId },
+      ) || [];
+  } catch (_) {
+    return;
+  }
 
   for (const row of rows) {
     const shouldBeCurrent = row.id === currentSessionId;
@@ -44,14 +48,22 @@ function markOnlyCurrentSession(app, userId, currentSessionId) {
     if (shouldBeCurrent) {
       if (!wasCurrent) {
         row.set('isCurrent', true);
-        app.save(row);
+        try {
+          app.save(row);
+        } catch (_) {
+          /* ignore */
+        }
       }
       continue;
     }
 
     if (wasCurrent) {
       row.set('isCurrent', null);
-      app.save(row);
+      try {
+        app.save(row);
+      } catch (_) {
+        /* required bool false-as-blank on older schemas */
+      }
     }
   }
 }
@@ -67,16 +79,20 @@ function recordSecuritySession(app, userId, e) {
   const now = new Date().toISOString();
 
   /** @type {Record[]} */
-  const existingRows = [];
-  app.findRecordsByFilter(
-    'security_sessions',
-    'user = {:userId} && deviceLabel = {:deviceLabel}',
-    '',
-    1,
-    0,
-    { userId, deviceLabel },
-    existingRows,
-  );
+  let existingRows = [];
+  try {
+    existingRows =
+      app.findRecordsByFilter(
+        'security_sessions',
+        'user = {:userId} && deviceLabel = {:deviceLabel}',
+        '',
+        1,
+        0,
+        { userId, deviceLabel },
+      ) || [];
+  } catch (_) {
+    existingRows = [];
+  }
 
   const sessionsCol = app.findCollectionByNameOrId('security_sessions');
   let currentSessionId;

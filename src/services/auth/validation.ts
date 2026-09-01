@@ -3,12 +3,11 @@ import {
   PASSWORD_RESET_CODE_LENGTH,
   PASSWORD_RESET_MIN_LENGTH,
 } from './constants';
-
-const PHONE_REGEX = /^\+79\d{9}$/;
+import { PHONE_INCOMPLETE_MESSAGE, PHONE_STORAGE_REGEX } from '@/utils/phone';
 
 export function validatePasswordResetPhone(phone: string): string | null {
-  if (!phone.trim()) return 'Введите номер телефона';
-  if (!PHONE_REGEX.test(phone)) return 'Формат: +79XXXXXXXXX';
+  if (!phone.trim() || phone.trim() === '+7') return 'Введите номер телефона';
+  if (!PHONE_STORAGE_REGEX.test(phone)) return PHONE_INCOMPLETE_MESSAGE;
   return null;
 }
 

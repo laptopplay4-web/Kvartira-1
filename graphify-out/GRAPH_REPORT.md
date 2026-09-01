@@ -1,11 +1,11 @@
 # Graph Report - Kvartira 1  (2026-09-02)
 
 ## Corpus Check
-- 335 files · ~138,520 words
+- 336 files · ~139,123 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2131 nodes · 2256 edges · 317 communities (206 shown, 111 thin omitted)
+- 2139 nodes · 2265 edges · 318 communities (207 shown, 111 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 78 edges (avg confidence: 0.58)
 - Token cost: 0 input · 0 output
 
@@ -260,7 +260,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (317 total, 111 thin omitted)
+## Communities (318 total, 111 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -572,11 +572,11 @@ Nodes (4): MIGRATION, REQUIRED_COLLECTIONS, ROOT, SCHEMA_DOC
 
 ### Community 226 - "kvartiraAuth.js"
 Cohesion: 0.07
-Nodes (20): getClientIp(), getDeviceLabel(), isValidPhone(), normalizePhone(), phoneToEmail(), recordLoginAttempt(), trimLoginHistory(), PURPOSES (+12 more)
+Nodes (21): getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone(), phoneToEmail(), recordLoginAttempt(), trimLoginHistory() (+13 more)
 
 ### Community 227 - "pocketbaseAuth.test.ts"
-Cohesion: 0.33
-Nodes (5): AUTH_HOOK, AUTH_LIB, AUTH_MIGRATION, ROOT, SCHEMA_DOC
+Cohesion: 0.18
+Nodes (10): AUTH_HOOK, AUTH_LIB, AUTH_MIGRATION, BOOL_MIGRATION, FORGOT_PAGE, LOGIN_PAGE, REGISTER_PAGE, ROOT (+2 more)
 
 ### Community 230 - "providers.tsx"
 Cohesion: 0.47
@@ -683,8 +683,8 @@ Cohesion: 0.33
 Nodes (4): BackLinkProps, backNavButtonClassName, backNavIconButtonClassName, defaultClassName
 
 ### Community 303 - "phone.ts"
-Cohesion: 0.33
-Nodes (7): digitsToStoredPhone(), extractPhoneDigits(), formatPhoneDisplay(), PHONE_DIGITS_LENGTH, PHONE_DISPLAY_PLACEHOLDER, PHONE_STORAGE_REGEX, storedPhoneToDisplay()
+Cohesion: 0.29
+Nodes (8): digitsToStoredPhone(), extractPhoneDigits(), formatPhoneDisplay(), PHONE_DIGITS_LENGTH, PHONE_DISPLAY_PLACEHOLDER, PHONE_INCOMPLETE_MESSAGE, PHONE_STORAGE_REGEX, storedPhoneToDisplay()
 
 ### Community 308 - "AssignmentContentEditor.tsx"
 Cohesion: 0.40
@@ -707,21 +707,21 @@ Cohesion: 0.40
 Nodes (3): assertSchoolSettingsAccess(), getRequesterUser(), pocketbaseSchoolSettingsApi
 
 ## Knowledge Gaps
-- **785 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+780 more)
+- **791 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+786 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **111 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
-  _High betweenness centrality (0.003) - this node is a cross-community bridge._
-- **Why does `AuthApi` connect `AuthApi` to `types.ts`?**
-  _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **Why does `LessonsApi` connect `LessonsApi` to `types.ts`?**
-  _High betweenness centrality (0.001) - this node is a cross-community bridge._
+  _High betweenness centrality (0.002) - this node is a cross-community bridge._
+- **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
+  _High betweenness centrality (0.002) - this node is a cross-community bridge._
+- **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
+  _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _785 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _791 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

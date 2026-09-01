@@ -32,8 +32,8 @@ describe('profile validation', () => {
   });
 
   it('validates phone format', () => {
-    expect(validateUpdateProfileInput({ phone: '123' })).toContain('Формат');
-    expect(validateUpdateProfileInput({ phone: '+78001234567' })).toContain('Формат');
+    expect(validateUpdateProfileInput({ phone: '123' })).toContain('Введите номер полностью');
+    expect(validateUpdateProfileInput({ phone: '+78001234567' })).toContain('Введите номер полностью');
   });
 
   it('accepts valid fields', () => {

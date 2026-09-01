@@ -27,6 +27,7 @@ describe('phone utils', () => {
     expect(digitsToStoredPhone('79991234567')).toBe('+79991234567');
     expect(digitsToStoredPhone('7')).toBe('+7');
     expect(storedPhoneToDisplay('+79991234567')).toBe('+7 (999) 123-45-67');
+    expect(storedPhoneToDisplay('+7')).toBe('');
   });
 
   it('validates complete phone', () => {

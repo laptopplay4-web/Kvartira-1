@@ -75,6 +75,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
         inputMode="numeric"
         autoComplete="tel"
         placeholder={PHONE_DISPLAY_PLACEHOLDER}
+        maxLength={PHONE_DISPLAY_PLACEHOLDER.length}
         value={displayValue}
         onChange={handleChange}
         onPaste={handlePaste}

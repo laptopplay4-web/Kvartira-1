@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { Logo } from '@/components/ui/Logo';
-import { PHONE_DISPLAY_PLACEHOLDER, PHONE_STORAGE_REGEX } from '@/utils/phone';
+import { PHONE_INCOMPLETE_MESSAGE, PHONE_STORAGE_REGEX } from '@/utils/phone';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
@@ -16,9 +16,7 @@ import { AUTH_PASSWORD_MIN_LENGTH } from '@/services/auth/constants';
 
 const schema = z
   .object({
-    phone: z
-      .string()
-      .regex(PHONE_STORAGE_REGEX, `Введите номер полностью: ${PHONE_DISPLAY_PLACEHOLDER}`),
+    phone: z.string().regex(PHONE_STORAGE_REGEX, PHONE_INCOMPLETE_MESSAGE),
     password: z
       .string()
       .min(AUTH_PASSWORD_MIN_LENGTH, `Минимум ${AUTH_PASSWORD_MIN_LENGTH} символов`),

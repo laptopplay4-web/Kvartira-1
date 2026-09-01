@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AdminRoute } from '@/app/layouts';
+import { AdminRoute, GuestRoute } from '@/app/layouts';
 import type { User } from '@/types';
 
 const adminUser: User = {
@@ -29,6 +29,25 @@ vi.mock('@/stores/authStore', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: undefined }),
 }));
+
+describe('GuestRoute', () => {
+  it('redirects authenticated user from landing to /home', () => {
+    mockUser = studentUser;
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/home" element={<div>Home</div>} />
+          <Route path="/" element={<GuestRoute />}>
+            <Route index element={<div>Landing</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Home')).toBeInTheDocument();
+    expect(screen.queryByText('Landing')).not.toBeInTheDocument();
+  });
+});
 
 describe('AdminRoute', () => {
   it('allows admin with admin:schedule permission', () => {

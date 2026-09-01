@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { BottomNav, SidebarNav } from '@/components/ui/BottomNav';
+import { MobileHeader } from '@/components/ui/MobileHeader';
 import type { User } from '@/types';
 
 const studentUser: User = {
@@ -40,17 +41,54 @@ describe('BottomNav active state', () => {
     expect(chatLink.className).toMatch(/text-brand/);
     expect(screen.getByRole('link', { name: /Главная/ })).not.toHaveAttribute('aria-current');
   });
+
+  it('highlights lessons on /lessons/availability', () => {
+    render(
+      <MemoryRouter initialEntries={['/lessons/availability']}>
+        <BottomNav chatBadge={0} />
+      </MemoryRouter>,
+    );
+
+    const lessonsLink = screen.getByRole('link', { name: /Занятия/ });
+    expect(lessonsLink).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /Профиль/ })).not.toHaveAttribute('aria-current');
+  });
 });
 
-describe('SidebarNav P1 notifications', () => {
-  beforeEach(() => {
-    mockUser = studentUser;
+describe('MobileHeader active state', () => {
+  it('highlights notifications icon on /notifications', () => {
+    render(
+      <MemoryRouter initialEntries={['/notifications']}>
+        <MobileHeader notifBadge={0} />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link', { name: /Уведомления/ });
+    expect(link).toHaveAttribute('aria-current', 'page');
+    expect(link.className).toMatch(/bg-brand-muted/);
+    expect(link.className).toMatch(/text-brand/);
   });
 
-  it('shows notifications link when unread is 0', () => {
+  it('highlights assignments icon on /assignments sub-routes', () => {
+    render(
+      <MemoryRouter initialEntries={['/assignments/create']}>
+        <MobileHeader showAssignments assignmentsBadge={0} notifBadge={0} />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link', { name: /Домашние задания/ });
+    expect(link).toHaveAttribute('aria-current', 'page');
+    expect(link.className).toMatch(/bg-brand-muted/);
+    expect(link.className).toMatch(/text-brand/);
+    expect(screen.getByRole('link', { name: /Уведомления/ })).not.toHaveAttribute('aria-current');
+  });
+});
+
+describe('MobileHeader notifications bell', () => {
+  it('shows notifications bell link when unread is 0', () => {
     render(
       <MemoryRouter>
-        <SidebarNav chatBadge={0} notifBadge={0} />
+        <MobileHeader notifBadge={0} />
       </MemoryRouter>,
     );
 
@@ -62,13 +100,64 @@ describe('SidebarNav P1 notifications', () => {
   it('shows unread badge only when unread > 0', () => {
     render(
       <MemoryRouter>
-        <SidebarNav chatBadge={0} notifBadge={3} />
+        <MobileHeader notifBadge={3} />
       </MemoryRouter>,
     );
 
-    const link = screen.getByRole('link', { name: /Уведомления/ });
+    const link = screen.getByRole('link', { name: /Уведомления, 3 непрочитанных/ });
     expect(link).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
+  });
+});
+
+describe('MobileHeader assignments icon', () => {
+  it('shows assignments link when enabled', () => {
+    render(
+      <MemoryRouter>
+        <MobileHeader showAssignments assignmentsBadge={0} notifBadge={0} />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link', { name: /Домашние задания/ });
+    expect(link).toHaveAttribute('href', '/assignments');
+    expect(link.querySelector('.rounded-full.bg-brand')).toBeNull();
+  });
+
+  it('hides assignments link by default', () => {
+    render(
+      <MemoryRouter>
+        <MobileHeader notifBadge={0} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('link', { name: /Домашние задания/ })).not.toBeInTheDocument();
+  });
+
+  it('shows assignments badge when pending > 0', () => {
+    render(
+      <MemoryRouter>
+        <MobileHeader showAssignments assignmentsBadge={2} notifBadge={0} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: /Домашние задания, 2 материалов/ })).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+});
+
+describe('SidebarNav has no notifications nav item', () => {
+  beforeEach(() => {
+    mockUser = studentUser;
+  });
+
+  it('does not render notifications link in sidebar', () => {
+    render(
+      <MemoryRouter>
+        <SidebarNav chatBadge={0} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('link', { name: /Уведомления/ })).not.toBeInTheDocument();
   });
 });
 
@@ -80,7 +169,7 @@ describe('SidebarNav active state', () => {
   it('marks current page with aria-current', () => {
     render(
       <MemoryRouter initialEntries={['/lessons']}>
-        <SidebarNav chatBadge={0} notifBadge={0} />
+        <SidebarNav chatBadge={0} />
       </MemoryRouter>,
     );
 
@@ -98,7 +187,7 @@ describe('SidebarNav admin active state', () => {
   it('highlights admin link on admin sub-routes', () => {
     render(
       <MemoryRouter initialEntries={['/admin/schedule']}>
-        <SidebarNav chatBadge={0} notifBadge={0} />
+        <SidebarNav chatBadge={0} />
       </MemoryRouter>,
     );
 

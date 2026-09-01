@@ -25,7 +25,7 @@ export default function LegalDocumentDetailPage() {
     <div className="min-h-dvh">
       <header className="border-b border-border-subtle px-4 py-4">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
-          <BackLink label="Документы" fallbackTo="/legal" className="mb-0 flex items-center gap-1 text-sm focus-ring rounded" />
+          <BackLink label="Документы" fallbackTo="/legal" className="mb-0" />
           <Logo size="sm" />
           {user ? (
             <Link to="/profile/legal" className="text-sm text-brand hover:underline">

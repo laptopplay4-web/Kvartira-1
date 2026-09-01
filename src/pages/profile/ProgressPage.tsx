@@ -114,7 +114,7 @@ function ProgressDashboard({
               label="Посещаемость"
               value={summary.attendanceRate !== null ? `${summary.attendanceRate}%` : '—'}
             />
-            <StatCard label="ДЗ проверено" value={summary.assignmentsReviewed} />
+            <StatCard label="Материалов ДЗ" value={summary.assignmentsTotal} />
           </div>
           {summary.attendanceRate !== null ? (
             <p className="mt-3 text-caption text-text-muted">

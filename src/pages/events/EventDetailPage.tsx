@@ -91,7 +91,7 @@ export default function EventDetailPage() {
 
   return (
     <div className="page-container max-w-lg">
-      <BackLink label="К мероприятиям" fallbackTo="/events" className="mb-4 flex items-center gap-1 text-sm focus-ring rounded" />
+      <BackLink label="К мероприятиям" fallbackTo="/events" />
 
       {event.imageUrl && (
         <img

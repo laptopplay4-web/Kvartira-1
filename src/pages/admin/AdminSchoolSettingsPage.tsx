@@ -75,7 +75,10 @@ export default function AdminSchoolSettingsPage() {
   if (loadError) {
     return (
       <div className="page-container">
-        <ErrorState onRetry={() => refetch()} />
+        <ErrorState
+          message={loadError instanceof ApiError ? loadError.message : undefined}
+          onRetry={() => refetch()}
+        />
       </div>
     );
   }

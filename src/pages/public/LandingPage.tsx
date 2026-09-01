@@ -1,8 +1,5 @@
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
-import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PublicLandingContent } from '@/components/public/PublicLandingContent';
@@ -27,24 +24,10 @@ function LandingSkeleton() {
 }
 
 export default function LandingPage() {
-  const user = useCurrentUser();
-
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['public', 'landing'],
     queryFn: () => api.public.getLandingData(),
-    enabled: !user,
   });
-
-  if (user) {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center px-4 text-center">
-        <p className="text-body text-text-secondary">Вы уже вошли</p>
-        <Link to="/home">
-          <Button className="mt-4">Перейти в приложение</Button>
-        </Link>
-      </div>
-    );
-  }
 
   if (isLoading) return <LandingSkeleton />;
 

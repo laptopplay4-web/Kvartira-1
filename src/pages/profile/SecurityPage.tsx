@@ -1,20 +1,19 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { BackLink } from '@/components/ui/BackLink';
+import { ru } from 'date-fns/locale';
 import {
   KeyRound,
   Laptop,
   LogOut,
   MonitorSmartphone,
-  ShieldAlert,
   History,
 } from 'lucide-react';
 import { useAuthStore, useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { can } from '@/permissions';
-import { SECURITY_ALERT_LABELS } from '@/services/security/helpers';
 import { validateChangePasswordInput } from '@/services/security/validation';
+import { LOGIN_HISTORY_UI_LIMIT } from '@/services/security/constants';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import { Button } from '@/components/ui/Button';
@@ -32,6 +31,11 @@ function StatCard({ label, value, loading }: { label: string; value: string | nu
       <p className="mt-1 text-h2">{value}</p>
     </Card>
   );
+}
+
+function formatLastLogin(value?: string): string {
+  if (!value) return '—';
+  return format(new Date(value), 'd MMM, HH:mm', { locale: ru });
 }
 
 export default function SecurityPage() {
@@ -80,17 +84,6 @@ export default function SecurityPage() {
     enabled,
   });
 
-  const {
-    data: alerts,
-    isLoading: alertsLoading,
-    error: alertsError,
-    refetch: refetchAlerts,
-  } = useQuery({
-    queryKey: ['security', 'alerts', user.id],
-    queryFn: () => api.security.getSecurityAlerts(user.id),
-    enabled,
-  });
-
   const invalidateSecurity = () => {
     void queryClient.invalidateQueries({ queryKey: ['security'] });
   };
@@ -123,11 +116,6 @@ export default function SecurityPage() {
     onSuccess: invalidateSecurity,
   });
 
-  const markReadMutation = useMutation({
-    mutationFn: (alertId: string) => api.security.markAlertRead(alertId, user.id),
-    onSuccess: invalidateSecurity,
-  });
-
   const handleChangePassword = () => {
     if (!isOnline) return;
     const validationError = validateChangePasswordInput({
@@ -143,25 +131,22 @@ export default function SecurityPage() {
     changePasswordMutation.mutate();
   };
 
-  const otherSessions = sessions?.filter((s) => !s.isCurrent) ?? [];
-
   return (
-    <div className="page-container max-w-lg">
-      <BackLink label="Профиль" fallbackTo="/profile" className="mb-4 flex items-center gap-1 text-sm focus-ring rounded" />
-
-      <header className="mb-6">
-        <h1 className="text-h1">Безопасность</h1>
-        <p className="mt-1 text-body-sm text-text-secondary">
-          Пароль, активные сессии и история входов
-        </p>
-      </header>
+    <div>
+      <p className="mb-6 text-body-sm text-text-secondary">
+        Пароль, активные сессии и история входов
+      </p>
 
       {overviewError ? (
         <ErrorState message="Не удалось загрузить обзор" onRetry={() => refetchOverview()} className="mb-6" />
       ) : (
         <div className="mb-6 grid grid-cols-2 gap-3">
           <StatCard label="Активные сессии" value={overview?.activeSessions ?? 0} loading={overviewLoading} />
-          <StatCard label="Оповещения" value={overview?.unreadAlerts ?? 0} loading={overviewLoading} />
+          <StatCard
+            label="Последний вход"
+            value={formatLastLogin(overview?.lastLoginAt)}
+            loading={overviewLoading}
+          />
         </div>
       )}
 
@@ -216,23 +201,10 @@ export default function SecurityPage() {
       </section>
 
       <section className="mb-6">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-label">
-            <MonitorSmartphone className="h-4 w-4" aria-hidden />
-            Активные сессии
-          </h2>
-          {otherSessions.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => revokeOthersMutation.mutate()}
-              disabled={!isOnline || revokeOthersMutation.isPending || !token}
-            >
-              <LogOut className="h-4 w-4" aria-hidden />
-              Завершить другие
-            </Button>
-          )}
-        </div>
+        <h2 className="mb-3 flex items-center gap-2 text-label">
+          <MonitorSmartphone className="h-4 w-4" aria-hidden />
+          Активные сессии
+        </h2>
         {sessionsError ? (
           <ErrorState message="Не удалось загрузить сессии" onRetry={() => refetchSessions()} />
         ) : sessionsLoading ? (
@@ -240,70 +212,48 @@ export default function SecurityPage() {
         ) : !sessions?.length ? (
           <EmptyState title="Нет активных сессий" className="py-8" />
         ) : (
-          <Card className="divide-y divide-border-subtle p-0 overflow-hidden">
-            {sessions.map((session) => (
-              <div key={session.id} className="flex items-start gap-3 px-4 py-3">
-                <Laptop className="mt-0.5 h-5 w-5 shrink-0 text-text-muted" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">
-                    {session.deviceLabel}
-                    {session.isCurrent && (
-                      <span className="ml-2 text-caption text-brand">Текущая</span>
-                    )}
-                  </p>
-                  <p className="text-caption text-text-muted">
-                    {session.ipAddress} · {format(new Date(session.lastActiveAt), 'd MMM, HH:mm')}
-                  </p>
+          <Card className="overflow-hidden p-0">
+            <div className="divide-y divide-border-subtle">
+              {sessions.map((session) => (
+                <div key={session.id} className="flex items-start gap-3 px-4 py-3">
+                  <Laptop className="mt-0.5 h-5 w-5 shrink-0 text-text-muted" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">
+                      {session.deviceLabel}
+                      {session.isCurrent && (
+                        <span className="ml-2 text-caption text-brand">Текущая</span>
+                      )}
+                    </p>
+                    <p className="text-caption text-text-muted">
+                      {session.ipAddress} · {format(new Date(session.lastActiveAt), 'd MMM, HH:mm', { locale: ru })}
+                    </p>
+                  </div>
+                  {!session.isCurrent && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => revokeSessionMutation.mutate(session.id)}
+                      disabled={!isOnline || revokeSessionMutation.isPending}
+                    >
+                      Завершить
+                    </Button>
+                  )}
                 </div>
-                {!session.isCurrent && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => revokeSessionMutation.mutate(session.id)}
-                    disabled={!isOnline || revokeSessionMutation.isPending}
-                  >
-                    Завершить
-                  </Button>
-                )}
+              ))}
+            </div>
+            {(sessions?.length ?? 0) > 1 && (
+              <div className="border-t border-border-subtle p-4">
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => revokeOthersMutation.mutate()}
+                  disabled={!isOnline || revokeOthersMutation.isPending || !token}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden />
+                  Закрыть все сессии
+                </Button>
               </div>
-            ))}
-          </Card>
-        )}
-      </section>
-
-      <section className="mb-6">
-        <h2 className="mb-3 flex items-center gap-2 text-label">
-          <ShieldAlert className="h-4 w-4" aria-hidden />
-          Оповещения
-        </h2>
-        {alertsError ? (
-          <ErrorState message="Не удалось загрузить оповещения" onRetry={() => refetchAlerts()} />
-        ) : alertsLoading ? (
-          <Skeleton className="h-24 rounded-xl" />
-        ) : !alerts?.length ? (
-          <EmptyState title="Нет оповещений" description="Здесь появятся важные события безопасности" className="py-8" />
-        ) : (
-          <Card className="divide-y divide-border-subtle p-0 overflow-hidden">
-            {alerts.map((alert) => (
-              <button
-                key={alert.id}
-                type="button"
-                className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface-elevated/50 focus-ring"
-                onClick={() => !alert.read && markReadMutation.mutate(alert.id)}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className={`font-medium ${alert.read ? 'text-text-secondary' : ''}`}>
-                    {alert.title}
-                  </p>
-                  <p className="text-body-sm text-text-muted">{alert.message}</p>
-                  <p className="mt-1 text-caption text-text-muted">
-                    {SECURITY_ALERT_LABELS[alert.type]} ·{' '}
-                    {format(new Date(alert.createdAt), 'd MMM yyyy, HH:mm')}
-                  </p>
-                </div>
-                {!alert.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand" />}
-              </button>
-            ))}
+            )}
           </Card>
         )}
       </section>
@@ -321,7 +271,7 @@ export default function SecurityPage() {
           <EmptyState title="История пуста" className="py-8" />
         ) : (
           <Card className="divide-y divide-border-subtle p-0 overflow-hidden">
-            {loginHistory.map((entry) => (
+            {loginHistory.slice(0, LOGIN_HISTORY_UI_LIMIT).map((entry) => (
               <div key={entry.id} className="px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">{entry.deviceLabel}</p>
@@ -332,7 +282,7 @@ export default function SecurityPage() {
                   </span>
                 </div>
                 <p className="text-caption text-text-muted">
-                  {entry.ipAddress} · {format(new Date(entry.createdAt), 'd MMM yyyy, HH:mm')}
+                  {entry.ipAddress} · {format(new Date(entry.createdAt), 'd MMM yyyy, HH:mm', { locale: ru })}
                 </p>
               </div>
             ))}

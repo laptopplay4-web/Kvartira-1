@@ -218,7 +218,7 @@ export default function AvailabilityPage() {
 
   return (
     <div className="page-container max-w-lg">
-      <BackLink label="Профиль" fallbackTo="/profile" />
+      <BackLink label="Занятия" fallbackTo="/lessons" />
 
       <header className="mb-6">
         <h1 className="text-h1">График работы</h1>

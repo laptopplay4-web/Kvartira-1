@@ -57,6 +57,24 @@ describe('BackLink', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/lessons');
   });
 
+  it('renders with secondary outline styling', () => {
+    window.history.replaceState({ idx: 0 }, '');
+
+    render(
+      <MemoryRouter initialEntries={['/lessons/lesson-1']}>
+        <Routes>
+          <Route path="/lessons/:id" element={<BackLink label="К занятиям" fallbackTo="/lessons" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: /К занятиям/ })).toHaveClass(
+      'bg-surface-elevated',
+      'border-border-subtle',
+      'text-text-secondary',
+    );
+  });
+
   it('uses history back when idx > 0', async () => {
     window.history.replaceState({ idx: 1 }, '');
     const user = userEvent.setup();

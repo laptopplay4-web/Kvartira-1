@@ -12,6 +12,7 @@ import {
   events,
   helpArticles,
   initialAssignments,
+  initialAssignmentGroups,
   initialHistory,
   initialLegalDocuments,
   initialLessons,
@@ -29,6 +30,7 @@ import {
   publicNews,
   publicSchoolInfo,
   skills,
+  studentDirections,
   teacherAvailabilities,
   teacherDirections,
   users,
@@ -81,7 +83,9 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
   for (const user of users) {
     const password = passwordForPhone(user.phone);
     const seedDirectionIds =
-      user.role === 'teacher' ? ids.remapIds(teacherDirections[user.id] ?? []) : [];
+      user.role === 'teacher'
+        ? ids.remapIds(teacherDirections[user.id] ?? [])
+        : ids.remapIds(studentDirections[user.id] ?? []);
     const rec = await client.createRecord('users', {
       email: phoneToEmail(user.phone),
       password,
@@ -252,20 +256,27 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
   counts.events = events.length;
   counts.event_registrations = registrationCount;
 
+  // ── Assignment groups ──────────────────────────────────────────────────
+  for (const group of initialAssignmentGroups) {
+    const rec = await client.createRecord('assignment_groups', {
+      name: group.name,
+      teacher: ids.get(group.teacherId),
+      memberIds: group.memberIds.map((id) => ids.get(id)).filter(Boolean),
+    });
+    await patchRecordTimestamps(client, 'assignment_groups', rec.id, group.createdAt, group.updatedAt);
+    ids.set(group.id, rec.id);
+  }
+  counts.assignment_groups = initialAssignmentGroups.length;
+
   // ── Assignments ────────────────────────────────────────────────────────
   for (const asgn of initialAssignments) {
     const rec = await client.createRecord('assignments', {
       title: asgn.title,
       description: asgn.description,
       teacher: ids.get(asgn.teacherId),
-      student: ids.get(asgn.studentId),
-      lesson: asgn.lessonId ? ids.get(asgn.lessonId) : '',
-      dueDate: asgn.dueDate,
-      responseType: asgn.responseType,
-      status: asgn.status,
-      materials: asgn.materials ?? [],
-      submission: asgn.submission ?? null,
-      feedback: asgn.feedback ?? null,
+      group: ids.get(asgn.groupId),
+      dueDate: asgn.dueDate ?? '',
+      contentBlocks: asgn.contentBlocks ?? [],
     });
     await patchRecordTimestamps(client, 'assignments', rec.id, asgn.createdAt, asgn.updatedAt);
     ids.set(asgn.id, rec.id);

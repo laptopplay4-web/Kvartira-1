@@ -79,4 +79,20 @@ export const pocketbaseAuthApi: AuthApi = {
   async getSession() {
     return buildSession();
   },
+
+  async refreshSession() {
+    return withPbError(async () => {
+      const pb = getPocketBase();
+      const userId = pb.authStore.record?.id;
+      if (!pb.authStore.isValid || !userId || !pb.authStore.token) return null;
+
+      const record = await pb.collection('users').getOne(userId);
+      const session: AuthSession = {
+        user: mapUserRecord(record),
+        token: pb.authStore.token,
+      };
+      setPocketBaseAuth(session.token, session.user);
+      return session;
+    });
+  },
 };

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PROGRESS_FEATURE_ENABLED } from '@/config/features';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -109,7 +110,6 @@ const progressSummary = {
   lessonsMissed: 1,
   lessonsCancelled: 0,
   attendanceRate: 75,
-  assignmentsReviewed: 1,
   assignmentsTotal: 2,
   activeGoals: 1,
   completedGoals: 1,
@@ -537,7 +537,7 @@ describe('HomePage Admin P1', () => {
   });
 });
 
-describe('HomePage progress block', () => {
+describe.skipIf(!PROGRESS_FEATURE_ENABLED)('HomePage progress block', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetDirections.mockResolvedValue([{ id: 'dir-1', name: 'Фортепиано' }]);
@@ -601,17 +601,39 @@ describe('HomePage progress block', () => {
   });
 });
 
+describe.skipIf(PROGRESS_FEATURE_ENABLED)('HomePage progress block hidden', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetDirections.mockResolvedValue([{ id: 'dir-1', name: 'Фортепиано' }]);
+    mockGetTeachers.mockResolvedValue([teacherUser]);
+    mockGetEvents.mockResolvedValue([]);
+    mockProgressDefaults();
+    mockAssignmentsDefaults();
+  });
+
+  it('student does not fetch or show progress when feature is disabled', async () => {
+    mockUser = studentUser;
+    mockGetLessons.mockResolvedValue([
+      { ...lesson, studentId: studentUser.id, teacherId: teacherUser.id },
+    ]);
+
+    renderHome();
+
+    await screen.findByRole('heading', { name: formatUserName(teacherUser) });
+    expect(screen.queryByText('Прогресс')).not.toBeInTheDocument();
+    expect(mockGetProgressSummary).not.toHaveBeenCalled();
+  });
+});
+
 describe('HomePage assignments block', () => {
   const pendingAssignment = {
     id: 'asgn-home-1',
     title: 'Дыхательная гимнастика',
     description: 'Упражнения',
     teacherId: teacherUser.id,
-    studentId: studentUser.id,
+    groupId: 'grp-vocalists',
     dueDate: '2099-06-15',
-    responseType: 'text' as const,
-    status: 'assigned' as const,
-    materials: [],
+    contentBlocks: [{ id: 'blk-1', type: 'text' as const, order: 0, text: 'Текст' }],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
   };
@@ -630,16 +652,7 @@ describe('HomePage assignments block', () => {
     mockGetLessons.mockResolvedValue([
       { ...lesson, studentId: studentUser.id, teacherId: teacherUser.id },
     ]);
-    mockGetAssignments.mockResolvedValue([
-      pendingAssignment,
-      {
-        ...pendingAssignment,
-        id: 'asgn-reviewed',
-        title: 'Проверенное',
-        status: 'reviewed',
-        feedback: { text: 'Ok', createdAt: '2024-01-01' },
-      },
-    ]);
+    mockGetAssignments.mockResolvedValue([pendingAssignment]);
 
     renderHome();
 
@@ -648,7 +661,6 @@ describe('HomePage assignments block', () => {
     const allLinks = screen.getAllByRole('link', { name: 'Все' });
     expect(allLinks.some((link) => link.getAttribute('href') === '/assignments')).toBe(true);
     expect(mockGetAssignments).toHaveBeenCalledWith({ requesterId: studentUser.id });
-    expect(screen.queryByText('Проверенное')).not.toBeInTheDocument();
   });
 
   it('shows ErrorState on assignments error without blocking lessons', async () => {

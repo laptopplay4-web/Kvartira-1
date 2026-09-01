@@ -74,7 +74,7 @@ export default function HelpTicketDetailPage() {
   return (
     <div className="page-container max-w-lg">
       <div className="mb-6">
-        <BackLink label="Помощь" fallbackTo="/profile/help" className="mb-0 flex items-center gap-1 text-sm focus-ring rounded" />
+        <BackLink label="Помощь" fallbackTo="/profile/help" className="mb-0" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">

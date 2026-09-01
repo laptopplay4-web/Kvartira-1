@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.73 Production Roadmap · 2026-09-01
+Версия: 1.90 Production Roadmap · 2026-09-02
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -56,7 +56,7 @@ Types + Mocks (src/types/*, src/mocks/seed.ts)
 - RBAC: `can(user, permission)` в `src/permissions/index.ts`.
 - Слоты: `calculateAvailableSlots()` в `src/services/slots/calculateSlots.ts` (перерывы, занятость, прошедшее время).
 - Доступ к занятиям: `canViewLesson` / `canRescheduleLesson` / `canCancelLesson` в `src/services/lessons/access.ts`.
-- Доступность преподавателя: `validateTeacherAvailability()` + `AvailabilityApi` в mock; UI `/profile/availability`.
+- Доступность преподавателя: `validateTeacherAvailability()` + `AvailabilityApi` в mock; UI `/lessons/availability` (redirect с `/profile/availability`).
 - Double-booking: `withBookingLock` + `slotsConflict` в mock API.
 - Календарь: единый `LessonCalendar` (day/week/month) → `getLessons({ from, to, requesterId })`; слоты только в booking через `calculateAvailableSlots`.
 - Чат: `ChatPage` (messenger layout) → `ChatApi` → `canAccessConversation` / IDOR в mock; unread через `ConversationMember.lastReadAt`; optimistic send через TanStack Query.
@@ -83,7 +83,7 @@ kvartira/
 │   │   ├── lessons/             # LessonsPage, BookLessonPage, LessonDetailPage
 │   │   ├── chat/                # ChatPage (list + active conversation)
 │   │   ├── events/              # EventsPage, EventDetailPage
-│   │   ├── profile/             # ProfilePage, SettingsPage, AvailabilityPage, ProgressPage, HelpPage
+│   │   ├── profile/             # ProfilePage, settings/*, AvailabilityPage, ProgressPage, HelpPage, SecurityPage
 │   │   ├── notifications/       # NotificationsPage
 │   │   ├── legal/               # LegalDocumentsPage, LegalDocumentDetailPage
 │   │   └── admin/               # AdminSchedule, AdminUsers, AdminLegal
@@ -168,6 +168,7 @@ kvartira/
 | `src/services/api/pocketbase/legal.ts` | PocketBase LegalApi (фаза 2.8) |
 | `src/services/api/pocketbase/security.ts` | PocketBase SecurityApi (фаза 2.9) |
 | `src/services/api/pocketbase/notifications.ts` | PocketBase NotificationsApi (фаза 2.10) |
+| `src/services/api/pocketbase/schoolSettings.ts` | PocketBase SchoolSettingsApi (admin `/admin/school`) |
 | `src/services/availability/validateAvailability.ts` | Валидация расписания, перерывов, интервала |
 | `src/services/availability/formHelpers.ts` | Конвертация TeacherAvailability ↔ форма UI |
 | `src/components/calendar/LessonCalendar.tsx` | Единый календарь: day/week/month, навигация, role-aware |
@@ -179,15 +180,19 @@ kvartira/
 | `src/components/availability/AvailabilityIntervalModal.tsx` | Модалка интервала между занятиями |
 | `src/services/slots/calculateSlots.ts` | Алгоритм доступных слотов |
 | `src/permissions/index.ts` | RBAC матрица + `can()` |
-| `src/stores/authStore.ts` | Сессия, login, demoLogin, `queryClient.clear()` |
+| `src/stores/authStore.ts` | Сессия, login, demoLogin, `syncSession`, `queryClient.clear()` |
+| `src/hooks/useAuthSessionSync.ts` | PB realtime + focus: автообновление роли/профиля без relogin |
 | `src/app/queryClient.ts` | Singleton QueryClient для Provider и auth cache isolation |
+| `src/config/features.ts` | Feature flags (`PROGRESS_FEATURE_ENABLED`, `isProgressFeatureEnabled`) |
 | `src/mocks/seed.ts` | Demo users, lessons, chats, events |
 | `src/app/layouts.tsx` | App shell, ProtectedRoute, AdminRoute |
 | `src/components/ui/Logo.tsx` | Логотип `/assets/logo.png` |
-| `src/components/ui/MobileHeader.tsx` | Mobile shell: logo + notifications |
+| `src/components/ui/PhoneInput.tsx` | Маска телефона +7 (999) 999-99-99; paste; только цифры |
+| `src/utils/phone.ts` | `formatPhoneDisplay`, `extractPhoneDigits`, `PHONE_STORAGE_REGEX` |
+| `src/components/ui/MobileHeader.tsx` | App shell header: logo (mobile) + `/assignments` (BookOpen + badge) + `/notifications` (bell + badge) |
 | `src/hooks/useBackNavigation.ts` | `navigate(-1)` с fallback при отсутствии history |
 | `src/utils/backNavigation.ts` | `canNavigateBack()` — проверка `history.state.idx` |
-| `src/components/ui/BackLink.tsx` | Единая кнопка «назад» для detail/sub-pages |
+| `src/components/ui/BackLink.tsx` | Единая кнопка «назад» + shared outline classes (`surface-elevated` + border) |
 | `src/services/lessons/access.ts` | IDOR-safe access helpers для занятий |
 | `src/components/ui/LessonStatusBadge.tsx` | Единый badge статуса (текст + цвет + иконка) |
 | `src/utils/dates.ts` | Централизованные дата/время + `formatChatListTime`, `formatChatDateSeparator` |
@@ -215,8 +220,8 @@ kvartira/
 
 ## 5. App Shell
 
-- **Mobile:** `MobileHeader` (логотип + колокольчик уведомлений) + `BottomNav` (5 вкладок) + offline banner.
-- **Desktop:** `SidebarNav` (логотип + навигация + «Уведомления» + ссылка Админ) + контент без bottom nav.
+- **Mobile:** `MobileHeader` (логотип + иконка ДЗ + колокольчик уведомлений) + `BottomNav` (5 вкладок) + offline banner.
+- **Desktop:** `SidebarNav` (логотип + навигация + ссылка Админ) + `MobileHeader` (ДЗ + колокольчик справа) + контент без bottom nav.
 - **Guards:** `GuestRoute`, `ProtectedRoute`, `AdminRoute`.
 - **Логотип:** `Logo` component, `object-contain`, без перекраски и растягивания; `logo.png` — PNG с прозрачным фоном (без белого квадрата на тёмной теме).
 
@@ -245,13 +250,15 @@ kvartira/
 
 | Путь | Экран | Guard |
 |------|-------|-------|
-| `/` | Landing | — |
-| `/login`, `/register` | Auth | GuestRoute |
+| `/` | Landing | GuestRoute |
+| `/login`, `/register`, `/forgot-password`, `/reset-password` | Auth | GuestRoute |
 | `/home` | Dashboard | Protected |
-| `/lessons`, `/lessons/book`, `/lessons/:id` | Занятия | Protected |
+| `/lessons`, `/lessons/book`, `/lessons/availability`, `/lessons/:id` | Занятия (+ график работы teacher) | Protected |
 | `/chat`, `/chat/:id` | Чат | Protected |
 | `/events`, `/events/:id` | Мероприятия | Protected |
-| `/profile`, `/profile/settings`, `/profile/security`, `/profile/availability` | Профиль | Protected (availability: teacher) |
+| `/profile`, `/profile/settings/account`, `/profile/settings/system`, `/profile/settings/security` | Профиль / настройки (вкладки) | Protected |
+| `/profile/security` | Redirect → settings/security | Protected |
+| `/profile/availability` | Redirect → `/lessons/availability` | Protected |
 | `/notifications` | Уведомления | Protected |
 | `/admin` | Redirect → `/home` | AdminRoute (внутри AppLayout) |
 | `/admin/schedule`, `/admin/users` | Расписание / Пользователи | AdminRoute + AppLayout |
@@ -391,7 +398,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 
 | Файл | Покрытие |
 |------|----------|
-| `auth.test.ts` | login, demoLogin, password recovery request/reset |
+| `phone.test.ts` | mask display, paste variants, stored format, completeness (4 tests) |
 | `permissions.test.ts` | can(), role guard |
 | `booking.test.ts` | book, double-booking, reschedule, cancel, IDOR |
 | `lessonDetail.test.ts` | materials, chat link, teacherNotes IDOR, updateTeacherNotes, findConversationForLesson (12 tests) |
@@ -401,9 +408,9 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `calendar.test.ts` | date ranges, IDOR filters, booking/reschedule/cancel → calendar data |
 | `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput (16 tests) |
 | `chat.test.ts` | access, send, edit, delete, reply, search, group, mute, pin, attachments, realtime, pagination, IDOR, notifications, cache isolation |
-| `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; Admin Home P1; progress block student-only (26 tests) |
-| `nav.test.tsx` | SidebarNav: notifications link/badge, aria-current, admin active on `/admin/*`; BottomNav active brand highlight (5 tests) |
-| `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back (5 tests) |
+| `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; Admin Home P1; progress block (skipped when UI hidden, §85) (30 tests) |
+| `nav.test.tsx` | MobileHeader assignments + bell link/badge/active state; SidebarNav без notifications; aria-current; admin active on `/admin/*`; BottomNav active brand highlight (11 tests) |
+| `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back + outline style (6 tests) |
 | `routes.test.ts` | основные маршруты (+ `/assignments/create`) |
 | `routes.test.tsx` | admin shell: redirect, AppLayout, nav links, student block, shared users cache, EmptyState (11 tests) |
 | `offline.test.tsx` | BookLessonLink offline; AvailabilityPage save disabled offline (4 tests) |
@@ -411,7 +418,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `progress.test.ts` | access, helpers, summary, achievements, auto-unlock, teacher goals/skills CRUD, attendance (32 tests) |
 | `support.test.ts` | access, FAQ filter/CRUD, validation, tickets search/filters, attachments, IDOR, notifications, permissions (31 tests) |
 | `public.test.ts` | public helpers, API, detail pages, no phone on teachers, event filtering (8 tests) |
-| `security.test.ts` | access, password change, sessions revoke, login history, alerts, IDOR (16 tests) |
+| `security.test.ts` | access, password change, sessions revoke, resolveSecuritySessions, login notifications, IDOR (19 tests) |
 | `legal.test.ts` | access, helpers, pending consents, accept, public docs, permissions, CMS update/publish, IDOR (21 tests) |
 | `pwa.test.tsx` | helpers, banner, usePwaInstall hook (8 tests) |
 | `notificationPreferences.test.ts` | preferences API, helpers, validation, delivery suppression (9 tests) |
@@ -420,11 +427,12 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md coverage (3 tests) |
 | `pocketbaseRbac.test.ts` | PB RBAC migration + kvmartiraRbac.js + RBAC.md coverage (8 tests) |
 | `pocketbaseSeed.test.ts` | PB seed script files, collections coverage, docs (5 tests) |
-| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/progress/support/legal/security/notifications/files/realtime, createApiClient pocketbase mode (41 tests) |
+| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/progress/support/legal/security/notifications/schoolSettings/files/realtime, createApiClient pocketbase mode (47 tests) |
 | `chatRealtime.test.ts` | PB subscription → ChatRealtimeEvent mappers (2 tests) |
 | `webPush.test.ts` | push helpers, subscription API, delivery gating (6 tests) |
+| `authSessionSync.test.ts` | refreshSession API, syncSession cache clear, PB subscribe hook (5 tests) |
 
-**Итого:** 463 tests (35 files).
+**Итого:** 476 tests (37 files; 4 skipped when Progress UI hidden).
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -500,6 +508,20 @@ services/chat/{access,messages,validation,realtime,helpers}
 | PWA | ✅ |
 | Logo integration | ✅ |
 | Production build TypeScript fix | ✅ 2026-09-01, см. §80 |
+| Settings tabs restructure (account/system/security) | ✅ 2026-09-01, см. §81 |
+| Profile logout button (destructive) | ✅ 2026-09-02, см. §82 |
+| Mobile viewport (no pinch-zoom, hidden scrollbar) | ✅ 2026-09-02, см. §83 |
+| Auth redirect landing → /home | ✅ 2026-09-02, см. §84 |
+| Progress UI hidden (feature flag) | ✅ 2026-09-02, см. §85 |
+| Register phone mask + paste | ✅ 2026-09-02, см. §86 |
+| Auth session sync (role refresh) | ✅ 2026-09-02, см. §87 |
+| Notifications nav dedup (bell only) | ✅ 2026-09-02, см. §88 |
+| Security sessions UI + login via notifications | ✅ 2026-09-02, см. §89 |
+| Security sessions isCurrent + dedupe fix | ✅ 2026-09-02, см. §90 |
+| Assignments nav — header icon | ✅ 2026-09-02, см. §91 |
+| Assignments groups + content blocks | ✅ 2026-09-02, см. §92 |
+| Back nav outline style | ✅ 2026-09-02, см. §96 |
+| Admin school settings PB adapter | ✅ 2026-09-02, см. §97 |
 | Production auth + backend | ⏳ |
 
 ---
@@ -1167,7 +1189,7 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 ### UI (✅)
 
 - `/` — `LandingPage`: hero, направления, преподаватели, мероприятия, новости, контакты, CTA login/register.
-- `PublicLandingContent` — секции с loading/error/retry; logged-in → redirect `/home`.
+- `PublicLandingContent` — секции с loading/error/retry; logged-in → `GuestRoute` redirect `/home`.
 
 ### Tests
 
@@ -1333,7 +1355,389 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2041 nodes, 2160 edges, 300 communities (graphify update 2026-09-01 post-§80).
+**Graphify stats:** 2131 nodes, 2256 edges, 318 communities (graphify update 2026-09-02 post-§97).
+
+---
+
+## 98. Availability Route — Lessons Nav Fix (2026-09-02)
+
+**Scope:** график работы подсвечивал «Профиль» в shell nav — URL был `/profile/availability`.
+
+**Graphify:** `LessonsPage()` → `/lessons/availability`; `router.tsx` redirect `/profile/availability`; `AvailabilityPage()` BackLink → `/lessons`.
+
+### Fix (✅)
+
+- Маршрут: `/lessons/availability` → `AvailabilityPage` (до `/lessons/:id`).
+- `/profile/availability` → redirect `/lessons/availability`.
+- `LessonsPage` link + `BackLink` «Занятия» / fallback `/lessons`.
+
+### Tests
+
+`nav.test.tsx` +1 (lessons active on availability) → **473 passed | 4 skipped** (37 files).
+
+---
+
+## 97. Admin School Settings — PocketBase Adapter (2026-09-02)
+
+**Scope:** фикс `/admin/school` в `VITE_API_MODE=pocketbase` — mock `schoolSettings` искал seed user id (`user-admin`), PB auth отдаёт PB id → `NOT_FOUND` / ErrorState.
+
+**Graphify:** `AdminSchoolSettingsPage()` → `SchoolSettingsApi` → `pocketbase/schoolSettings.ts` → `school_settings` collection; `mapSchoolSettingsRecord()` в `mappers.ts`.
+
+### Root cause (✅)
+
+- `createPocketbaseApiClient()` подключал `mockSchoolSettingsApi` с локальным `getUserById` — не резолвит PB user id.
+- `school_settings.getList()` без `sort: '-id'` — PB сортирует по `-created`, поля нет → HTTP 400.
+- Пустая коллекция без `pb:seed` → NOT_FOUND.
+
+### Adapter (✅)
+
+- `pocketbaseSchoolSettingsApi`: `getSchoolSettings` / `updateSchoolSettings` — singleton `school_settings` (`sort: '-id'`); auto-create из `publicSchoolInfo` если записей нет; RBAC через `canManageSchoolSettings` + PB rules.
+- `mapSchoolSettingsRecord` — name/tagline/about + contacts JSON.
+- `createPocketbaseApiClient`: `schoolSettings` → PB; `public` остаётся mock (landing school — отдельный шаг).
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +2 (mapper, createApiClient) → **476 total** (37 files, 4 skipped).
+
+---
+
+## 96. Back Nav Outline Style (2026-09-02)
+
+**Scope:** единое выделение кнопок «назад» — secondary outline (`surface-elevated` + border), **не** как активная shell-навигация.
+
+**Graphify:** `BackLink()` → `backNavButtonClassName`; `ChatHeader()` / `BookLessonPage()` → shared exports.
+
+### UI (✅)
+
+- `BackLink`: `backNavButtonClassName` / `backNavIconButtonClassName` — bordered chip, серый текст, hover → `surface-hover` + `text-primary`.
+- `ChatHeader` mobile back + `BookLessonPage` wizard — те же классы.
+- Отличие от nav: без `bg-brand-muted` / `text-brand`.
+
+### Tests
+
+`backNavigation.test.tsx` +1 (outline class) → **475 total** (37 files, 4 skipped).
+
+---
+
+## 95. MobileHeader Active Nav (2026-09-02)
+
+**Scope:** подсветка иконок ДЗ и уведомлений в `MobileHeader` на активных маршрутах — паттерн `BottomNav` (`bg-brand-muted`, `text-brand`).
+
+**Graphify:** `MobileHeader()` → `NavLink` `/assignments` / `/notifications`; `BottomNav()` → `NavLink` active class.
+
+### UI (✅)
+
+- `MobileHeader`: `Link` → `NavLink` для ДЗ и колокольчика; общий `headerNavLinkClass` с brand active state.
+- `/assignments/*` (create, groups, detail) — активна иконка ДЗ; `/notifications` — колокольчик.
+
+### Tests
+
+`nav.test.tsx` +2 (assignments/notifications active state) → **474 total** (37 files, 4 skipped).
+
+---
+
+## 94. Profile — Remove Availability Nav (2026-09-02)
+
+**Scope:** убрать «График работы» из меню `/profile` — точка входа только на `/lessons` (teacher).
+
+**Graphify:** `ProfilePage()` без availability menu item; `LessonsPage()` → `/profile/availability`.
+
+### UI (✅)
+
+- `ProfilePage`: убран пункт меню «График работы» и импорт `CalendarClock`.
+- `LessonsPage`: кнопка «График работы» без изменений.
+- Маршрут `/profile/availability` и `AvailabilityPage` без изменений.
+
+### Tests
+
+Без новых; **474 total** (37 files, 4 skipped).
+
+---
+
+## 93. Create Assignment UI — Recipients + MP3 (2026-09-02)
+
+**Scope:** форма создания ДЗ — убрать срок; «Получатели» с «Общее задание»; MP3 label; фикс создания группы.
+
+**Graphify:** `CreateAssignmentPage()` → `GENERAL_ASSIGNMENT_GROUP_ID`; `AssignmentGroupsPage()` → `createGroup` без client teacherId filter.
+
+### UI (✅)
+
+- `CreateAssignmentPage`: убран `dueDate`; label **Получатели**; первый пункт **Общее задание** (`grp-general`), затем кастомные группы.
+- `ASSIGNMENT_CONTENT_LABELS.voice` → **MP3**.
+- `AssignmentGroupsPage`: `type="button"`, navigate после create; список без `grp-general`.
+- Срок убран из списка/детали/Home block.
+
+### Domain (✅)
+
+- `services/assignments/groups/helpers.ts` — `GENERAL_ASSIGNMENT_GROUP_ID`, `getAssignmentGroupLabel`, `sortRecipientGroups`.
+- Seed: `grp-general` со всеми учениками.
+- `canViewAssignment` / `canViewAssignmentGroup` — general visible всем студентам и teacher/admin с manage.
+
+### Tests
+
+Без новых; `assignments.test.ts` 22 passed.
+
+---
+
+## 92. Assignments Groups + Content Blocks (2026-09-02)
+
+**Scope:** переработка ДЗ — убраны submit/review/статусы; материалы по группам; блоки voice (MP3) + text + pdf + video.
+
+**Graphify:** `AssignmentGroupsPage()` / `CreateAssignmentPage()` → `AssignmentGroupsApi` + `AssignmentsApi`; `AssignmentContentEditor` / `AssignmentContentView`.
+
+### Модель (✅)
+
+- `AssignmentGroup`: name, teacherId, memberIds[] — teacher/admin управляют участниками.
+- `Assignment`: groupId, contentBlocks[] (voice|text|pdf|video); без status/submission/feedback.
+- Убраны permissions `assignments:submit`, `assignments:review`; добавлен `assignments:manage-groups`.
+
+### API (✅)
+
+- Mock: `assignmentGroups` CRUD + add/remove member; `createAssignment` с contentBlocks; уведомления всем участникам группы.
+- PB: stub NOT_IMPLEMENTED до миграции schema.
+
+### UI (✅)
+
+- `/assignments/groups`, `/assignments/groups/:id` — управление группами.
+- `CreateAssignmentPage` — выбор группы + `AssignmentContentEditor`.
+- `AssignmentDetailPage` — только просмотр материалов (`AssignmentContentView`).
+- Удалены `AssignmentStatusBadge`, submit/review UI.
+
+### Tests
+
+`assignments.test.ts` rewrite → **474 total** (37 files, 4 skipped).
+
+---
+
+## 91. Assignments Nav — Header Icon (2026-09-02)
+
+**Scope:** перенос «Домашние задания» из профиля в `MobileHeader` — иконка `BookOpen` слева от колокольчика уведомлений.
+
+**Graphify:** `MobileHeader()` → `/assignments`; `AppLayout()` → assignments query + badge; `ProfilePage()` без пункта ДЗ.
+
+### UI (✅)
+
+- `MobileHeader`: `showAssignments` + `assignmentsBadge` — иконка `/assignments` рядом с bell (mobile + desktop).
+- `AppLayout`: query `['assignments', userId, role]`; badge — `assigned` (student), `submitted` (teacher), все pending (admin).
+- `ProfilePage`: убран пункт меню «Домашние задания».
+
+### Tests
+
+`nav.test.tsx` +3 (assignments link, hidden by default, badge) → **481 total** (37 files, 4 skipped).
+
+---
+
+## 90. Security Sessions isCurrent + Dedupe Fix (2026-09-02)
+
+**Scope:** фикс «6 сессий / нет кнопок Завершить» — PB bool `isCurrent`, дубли при повторном входе.
+
+**Graphify:** `resolveSecuritySessions()` → `security/helpers.ts` → mock/PB `getSessions`; `markOnlyCurrentSession` → `kvartiraSecurity.js`.
+
+### Domain (✅)
+
+- `resolveSecuritySessions`: dedupe по `deviceLabel` (последняя `lastActiveAt`), ровно одна `isCurrent` (последняя активная при сбое PB bool).
+- Mock `recordAuthLogin`: повторный вход с тем же `deviceLabel` обновляет токен, не плодит сессии.
+
+### PocketBase hooks (✅)
+
+- `markOnlyCurrentSession`: сброс чужих через `isCurrent = null` (обход PB false-blank); только одна текущая после login.
+
+### Tests
+
+`security.test.ts` +2; `pocketbaseAdapter.test.ts` +1 assertion → **478 total** (37 files, 4 skipped).
+
+---
+
+## 89. Security Sessions + Login Notifications (2026-09-02)
+
+**Scope:** управление сессиями на `/profile/settings/security`; убрать блок «Оповещения»; вход/неудачный вход → in-app + push; история входов без изменений.
+
+**Graphify:** `SecurityPage()` → `revokeSession` / `revokeAllOtherSessions`; `recordAuthLogin()` → `tryPushNotification`; PB `kvartiraAuth.js` / `kvartiraSecurity.js` → `createNotificationForUser`.
+
+### UI (✅)
+
+- `SecurityPage`: кнопка «Завершить» на каждой чужой сессии; снизу списка — «Завершить все другие сессии» (destructive, full width).
+- Убран блок «Оповещения» и KPI «Оповещения»; вместо него — «Последний вход».
+- История входов — без изменений.
+
+### Notifications (✅)
+
+- Mock: `recordAuthLogin` / `changePassword` → `tryPushNotification` (`system`, link `/profile/settings/security`).
+- PB hooks: `createNotificationForUser` в `kvartiraNotifications.js`; failed login + new device → `notifications` (+ push via `kvartiraPush.js`).
+- `SecurityOverview`: убрано поле `unreadAlerts`; API `getSecurityAlerts` сохранён для совместимости.
+
+### Tests
+
+`security.test.ts` +2 (login notifications) → **476 total** (37 files, 4 skipped).
+
+---
+
+## 88. Notifications Nav Dedup — Bell Only (2026-09-02)
+
+**Scope:** убрать дублирующие пункты «Уведомления» из навигации — единственная точка входа: колокольчик в правом верхнем углу (`MobileHeader`).
+
+**Graphify:** `MobileHeader()` → `/notifications`; `SidebarNav()` / `ProfilePage()` без notifications link; `AppLayout` → `notifBadge` только в header.
+
+### UI (✅)
+
+- `SidebarNav`: убран пункт «Уведомления» и `notifBadge` prop.
+- `ProfilePage`: убран пункт меню «Уведомления».
+- `MobileHeader`: колокольчик на mobile + desktop (logo только на mobile; desktop — bell справа).
+- `/notifications` page и API без изменений.
+
+### Tests
+
+`nav.test.tsx`: MobileHeader bell tests + SidebarNav no-notifications assertion → **475 total** (37 files, 4 skipped).
+
+---
+
+## 87. Auth Session Sync — Role Refresh (2026-09-02)
+
+**Scope:** смена роли/профиля в PocketBase без перелогина — realtime + refresh on focus.
+
+**Graphify:** `useAuthSessionSync()` → `authStore.syncSession()` → `AuthApi.refreshSession()` → `pocketbase/auth.ts` → PB `users` subscribe.
+
+### API + store (✅)
+
+- `AuthApi.refreshSession()` — `getOne(userId)` + `setPocketBaseAuth`; mock no-op.
+- `authStore.syncSession()` — обновляет Zustand session; `queryClient.clear()` при смене `role`.
+
+### Hook (✅)
+
+- `hooks/useAuthSessionSync.ts` — PB `users` subscribe (`update`); refresh on mount + `window.focus`.
+- `ProtectedRoute` — вызывает hook для всех авторизованных маршрутов.
+
+### Tests
+
+`authSessionSync.test.ts` +5 → **474 total** (37 files, 4 skipped).
+
+---
+
+## 86. Register Phone Mask + Paste (2026-09-02)
+
+**Scope:** маска телефона на регистрации — только цифры, шаблон `+7 (999) 999-99-99`, вставка из буфера.
+
+**Graphify:** `PhoneInput()` → `utils/phone.ts` → `RegisterPage()` → `authStore.register()`.
+
+### Utils + UI (✅)
+
+- `src/utils/phone.ts` — `extractPhoneDigits` (8…/9…/+7…), `formatPhoneDisplay`, `digitsToStoredPhone`, `PHONE_STORAGE_REGEX`.
+- `src/components/ui/PhoneInput.tsx` — controlled mask, `inputMode="numeric"`, `onPaste`, блок букв в `onKeyDown`.
+- `RegisterPage`: `Controller` + `PhoneInput`; API value остаётся `+79XXXXXXXXX`.
+
+### Tests
+
+`phone.test.ts` +4 → **469 total** (36 files, 4 skipped).
+
+---
+
+## 85. Progress UI Hidden — Feature Flag (2026-09-02)
+
+**Scope:** скрыть модуль «Прогресс» из UI приложения; API, домен, PB-адаптер и тесты остаются для возможного возврата.
+
+**Graphify:** `isProgressFeatureEnabled()` → `config/features.ts` → `HomePage()` / `ProfilePage()` / `router.tsx` `/profile/progress`.
+
+### Feature flag (✅)
+
+- `src/config/features.ts` — `PROGRESS_FEATURE_ENABLED = false`, `isProgressFeatureEnabled()`.
+- `HomePage`: блок `HomeProgressBlock` не рендерится.
+- `ProfilePage`: пункт меню «Прогресс» скрыт.
+- `router.tsx`: `/profile/progress` → redirect `/profile` при выключенном флаге.
+
+### Не тронуто (re-enable)
+
+- `ProgressPage`, `components/progress/*`, `services/progress/*`, mock/PB `ProgressApi`, RBAC permissions, achievement unlocks, уведомления с link `/profile/progress`.
+
+### Возврат
+
+Установить `PROGRESS_FEATURE_ENABLED = true` в `src/config/features.ts`.
+
+### Tests
+
+`home.test.tsx`: progress block tests `skipIf(!PROGRESS_FEATURE_ENABLED)`; +1 hidden-state test → **465 total** (35 files, 4 skipped).
+
+---
+
+## 84. Auth Redirect — Landing → Home (2026-09-02)
+
+**Scope:** авторизованный пользователь при открытии `/` сразу попадает на `/home` (без промежуточного экрана «Вы уже вошли»).
+
+**Graphify:** `GuestRoute()` → `router.tsx` `/` nested; `LandingPage()` без `useCurrentUser` redirect UI.
+
+### Fix (✅)
+
+- `router.tsx`: `/` под `GuestRoute` (как `/login`, `/register`).
+- `LandingPage`: убран промежуточный экран и `enabled: !user` на query.
+
+### Tests
+
+`layouts.test.tsx` +1 (GuestRoute redirect from `/`) → **464 total** (35 files).
+
+---
+
+## 83. Mobile Viewport — No Pinch-Zoom + Hidden Scrollbar (2026-09-02)
+
+**Scope:** мобильный UX — отключить pinch-zoom двумя пальцами; скрыть полосу прокрутки справа; запретить выделение текста при долгом нажатии (app-like PWA shell).
+
+**Graphify:** `index.html` viewport meta → `globals.css` `html`/`body` (`touch-action`, `scrollbar-width`, `select-none`, `-webkit-touch-callout`); `.scrollbar-none` utility для горизонтальных списков (`ChatFilters`, `SupportTicketFilters`).
+
+### Fix (✅)
+
+- `index.html`: `maximum-scale=1.0, user-scalable=no` в viewport meta.
+- `globals.css`: `touch-action: manipulation` на `html`; скрытие scrollbar на `html`/`body` (Firefox `scrollbar-width`, WebKit `::-webkit-scrollbar`).
+- `body`: `select-none` + `-webkit-touch-callout: none`; исключение `user-select: text` для `input`/`textarea`/`select`/`[contenteditable]`/`[role='alert']` (ошибки, в т.ч. `ErrorState`).
+- `.scrollbar-none` utility — явное скрытие scrollbar на overflow-контейнерах.
+
+### Tests
+
+Без новых тестов; **463 total** (35 files).
+
+---
+
+## 82. Profile Logout Button (2026-09-02)
+
+**Scope:** кнопка «Выйти» на `/profile` — красная форма в стиле design system (destructive variant).
+
+**Graphify:** `ProfilePage()` → `Button variant="destructive"` → `Button.tsx` destructive tokens (`bg-danger-muted`, `text-danger`, `border-danger/30`).
+
+### UI (✅)
+
+- `ProfilePage`: `variant="destructive"` + `fullWidth` вместо `ghost` + `text-danger`.
+- Паттерн согласован с «Отменить» на `LessonDetailPage` и admin delete actions.
+
+### Tests
+
+Без новых тестов; **463 total** (35 files).
+
+---
+
+## 81. Settings Tabs Restructure (2026-09-01)
+
+**Scope:** реорганизация настроек — вкладки в `/profile/settings`; график работы и аватар только в профиле; безопасность только в настройках.
+
+**Graphify:** `SettingsLayout()` → `AccountSettingsPage` / `SystemSettingsPage` / `SecurityPage`; `ProfilePage()` — avatar + menu без security.
+
+### Routes (✅)
+
+- `/profile/settings` → `SettingsLayout` + redirect index → `account`.
+- `/profile/settings/account` — имя, фамилия, телефон (без аватара).
+- `/profile/settings/system` — оформление (тема) + push-уведомления.
+- `/profile/settings/security` — `SecurityPage` (embedded, без отдельного header/back).
+- `/profile/security` → redirect `/profile/settings/security`.
+
+### Profile (✅)
+
+- Аватар — только на `/profile` (header).
+- «График работы» — кнопка на `/lessons` (teacher), не в меню профиля.
+- Убрана ссылка «Безопасность» из профиля.
+
+### Removed
+
+- `SettingsPage.tsx` (монолит) — заменён на `pages/profile/settings/*`.
+
+### Tests
+
+`routes.test.ts` — nested path collector + settings routes; **463 total** (35 files).
 
 ---
 

@@ -25,8 +25,7 @@ export type Permission =
   | 'assignments:view-assigned'
   | 'assignments:view-all'
   | 'assignments:create'
-  | 'assignments:submit'
-  | 'assignments:review'
+  | 'assignments:manage-groups'
   | 'progress:view-own'
   | 'progress:view-assigned'
   | 'progress:view-all'
@@ -67,7 +66,6 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'events:view',
     'events:register',
     'assignments:view-own',
-    'assignments:submit',
     'progress:view-own',
     'profile:view-own',
     'profile:edit-own',
@@ -101,7 +99,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'events:manage',
     'assignments:view-assigned',
     'assignments:create',
-    'assignments:review',
+    'assignments:manage-groups',
     'progress:view-assigned',
     'progress:manage-goals',
     'progress:manage-skills',
@@ -137,6 +135,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'events:register',
     'events:manage',
     'assignments:view-all',
+    'assignments:create',
+    'assignments:manage-groups',
     'progress:view-all',
     'progress:manage-goals',
     'progress:manage-skills',

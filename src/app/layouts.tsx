@@ -7,6 +7,7 @@ import { can, type Permission } from '@/permissions';
 import { api } from '@/services/api';
 import { WifiOff } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useAuthSessionSync } from '@/hooks/useAuthSessionSync';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { PwaInstallBanner } from '@/components/ui/PwaInstallBanner';
 
@@ -33,11 +34,29 @@ export function AppLayout() {
 
   const notifBadge = notifications?.filter((n) => !n.read).length ?? 0;
 
+  const showAssignments =
+    !!user &&
+    (can(user, 'assignments:view-own') ||
+      can(user, 'assignments:view-assigned') ||
+      can(user, 'assignments:view-all'));
+
+  const { data: assignments } = useQuery({
+    queryKey: ['assignments', user?.id, user?.role],
+    queryFn: () => api.assignments.getAssignments({ requesterId: user!.id }),
+    enabled: showAssignments,
+  });
+
+  const assignmentsBadge = user?.role === 'student' ? (assignments?.length ?? 0) : 0;
+
   return (
     <div className="flex min-h-dvh min-w-0 overflow-x-hidden">
-      <SidebarNav chatBadge={chatBadge} notifBadge={notifBadge} />
+      <SidebarNav chatBadge={chatBadge} />
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-hidden">
-        <MobileHeader notifBadge={notifBadge} />
+        <MobileHeader
+          showAssignments={showAssignments}
+          assignmentsBadge={assignmentsBadge}
+          notifBadge={notifBadge}
+        />
         {!isOnline && (
           <div
             role="status"
@@ -66,6 +85,7 @@ export function AppLayout() {
 
 export function ProtectedRoute({ children }: { children?: React.ReactNode }) {
   const user = useCurrentUser();
+  useAuthSessionSync(user?.id);
   if (!user) return <Navigate to="/login" replace />;
   return children ? <>{children}</> : <Outlet />;
 }

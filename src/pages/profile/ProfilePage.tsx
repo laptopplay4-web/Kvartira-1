@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Settings, Bell, Shield, LogOut, ChevronRight, CalendarClock, BookOpen, TrendingUp, HelpCircle, Lock, FileText } from 'lucide-react';
+import { Settings, Shield, LogOut, ChevronRight, TrendingUp, HelpCircle, FileText } from 'lucide-react';
+import { isProgressFeatureEnabled } from '@/config/features';
 import { useCurrentUser, useAuthStore } from '@/stores/authStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAvatarMutations } from '@/hooks/useAvatarMutations';
@@ -17,27 +18,16 @@ export default function ProfilePage() {
 
   const menuItems = [
     { to: '/profile/settings', icon: Settings, label: 'Настройки' },
-    ...(can(user, 'availability:manage') && user.role === 'teacher'
-      ? [{ to: '/profile/availability', icon: CalendarClock, label: 'График работы' }]
-      : []),
-    ...(can(user, 'assignments:view-own') ||
-    can(user, 'assignments:view-assigned') ||
-    can(user, 'assignments:view-all')
-      ? [{ to: '/assignments', icon: BookOpen, label: 'Домашние задания' }]
-      : []),
-    ...(can(user, 'progress:view-own') ||
-    can(user, 'progress:view-assigned') ||
-    can(user, 'progress:view-all')
+    ...(isProgressFeatureEnabled() &&
+    (can(user, 'progress:view-own') ||
+      can(user, 'progress:view-assigned') ||
+      can(user, 'progress:view-all'))
       ? [{ to: '/profile/progress', icon: TrendingUp, label: 'Прогресс' }]
       : []),
     ...(can(user, 'support:view-faq') ? [{ to: '/profile/help', icon: HelpCircle, label: 'Помощь' }] : []),
-    ...(can(user, 'security:view-own')
-      ? [{ to: '/profile/security', icon: Lock, label: 'Безопасность' }]
-      : []),
     ...(can(user, 'legal:view-own')
       ? [{ to: '/profile/legal', icon: FileText, label: 'Документы и согласия' }]
       : []),
-    { to: '/notifications', icon: Bell, label: 'Уведомления' },
     ...(can(user, 'admin:access')
       ? [{ to: '/home', icon: Shield, label: 'Администрирование' }]
       : []),
@@ -79,7 +69,7 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      <Button variant="ghost" className="mt-8 w-full text-danger" onClick={() => logout()}>
+      <Button variant="destructive" fullWidth className="mt-8" onClick={() => logout()}>
         <LogOut className="h-4 w-4" aria-hidden />
         Выйти
       </Button>

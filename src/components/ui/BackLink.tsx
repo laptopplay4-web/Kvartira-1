@@ -8,8 +8,14 @@ interface BackLinkProps {
   className?: string;
 }
 
-const defaultClassName =
-  'mb-4 flex min-h-11 items-center gap-1 rounded text-sm text-text-secondary hover:text-brand focus-ring';
+/** Secondary outline — distinct from shell nav active highlight. */
+export const backNavButtonClassName =
+  'inline-flex min-h-11 items-center gap-1 rounded-lg border border-border-subtle bg-surface-elevated px-3 py-2 text-sm font-medium text-text-secondary transition-colors focus-ring hover:border-border hover:bg-surface-hover hover:text-text-primary active:scale-[0.98]';
+
+export const backNavIconButtonClassName =
+  'flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-elevated text-text-secondary transition-colors focus-ring hover:border-border hover:bg-surface-hover hover:text-text-primary active:scale-[0.98]';
+
+const defaultClassName = cn('mb-4', backNavButtonClassName);
 
 export function BackLink({ label, fallbackTo, className }: BackLinkProps) {
   const goBack = useBackNavigation(fallbackTo);

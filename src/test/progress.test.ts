@@ -97,10 +97,7 @@ describe('progress helpers', () => {
         { studentId: 'user-student', status: 'completed', date: '2020-01-01', startTime: '10:00' } as never,
         { studentId: 'user-student', status: 'scheduled', date: '2099-01-01', startTime: '10:00' } as never,
       ],
-      assignments: [
-        { studentId: 'user-student', status: 'reviewed' } as never,
-        { studentId: 'user-student', status: 'assigned' } as never,
-      ],
+      assignments: [{ studentId: 'user-student' } as never, { studentId: 'user-student' } as never],
       goals: [
         { studentId: 'user-student', status: 'active' } as never,
         { studentId: 'user-student', status: 'completed' } as never,
@@ -116,7 +113,7 @@ describe('progress helpers', () => {
     expect(summary.lessonsTotal).toBe(2);
     expect(summary.lessonsCompleted).toBe(1);
     expect(summary.lessonsUpcoming).toBe(1);
-    expect(summary.assignmentsReviewed).toBe(1);
+    expect(summary.assignmentsTotal).toBe(2);
     expect(summary.activeGoals).toBe(1);
     expect(summary.completedGoals).toBe(1);
     expect(summary.averageSkillLevel).toBe(50);

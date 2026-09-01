@@ -5,23 +5,22 @@ import { pocketbaseLessonsApi } from '@/services/api/pocketbase/lessons';
 import { pocketbaseAvailabilityApi } from '@/services/api/pocketbase/availability';
 import { pocketbaseEventsApi } from '@/services/api/pocketbase/events';
 import { pocketbaseChatApi } from '@/services/api/pocketbase/chat';
-import { pocketbaseAssignmentsApi } from '@/services/api/pocketbase/assignments';
 import { pocketbaseProgressApi } from '@/services/api/pocketbase/progress';
 import { pocketbaseSupportApi } from '@/services/api/pocketbase/support';
 import { pocketbaseLegalApi } from '@/services/api/pocketbase/legal';
 import { pocketbaseSecurityApi } from '@/services/api/pocketbase/security';
 import { pocketbaseNotificationsApi } from '@/services/api/pocketbase/notifications';
-import {
-  mockPublicApi,
-  mockSchoolSettingsApi,
-} from '@/services/api/mock';
+import { pocketbaseSchoolSettingsApi } from '@/services/api/pocketbase/schoolSettings';
+import { mockPublicApi, createPocketbaseHybridAssignmentApis } from '@/services/api/mock';
 
 /**
  * PocketBase adapter (ROADMAP 2.1+).
- * Auth + Users + Lessons + Availability + Events + Chat + Assignments + Progress + Support + Legal + Security + Notifications → PocketBase;
- * остальные модули — mock до фазы 2.11+.
+ * Auth + Users + Lessons + Availability + Events + Chat + Progress + Support + Legal + Security + Notifications + SchoolSettings → PocketBase;
+ * Assignments + Groups — mock hybrid (PB user ids → mock seed by phone);
+ * public — mock.
  */
 export function createPocketbaseApiClient(): ApiClient {
+  const hybridAssignments = createPocketbaseHybridAssignmentApis();
   return {
     auth: pocketbaseAuthApi,
     users: pocketbaseUsersApi,
@@ -30,12 +29,13 @@ export function createPocketbaseApiClient(): ApiClient {
     events: pocketbaseEventsApi,
     notifications: pocketbaseNotificationsApi,
     availability: pocketbaseAvailabilityApi,
-    assignments: pocketbaseAssignmentsApi,
+    assignments: hybridAssignments.assignments,
+    assignmentGroups: hybridAssignments.assignmentGroups,
     progress: pocketbaseProgressApi,
     support: pocketbaseSupportApi,
     legal: pocketbaseLegalApi,
     public: mockPublicApi,
     security: pocketbaseSecurityApi,
-    schoolSettings: mockSchoolSettingsApi,
+    schoolSettings: pocketbaseSchoolSettingsApi,
   };
 }

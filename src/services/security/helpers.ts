@@ -1,4 +1,4 @@
-import type { LoginHistoryEntry, SecurityAlert } from '@/types';
+import type { LoginHistoryEntry, SecurityAlert, SecuritySession } from '@/types';
 
 export const SECURITY_ALERT_LABELS: Record<
   import('@/types').SecurityAlertType,
@@ -23,4 +23,29 @@ export function countUnreadAlerts(alerts: SecurityAlert[]): number {
 export function getLastSuccessfulLogin(entries: LoginHistoryEntry[]): string | undefined {
   const success = sortLoginHistoryByDate(entries).find((entry) => entry.success);
   return success?.createdAt;
+}
+
+/** Ensures exactly one current session (fixes PB bool / duplicate isCurrent). */
+export function resolveSecuritySessions(sessions: SecuritySession[]): SecuritySession[] {
+  if (sessions.length === 0) return [];
+
+  const byDevice = new Map<string, SecuritySession>();
+  for (const session of sessions) {
+    const existing = byDevice.get(session.deviceLabel);
+    if (!existing || session.lastActiveAt.localeCompare(existing.lastActiveAt) > 0) {
+      byDevice.set(session.deviceLabel, session);
+    }
+  }
+
+  const sorted = [...byDevice.values()].sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+  const flaggedCurrent = sorted.filter((session) => session.isCurrent);
+  const currentId =
+    flaggedCurrent.length === 1
+      ? flaggedCurrent[0].id
+      : sorted[0]?.id;
+
+  return sorted.map((session) => ({
+    ...session,
+    isCurrent: session.id === currentId,
+  }));
 }

@@ -16,15 +16,18 @@ import {
   canViewSecurity,
 } from '@/services/security/access';
 import {
-  countUnreadAlerts,
   getLastSuccessfulLogin,
+  resolveSecuritySessions,
   sortLoginHistoryByDate,
 } from '@/services/security/helpers';
 import { MAX_LOGIN_HISTORY_ENTRIES, MIN_PASSWORD_LENGTH } from '@/services/security/constants';
 import { ApiError } from '@/services/api/types';
 import type { ChangePasswordInput, SecurityApi } from '@/services/api/types';
+import { tryPushNotification, type MockNotificationsDb } from './notifications';
 
-export interface MockSecurityDb {
+const SECURITY_SETTINGS_LINK = '/profile/settings/security';
+
+export interface MockSecurityDb extends MockNotificationsDb {
   users: User[];
   passwords: Map<string, string>;
   securitySessions: SecuritySessionRecord[];
@@ -72,6 +75,16 @@ export function pushAlert(
     read: false,
     createdAt: new Date().toISOString(),
   });
+}
+
+function pushSecurityNotification(
+  db: MockSecurityDb,
+  userId: string,
+  title: string,
+  body: string,
+  link = SECURITY_SETTINGS_LINK,
+) {
+  tryPushNotification(db, userId, 'system', title, body, link);
 }
 
 function toPublicSession(
@@ -127,13 +140,22 @@ export function recordAuthLogin(
   }
 
   if (!success) {
-    pushAlert(
+    pushSecurityNotification(
       db,
       userId,
-      'failed_login',
       'Неудачная попытка входа',
       'Кто-то пытался войти в аккаунт с неверным паролем.',
     );
+    return;
+  }
+
+  const existingByDevice = db.securitySessions.find(
+    (s) => s.userId === userId && s.deviceLabel === deviceLabel,
+  );
+  if (existingByDevice) {
+    existingByDevice.token = token;
+    existingByDevice.lastActiveAt = new Date().toISOString();
+    existingByDevice.ipAddress = ipAddress;
     return;
   }
 
@@ -149,11 +171,10 @@ export function recordAuthLogin(
       lastActiveAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     });
-    pushAlert(
+    pushSecurityNotification(
       db,
       userId,
-      'new_device',
-      'Вход с нового устройства',
+      'Вход в аккаунт',
       `Обнаружен вход с ${deviceLabel}.`,
     );
   } else {
@@ -169,12 +190,14 @@ export function createMockSecurityApi(
     async getOverview(requesterId) {
       await delay();
       assertViewAccess(db, requesterId, requesterId);
-      const sessions = db.securitySessions.filter((s) => s.userId === requesterId);
-      const alerts = db.securityAlerts.filter((a) => a.userId === requesterId);
+      const sessions = resolveSecuritySessions(
+        db.securitySessions
+          .filter((s) => s.userId === requesterId)
+          .map((s) => toPublicSession(s)),
+      );
       const history = db.loginHistory.filter((h) => h.userId === requesterId);
       const overview: SecurityOverview = {
         activeSessions: sessions.length,
-        unreadAlerts: countUnreadAlerts(alerts),
         lastLoginAt: getLastSuccessfulLogin(history),
         passwordChangedAt: db.passwordChangedAt.get(requesterId),
       };
@@ -204,10 +227,9 @@ export function createMockSecurityApi(
       db.passwords.set(requesterId, input.newPassword);
       const changedAt = new Date().toISOString();
       db.passwordChangedAt.set(requesterId, changedAt);
-      pushAlert(
+      pushSecurityNotification(
         db,
         requesterId,
-        'password_changed',
         'Пароль изменён',
         'Пароль вашего аккаунта был успешно обновлён.',
       );
@@ -216,10 +238,11 @@ export function createMockSecurityApi(
     async getSessions(requesterId, currentToken) {
       await delay();
       assertViewAccess(db, requesterId, requesterId);
-      return db.securitySessions
-        .filter((s) => s.userId === requesterId)
-        .map((s) => toPublicSession(s, currentToken))
-        .sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+      return resolveSecuritySessions(
+        db.securitySessions
+          .filter((s) => s.userId === requesterId)
+          .map((s) => toPublicSession(s, currentToken)),
+      );
     },
 
     async revokeSession(sessionId, requesterId, currentToken) {
@@ -236,13 +259,6 @@ export function createMockSecurityApi(
 
       db.securitySessions = db.securitySessions.filter((s) => s.id !== sessionId);
       db.sessions.delete(session.token);
-      pushAlert(
-        db,
-        requesterId,
-        'session_revoked',
-        'Сессия завершена',
-        `Завершена сессия: ${session.deviceLabel}.`,
-      );
     },
 
     async revokeAllOtherSessions(requesterId, currentToken) {
@@ -260,15 +276,6 @@ export function createMockSecurityApi(
       );
       for (const session of revoked) {
         db.sessions.delete(session.token);
-      }
-      if (revoked.length > 0) {
-        pushAlert(
-          db,
-          requesterId,
-          'session_revoked',
-          'Другие сессии завершены',
-          `Завершено сессий: ${revoked.length}.`,
-        );
       }
     },
 

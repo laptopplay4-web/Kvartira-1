@@ -67,7 +67,7 @@ export default function LegalConsentsPage() {
 
   return (
     <div className="page-container max-w-lg">
-      <BackLink label="Профиль" fallbackTo="/profile" className="mb-4 flex items-center gap-1 text-sm focus-ring rounded" />
+      <BackLink label="Профиль" fallbackTo="/profile" />
       <h1 className="text-h1">Документы и согласия</h1>
       <p className="mt-2 text-body-sm text-text-secondary">
         Актуальные согласия и история принятых версий.

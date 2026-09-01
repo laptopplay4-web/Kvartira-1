@@ -5,7 +5,9 @@ import { ChevronLeft, MoreHorizontal, Users, Calendar } from 'lucide-react';
 import type { Conversation, User } from '@/types';
 import { getConversationDisplayTitle, isGroupLike } from '@/services/chat/helpers';
 import { Avatar } from '@/components/ui/Avatar';
+import { backNavIconButtonClassName } from '@/components/ui/BackLink';
 import { Button } from '@/components/ui/Button';
+import { cn } from '@/utils';
 import { ConversationSettings } from './ConversationSettings';
 import { api } from '@/services/api';
 import { formatLessonDateTime } from '@/utils/dates';
@@ -57,9 +59,14 @@ export function ChatHeader({
       <header className="sticky top-0 z-10 flex shrink-0 flex-col overflow-hidden border-b border-border-subtle bg-surface">
         <div className="flex h-14 items-center gap-3 px-3 md:px-4">
           {showBack && (
-            <Button variant="ghost" size="icon" onClick={onBack} aria-label="Назад к списку чатов" className="md:hidden">
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Назад к списку чатов"
+              className={cn(backNavIconButtonClassName, 'md:hidden')}
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
           )}
 
           {isGroup ? (

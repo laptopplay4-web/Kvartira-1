@@ -1,14 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Calendar } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { api } from '@/services/api';
-import { getUpcomingAssignmentsForHome } from '@/services/assignments/helpers';
-import { AssignmentStatusBadge } from '@/components/ui/AssignmentStatusBadge';
+import { getRecentAssignmentsForHome } from '@/services/assignments/helpers';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatFullDate } from '@/utils/dates';
 import { formatUserName } from '@/utils';
 
 interface HomeAssignmentsBlockProps {
@@ -32,7 +30,7 @@ export function HomeAssignmentsBlock({ studentId, requesterId }: HomeAssignments
     queryFn: () => api.lessons.getTeachers(),
   });
 
-  const pending = assignments ? getUpcomingAssignmentsForHome(assignments) : [];
+  const recent = assignments ? getRecentAssignmentsForHome(assignments) : [];
 
   const getTeacherName = (teacherId: string) => {
     const teacher = teachers?.find((t) => t.id === teacherId);
@@ -57,25 +55,16 @@ export function HomeAssignmentsBlock({ studentId, requesterId }: HomeAssignments
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
         </div>
-      ) : pending.length > 0 ? (
+      ) : recent.length > 0 ? (
         <div className="space-y-3">
-          {pending.map((assignment) => (
+          {recent.map((assignment) => (
             <Link key={assignment.id} to={`/assignments/${assignment.id}`}>
               <Card interactive>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <AssignmentStatusBadge assignment={assignment} />
-                    <h3 className="mt-2 text-h3">{assignment.title}</h3>
-                    <div className="mt-2 flex flex-wrap gap-3 text-caption text-text-muted">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" aria-hidden />
-                        Срок: {formatFullDate(assignment.dueDate)}
-                      </span>
-                      {getTeacherName(assignment.teacherId) && (
-                        <span>{getTeacherName(assignment.teacherId)}</span>
-                      )}
-                    </div>
-                  </div>
+                <h3 className="text-h3">{assignment.title}</h3>
+                <div className="mt-2 flex flex-wrap gap-3 text-caption text-text-muted">
+                  {getTeacherName(assignment.teacherId) && (
+                    <span>{getTeacherName(assignment.teacherId)}</span>
+                  )}
                 </div>
               </Card>
             </Link>
@@ -84,8 +73,8 @@ export function HomeAssignmentsBlock({ studentId, requesterId }: HomeAssignments
       ) : assignments ? (
         <EmptyState
           icon={BookOpen}
-          title="Нет активных заданий"
-          description="Когда преподаватель выдаст задание, оно появится здесь"
+          title="Нет материалов"
+          description="Когда преподаватель опубликует материалы для вашей группы, они появятся здесь"
           className="py-8"
         />
       ) : null}

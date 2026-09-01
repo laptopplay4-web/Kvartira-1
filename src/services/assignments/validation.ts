@@ -1,71 +1,61 @@
-import type { AssignmentResponseType } from '@/types';
-import { detectAttachmentType, validateAttachment, type AttachmentValidationInput } from '@/services/chat/validation';
+import type { AssignmentContentType } from '@/types';
+import { validateAttachment, type AttachmentValidationInput } from '@/services/chat/validation';
+import { ASSIGNMENT_CONTENT_ACCEPT } from '@/services/assignments/constants';
 
-export function getAcceptForResponseType(type: AssignmentResponseType): string | undefined {
-  switch (type) {
-    case 'text':
-      return undefined;
-    case 'audio':
-      return 'audio/*';
-    case 'video':
-      return 'video/*';
-    case 'image':
-      return 'image/*';
-    case 'file':
-      return '.pdf,.doc,.docx,.txt,application/pdf';
-  }
-}
-
-export function responseTypeMatchesFile(
-  responseType: AssignmentResponseType,
-  mimeType: string,
-  filename: string,
-): boolean {
-  if (responseType === 'text') return false;
-  const detected = detectAttachmentType(mimeType, filename);
-  if (!detected) return false;
-  if (responseType === 'image') return detected === 'image';
-  if (responseType === 'audio') return detected === 'audio';
-  if (responseType === 'video') return detected === 'video';
-  if (responseType === 'file') return detected === 'file';
-  return false;
-}
-
-export function validateAssignmentMaterial(
+export function validateAssignmentContentFile(
   input: AttachmentValidationInput,
+  contentType: AssignmentContentType,
 ): { valid: true } | { valid: false; message: string } {
-  const err = validateAttachment(input);
-  if (err) return { valid: false, message: err.message };
-  return { valid: true };
-}
-
-export function validateAssignmentResponseFile(
-  input: AttachmentValidationInput,
-  responseType: AssignmentResponseType,
-): { valid: true } | { valid: false; message: string } {
-  if (responseType === 'text') {
-    return { valid: false, message: 'Для текстового задания файл не нужен' };
+  if (contentType === 'text') {
+    return { valid: false, message: 'Для текстового блока файл не нужен' };
   }
 
   const err = validateAttachment(input);
   if (err) return { valid: false, message: err.message };
 
-  if (!responseTypeMatchesFile(responseType, input.mimeType, input.filename)) {
-    return { valid: false, message: 'Файл не соответствует типу ответа' };
+  if (contentType === 'voice') {
+    const isMp3 =
+      input.mimeType === 'audio/mpeg' ||
+      input.mimeType === 'audio/mp3' ||
+      input.filename.toLowerCase().endsWith('.mp3');
+    if (!isMp3) return { valid: false, message: 'Загрузите MP3-файл' };
+  }
+
+  if (contentType === 'pdf') {
+    const isPdf =
+      input.mimeType === 'application/pdf' || input.filename.toLowerCase().endsWith('.pdf');
+    if (!isPdf) return { valid: false, message: 'Загрузите PDF-файл' };
+  }
+
+  if (contentType === 'video') {
+    if (!input.mimeType.startsWith('video/')) {
+      return { valid: false, message: 'Загрузите видеофайл' };
+    }
   }
 
   return { valid: true };
 }
 
-export function validateAssignmentFeedbackAudio(
-  input: AttachmentValidationInput,
+export function getAcceptForContentType(type: AssignmentContentType): string | undefined {
+  return ASSIGNMENT_CONTENT_ACCEPT[type];
+}
+
+export function validateContentBlock(
+  type: AssignmentContentType,
+  text?: string,
+  file?: { filename: string; mimeType: string; size: number },
 ): { valid: true } | { valid: false; message: string } {
-  const err = validateAttachment(input);
-  if (err) return { valid: false, message: err.message };
-
-  if (!responseTypeMatchesFile('audio', input.mimeType, input.filename)) {
-    return { valid: false, message: 'Загрузите аудиофайл' };
+  if (type === 'text') {
+    if (!text?.trim()) return { valid: false, message: 'Введите текст' };
+    return { valid: true };
   }
+  if (!file) return { valid: false, message: 'Загрузите файл' };
+  return validateAssignmentContentFile(file, type);
+}
 
+export function validateGroupName(name: string): { valid: true } | { valid: false; message: string } {
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return { valid: false, message: 'Название группы — минимум 2 символа' };
+  if (trimmed.length > 80) return { valid: false, message: 'Название группы — максимум 80 символов' };
   return { valid: true };
 }

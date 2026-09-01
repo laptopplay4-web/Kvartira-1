@@ -1,8 +1,10 @@
 import type {
   AppNotification,
   Assignment,
-  AssignmentResponseType,
-  AssignmentStatus,
+  AssignmentContentBlock,
+  AssignmentContentType,
+  AssignmentGroup,
+  AssignmentGroupDetail,
   AuthSession,
   BookLessonInput,
   Conversation,
@@ -83,6 +85,8 @@ export interface AuthApi {
   completePasswordReset(input: CompletePasswordResetInput): Promise<void>;
   logout(): Promise<void>;
   getSession(): Promise<AuthSession | null>;
+  /** Fetch latest user profile from server (role, name, …) without re-login. */
+  refreshSession(): Promise<AuthSession | null>;
 }
 
 export interface LessonsApi {
@@ -314,18 +318,9 @@ export interface AvailabilityApi {
 export interface CreateAssignmentInput {
   title: string;
   description: string;
-  studentId: string;
-  lessonId?: string;
-  dueDate: string;
-  responseType: AssignmentResponseType;
-  materials?: Omit<Assignment['materials'][number], 'id'>[];
-}
-
-export interface SubmitAssignmentInput {
-  text?: string;
-  attachmentUrl?: string;
-  attachmentFilename?: string;
-  attachmentMimeType?: string;
+  groupId: string;
+  dueDate?: string;
+  contentBlocks: Omit<AssignmentContentBlock, 'id'>[];
 }
 
 export interface UploadAssignmentFileInput {
@@ -335,31 +330,37 @@ export interface UploadAssignmentFileInput {
   dataUrl?: string;
 }
 
-export interface ReviewAssignmentInput {
-  text?: string;
-  rating?: number;
-  audioUrl?: string;
-  audioFilename?: string;
-  audioMimeType?: string;
-}
-
 export interface AssignmentsApi {
   getAssignments(filters: {
     requesterId: string;
-    studentId?: string;
+    groupId?: string;
     teacherId?: string;
-    status?: AssignmentStatus;
   }): Promise<Assignment[]>;
   getAssignment(id: string, requesterId: string): Promise<Assignment>;
   createAssignment(input: CreateAssignmentInput, teacherId: string): Promise<Assignment>;
   uploadAssignmentFile(
     input: UploadAssignmentFileInput,
     userId: string,
-    purpose: 'material' | 'submission' | 'feedback',
-    responseType?: Assignment['responseType'],
-  ): Promise<Omit<Assignment['materials'][number], 'id'>>;
-  submitAssignment(id: string, input: SubmitAssignmentInput, studentId: string): Promise<Assignment>;
-  reviewAssignment(id: string, input: ReviewAssignmentInput, teacherId: string): Promise<Assignment>;
+    contentType: AssignmentContentType,
+  ): Promise<Omit<AssignmentContentBlock, 'id' | 'type' | 'order'>>;
+}
+
+export interface CreateAssignmentGroupInput {
+  name: string;
+}
+
+export interface UpdateAssignmentGroupInput {
+  name: string;
+}
+
+export interface AssignmentGroupsApi {
+  getGroups(requesterId: string): Promise<AssignmentGroup[]>;
+  getGroup(id: string, requesterId: string): Promise<AssignmentGroupDetail>;
+  createGroup(input: CreateAssignmentGroupInput, requesterId: string): Promise<AssignmentGroup>;
+  updateGroup(id: string, input: UpdateAssignmentGroupInput, requesterId: string): Promise<AssignmentGroup>;
+  addMember(groupId: string, studentId: string, requesterId: string): Promise<AssignmentGroup>;
+  removeMember(groupId: string, studentId: string, requesterId: string): Promise<AssignmentGroup>;
+  deleteGroup(id: string, requesterId: string): Promise<void>;
 }
 
 export interface ProgressApi {
@@ -512,6 +513,7 @@ export interface ApiClient {
   notifications: NotificationsApi;
   availability: AvailabilityApi;
   assignments: AssignmentsApi;
+  assignmentGroups: AssignmentGroupsApi;
   progress: ProgressApi;
   support: SupportApi;
   public: PublicApi;

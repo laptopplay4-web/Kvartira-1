@@ -9,7 +9,7 @@ const admin: User = { id: '3', phone: '+7', role: 'admin', firstName: 'E', lastN
 describe('permissions', () => {
   it('student can book lessons', () => {
     expect(can(student, 'lessons:book')).toBe(true);
-    expect(can(student, 'assignments:submit')).toBe(true);
+    expect(can(student, 'assignments:view-own')).toBe(true);
     expect(can(student, 'progress:view-own')).toBe(true);
     expect(can(student, 'support:view-faq')).toBe(true);
     expect(can(student, 'security:view-own')).toBe(true);
@@ -20,6 +20,7 @@ describe('permissions', () => {
   it('teacher can manage availability', () => {
     expect(can(teacher, 'availability:manage')).toBe(true);
     expect(can(teacher, 'assignments:create')).toBe(true);
+    expect(can(teacher, 'assignments:manage-groups')).toBe(true);
     expect(can(teacher, 'progress:view-assigned')).toBe(true);
     expect(can(teacher, 'progress:manage-goals')).toBe(true);
     expect(can(teacher, 'progress:manage-skills')).toBe(true);

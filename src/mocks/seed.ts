@@ -3,6 +3,7 @@ import type {
   AchievementDefinition,
   AppNotification,
   Assignment,
+  AssignmentGroup,
   Conversation,
   ConversationMember,
   Direction,
@@ -42,6 +43,16 @@ export const directions: Direction[] = [
 
 const today = new Date();
 
+export const studentDirections: Record<string, string[]> = {
+  'user-student': ['dir-vocal'],
+  'user-student-2': ['dir-guitar'],
+};
+
+export const teacherDirections: Record<string, string[]> = {
+  'user-teacher-1': ['dir-vocal'],
+  'user-teacher-2': ['dir-piano', 'dir-guitar'],
+};
+
 export const users: User[] = [
   {
     id: 'user-student',
@@ -50,6 +61,7 @@ export const users: User[] = [
     firstName: 'Анна',
     lastName: 'Смирнова',
     bio: 'Учусь вокалу',
+    directionIds: studentDirections['user-student'],
   },
   {
     id: 'user-teacher-1',
@@ -58,6 +70,7 @@ export const users: User[] = [
     firstName: 'Елена',
     lastName: 'Волкова',
     bio: 'Преподаватель вокала, 12 лет опыта',
+    directionIds: teacherDirections['user-teacher-1'],
   },
   {
     id: 'user-teacher-2',
@@ -66,6 +79,7 @@ export const users: User[] = [
     firstName: 'Дмитрий',
     lastName: 'Козлов',
     bio: 'Пианист, джаз и классика',
+    directionIds: teacherDirections['user-teacher-2'],
   },
   {
     id: 'user-admin',
@@ -81,13 +95,9 @@ export const users: User[] = [
     role: 'student',
     firstName: 'Игорь',
     lastName: 'Петров',
+    directionIds: studentDirections['user-student-2'],
   },
 ];
-
-export const teacherDirections: Record<string, string[]> = {
-  'user-teacher-1': ['dir-vocal'],
-  'user-teacher-2': ['dir-piano', 'dir-guitar'],
-};
 
 const defaultSchedule = [
   { dayOfWeek: 1, ranges: [{ start: '10:00', end: '18:00' }], breaks: [{ start: '13:00', end: '14:00' }] },
@@ -458,22 +468,62 @@ export const notifications: AppNotification[] = [
   },
 ];
 
+export const initialAssignmentGroups: AssignmentGroup[] = [
+  {
+    id: 'grp-general',
+    name: 'Общее задание',
+    teacherId: 'user-teacher-1',
+    memberIds: ['user-student', 'user-student-2'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'grp-vocalists',
+    name: 'Вокалисты',
+    teacherId: 'user-teacher-1',
+    memberIds: ['user-student'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'grp-guitarists',
+    name: 'Гитаристы',
+    teacherId: 'user-teacher-1',
+    memberIds: ['user-student-2'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
 export const initialAssignments: Assignment[] = [
   {
     id: 'asgn-1',
     title: 'Дыхательная гимнастика',
-    description: 'Выполните упражнения из методички (стр. 12–15). Запишите 2 минуты вокальной разминки.',
+    description: 'Материалы для вокальной группы — выполните упражнения из методички.',
     teacherId: 'user-teacher-1',
-    studentId: 'user-student',
-    lessonId: 'lesson-1',
+    groupId: 'grp-vocalists',
     dueDate: format(addDays(today, 5), 'yyyy-MM-dd'),
-    responseType: 'audio',
-    status: 'assigned',
-    materials: [
+    contentBlocks: [
       {
-        id: 'mat-1',
+        id: 'blk-1',
+        type: 'text',
+        order: 0,
+        text: 'Выполните упражнения из методички (стр. 12–15). Запишите 2 минуты вокальной разминки.',
+      },
+      {
+        id: 'blk-2',
+        type: 'pdf',
+        order: 1,
         filename: 'breathing-exercises.pdf',
         mimeType: 'application/pdf',
+        url: '#',
+      },
+      {
+        id: 'blk-3',
+        type: 'voice',
+        order: 2,
+        filename: 'demo-warmup.mp3',
+        mimeType: 'audio/mpeg',
         url: '#',
       },
     ],
@@ -483,55 +533,26 @@ export const initialAssignments: Assignment[] = [
   {
     id: 'asgn-2',
     title: 'Этюд №3',
-    description: 'Отработайте первые 16 тактов с метрономом 60 bpm.',
+    description: 'Материалы для гитаристов — отработка первых 16 тактов.',
     teacherId: 'user-teacher-1',
-    studentId: 'user-student',
-    dueDate: format(addDays(today, -2), 'yyyy-MM-dd'),
-    responseType: 'video',
-    status: 'assigned',
-    materials: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'asgn-3',
-    title: 'Анализ произведения',
-    description: 'Кратко опишите структуру выбранной песни.',
-    teacherId: 'user-teacher-1',
-    studentId: 'user-student',
-    dueDate: format(addDays(today, -5), 'yyyy-MM-dd'),
-    responseType: 'text',
-    status: 'submitted',
-    materials: [],
-    submission: {
-      text: 'Песня построена по схеме куплет-припев. В припеве поднимается tessitura.',
-      submittedAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'asgn-4',
-    title: 'Гаммы соль мажор',
-    description: 'Сыграйте гамму двумя руками в темпе allegretto.',
-    teacherId: 'user-teacher-2',
-    studentId: 'user-student-2',
-    dueDate: format(addDays(today, 3), 'yyyy-MM-dd'),
-    responseType: 'audio',
-    status: 'reviewed',
-    materials: [],
-    submission: {
-      text: 'Запись приложена',
-      submittedAt: new Date(Date.now() - 172800000).toISOString(),
-    },
-    feedback: {
-      text: 'Хороший темп, следите за ровностью левой руки.',
-      rating: 4,
-      audioUrl: 'mock://feedback/gammas-feedback.mp3',
-      audioFilename: 'gammas-feedback.mp3',
-      audioMimeType: 'audio/mpeg',
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-    },
+    groupId: 'grp-guitarists',
+    dueDate: format(addDays(today, 7), 'yyyy-MM-dd'),
+    contentBlocks: [
+      {
+        id: 'blk-4',
+        type: 'text',
+        order: 0,
+        text: 'Отработайте первые 16 тактов с метрономом 60 bpm.',
+      },
+      {
+        id: 'blk-5',
+        type: 'video',
+        order: 1,
+        filename: 'etude-demo.mp4',
+        mimeType: 'video/mp4',
+        url: '#',
+      },
+    ],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },

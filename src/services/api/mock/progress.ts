@@ -30,6 +30,7 @@ export interface MockProgressDb extends AchievementEvaluationData {
   users: User[];
   skills: Skill[];
   progressGoals: ProgressGoal[];
+  assignmentGroups: import('@/types').AssignmentGroup[];
 }
 
 export function createMockProgressApi(
@@ -103,6 +104,7 @@ export function createMockProgressApi(
         studentId,
         lessons: db.lessons,
         assignments: db.assignments,
+        assignmentGroups: db.assignmentGroups,
         goals: db.progressGoals,
         skillProgress: db.skillProgress,
         achievements: db.achievementDefinitions,

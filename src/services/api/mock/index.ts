@@ -10,6 +10,7 @@ import {
   initialHistory,
   initialLessons,
   initialAssignments,
+  initialAssignmentGroups,
   achievementDefinitions,
   initialProgressGoals,
   initialProgressHistory,
@@ -49,6 +50,8 @@ import type {
 } from '@/services/api/types';
 import { createMockChatApi } from './chat';
 import { createMockAssignmentsApi } from './assignments';
+import { createMockAssignmentGroupsApi } from './groups';
+import { createHybridUserResolver } from './userResolver';
 import { createMockProgressApi } from './progress';
 import { createMockSupportApi } from './support';
 import { createMockPublicApi } from './public';
@@ -108,6 +111,7 @@ class MockDatabase {
   pushSubscriptions = [];
   teacherAvailabilities = structuredClone(seedTeacherAvailabilities);
   assignments = structuredClone(initialAssignments);
+  assignmentGroups = structuredClone(initialAssignmentGroups);
   skills = structuredClone(skills);
   skillProgress = structuredClone(initialSkillProgress);
   progressGoals = structuredClone(initialProgressGoals);
@@ -322,6 +326,10 @@ export const mockAuthApi: AuthApi = {
   },
 
   async getSession() {
+    return null;
+  },
+
+  async refreshSession() {
     return null;
   },
 };
@@ -623,6 +631,15 @@ export const mockLessonsApi: LessonsApi = {
 
 export const mockChatApi: ChatApi = createMockChatApi(db, delay);
 export const mockAssignmentsApi = createMockAssignmentsApi(db, delay);
+export const mockAssignmentGroupsApi = createMockAssignmentGroupsApi(db, delay);
+
+export function createPocketbaseHybridAssignmentApis() {
+  const resolveUser = createHybridUserResolver(db.users);
+  return {
+    assignments: createMockAssignmentsApi(db, delay, resolveUser),
+    assignmentGroups: createMockAssignmentGroupsApi(db, delay, resolveUser),
+  };
+}
 export const mockProgressApi = createMockProgressApi(db, delay);
 export const mockSupportApi = createMockSupportApi(db, delay);
 export const mockPublicApi = createMockPublicApi(db, delay);
@@ -924,6 +941,7 @@ export function resetMockDatabase() {
   db.pushSubscriptions = [];
   db.teacherAvailabilities = structuredClone(seedTeacherAvailabilities);
   db.assignments = structuredClone(initialAssignments);
+  db.assignmentGroups = structuredClone(initialAssignmentGroups);
   db.skills = structuredClone(skills);
   db.skillProgress = structuredClone(initialSkillProgress);
   db.progressGoals = structuredClone(initialProgressGoals);

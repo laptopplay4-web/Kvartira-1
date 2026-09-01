@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
-import { Home, Calendar, MessageCircle, Sparkles, User, Shield, Bell } from 'lucide-react';
+import { Home, Calendar, MessageCircle, Sparkles, User, Shield } from 'lucide-react';
 import { cn } from '@/utils';
 import { can } from '@/permissions';
 import { useCurrentUser } from '@/stores/authStore';
@@ -14,7 +14,6 @@ interface NavItem {
 
 interface BottomNavProps {
   chatBadge?: number;
-  notifBadge?: number;
 }
 
 export function BottomNav({ chatBadge = 0 }: BottomNavProps) {
@@ -62,7 +61,7 @@ export function BottomNav({ chatBadge = 0 }: BottomNavProps) {
   );
 }
 
-export function SidebarNav({ chatBadge = 0, notifBadge = 0 }: BottomNavProps) {
+export function SidebarNav({ chatBadge = 0 }: BottomNavProps) {
   const user = useCurrentUser();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -72,7 +71,6 @@ export function SidebarNav({ chatBadge = 0, notifBadge = 0 }: BottomNavProps) {
     { to: '/lessons', label: 'Занятия', icon: Calendar },
     { to: '/chat', label: 'Чат', icon: MessageCircle, badge: chatBadge },
     { to: '/events', label: 'События', icon: Sparkles },
-    { to: '/notifications', label: 'Уведомления', icon: Bell, badge: notifBadge },
     { to: '/profile', label: 'Профиль', icon: User },
   ];
 

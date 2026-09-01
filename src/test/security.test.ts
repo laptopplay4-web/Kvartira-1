@@ -6,19 +6,19 @@ import {
   canViewSecurity,
 } from '@/services/security/access';
 import {
-  countUnreadAlerts,
   getLastSuccessfulLogin,
+  resolveSecuritySessions,
   sortLoginHistoryByDate,
 } from '@/services/security/helpers';
 import { validateChangePasswordInput } from '@/services/security/validation';
-import { createMockSecurityApi, buildPasswordMap } from '@/services/api/mock/security';
+import { createMockSecurityApi, buildPasswordMap, recordAuthLogin } from '@/services/api/mock/security';
 import {
   initialLoginHistory,
   initialSecurityAlerts,
   initialSecuritySessions,
   users,
 } from '@/mocks/seed';
-import type { AuthSession } from '@/types';
+import type { AuthSession, AppNotification } from '@/types';
 
 const student = users.find((u) => u.id === 'user-student')!;
 const otherStudent = users.find((u) => u.id === 'user-student-2')!;
@@ -32,6 +32,10 @@ function createTestDb() {
     securityAlerts: structuredClone(initialSecurityAlerts),
     sessions: new Map<string, AuthSession>(),
     passwordChangedAt: new Map<string, string>(),
+    notifications: [] as AppNotification[],
+    notificationPreferences: new Map(),
+    pushDeliveries: [],
+    pushSubscriptions: [],
   };
 }
 
@@ -62,13 +66,48 @@ describe('security helpers', () => {
     );
   });
 
-  it('counts unread alerts', () => {
-    expect(countUnreadAlerts(initialSecurityAlerts.filter((a) => a.userId === student.id))).toBe(1);
-  });
-
   it('returns last successful login', () => {
     const last = getLastSuccessfulLogin(initialLoginHistory.filter((h) => h.userId === student.id));
     expect(last).toBeDefined();
+  });
+
+  it('resolves a single current session when multiple are flagged', () => {
+    const resolved = resolveSecuritySessions([
+      {
+        id: 'a',
+        userId: 'user-student',
+        deviceLabel: 'Chrome · Windows',
+        platform: 'web',
+        ipAddress: '1.1.1.1',
+        lastActiveAt: '2026-01-02T10:00:00.000Z',
+        createdAt: '2026-01-01T10:00:00.000Z',
+        isCurrent: true,
+      },
+      {
+        id: 'b',
+        userId: 'user-student',
+        deviceLabel: 'Chrome · Windows',
+        platform: 'web',
+        ipAddress: '1.1.1.2',
+        lastActiveAt: '2026-01-03T10:00:00.000Z',
+        createdAt: '2026-01-02T10:00:00.000Z',
+        isCurrent: true,
+      },
+      {
+        id: 'c',
+        userId: 'user-student',
+        deviceLabel: 'Safari · iPhone',
+        platform: 'ios',
+        ipAddress: '1.1.1.3',
+        lastActiveAt: '2026-01-01T10:00:00.000Z',
+        createdAt: '2026-01-01T10:00:00.000Z',
+        isCurrent: true,
+      },
+    ]);
+
+    expect(resolved).toHaveLength(2);
+    expect(resolved.filter((s) => s.isCurrent)).toHaveLength(1);
+    expect(resolved.find((s) => s.isCurrent)?.id).toBe('b');
   });
 });
 
@@ -106,7 +145,7 @@ describe('security api', () => {
   it('returns overview for own user', async () => {
     const overview = await api.getOverview(student.id);
     expect(overview.activeSessions).toBeGreaterThan(0);
-    expect(overview.unreadAlerts).toBe(1);
+    expect(overview.lastLoginAt).toBeDefined();
   });
 
   it('blocks revoking another user session', async () => {
@@ -149,6 +188,29 @@ describe('security api', () => {
     await expect(
       api.revokeSession('sess-1', student.id, 'seed-token-student-desktop'),
     ).rejects.toMatchObject({ code: 'VALIDATION' });
+  });
+
+  it('reuses session for same device on login', () => {
+    const chromeBefore = db.securitySessions.filter(
+      (s) => s.userId === student.id && s.deviceLabel === 'Chrome · Windows',
+    );
+    recordAuthLogin(db, student.id, 'token-relogin', true, 'Chrome · Windows');
+    recordAuthLogin(db, student.id, 'token-relogin-2', true, 'Chrome · Windows');
+    const chromeAfter = db.securitySessions.filter(
+      (s) => s.userId === student.id && s.deviceLabel === 'Chrome · Windows',
+    );
+    expect(chromeAfter).toHaveLength(chromeBefore.length);
+    expect(chromeAfter[0]?.token).toBe('token-relogin-2');
+  });
+
+  it('creates in-app notification on failed login', () => {
+    recordAuthLogin(db, student.id, 'token-fail', false);
+    expect(db.notifications.some((n) => n.title === 'Неудачная попытка входа')).toBe(true);
+  });
+
+  it('creates in-app notification on new session login', () => {
+    recordAuthLogin(db, student.id, 'token-new-login', true, 'Safari · iOS');
+    expect(db.notifications.some((n) => n.title === 'Вход в аккаунт')).toBe(true);
   });
 
   it('marks alert as read', async () => {

@@ -6,7 +6,9 @@ import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 import { Logo } from '@/components/ui/Logo';
+import { PHONE_DISPLAY_PLACEHOLDER, PHONE_STORAGE_REGEX } from '@/utils/phone';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
@@ -14,7 +16,9 @@ import { AUTH_PASSWORD_MIN_LENGTH } from '@/services/auth/constants';
 
 const schema = z
   .object({
-    phone: z.string().regex(/^\+79\d{9}$/, 'Формат: +79XXXXXXXXX'),
+    phone: z
+      .string()
+      .regex(PHONE_STORAGE_REGEX, `Введите номер полностью: ${PHONE_DISPLAY_PLACEHOLDER}`),
     password: z
       .string()
       .min(AUTH_PASSWORD_MIN_LENGTH, `Минимум ${AUTH_PASSWORD_MIN_LENGTH} символов`),
@@ -87,7 +91,20 @@ export default function RegisterPage() {
             <Input label="Имя" error={errors.firstName?.message} {...register('firstName')} />
             <Input label="Фамилия" error={errors.lastName?.message} {...register('lastName')} />
           </div>
-          <Input label="Телефон" type="tel" error={errors.phone?.message} {...register('phone')} />
+          <Controller
+            name="phone"
+            control={control}
+            render={({ field }) => (
+              <PhoneInput
+                label="Телефон"
+                error={errors.phone?.message}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                name={field.name}
+              />
+            )}
+          />
           <Input label="Пароль" type="password" error={errors.password?.message} {...register('password')} />
           <Input
             label="Подтверждение пароля"

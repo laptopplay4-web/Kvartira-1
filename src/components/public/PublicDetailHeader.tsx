@@ -14,7 +14,7 @@ export function PublicDetailHeader({ backTo, backLabel }: PublicDetailHeaderProp
   return (
     <header className="border-b border-border-subtle px-4 py-4">
       <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
-        <BackLink label={backLabel} fallbackTo={backTo} className="mb-0 min-h-0" />
+        <BackLink label={backLabel} fallbackTo={backTo} className="mb-0" />
         <Logo size="sm" />
         {user ? (
           <Link to="/home" className="text-sm text-brand hover:underline">

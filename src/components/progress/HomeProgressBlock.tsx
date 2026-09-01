@@ -71,7 +71,7 @@ export function HomeProgressBlock({ studentId, requesterId }: HomeProgressBlockP
           <div className="flex items-center gap-2 text-body-sm text-text-secondary">
             <TrendingUp className="h-4 w-4 shrink-0 text-brand" aria-hidden />
             <span>
-              {summary.lessonsCompleted} занятий · {summary.assignmentsReviewed} ДЗ
+              {summary.lessonsCompleted} занятий · {summary.assignmentsTotal} ДЗ
               {summary.attendanceRate !== null ? ` · посещаемость ${summary.attendanceRate}%` : ''}
               {' · '}средний навык {summary.averageSkillLevel}%
             </span>
@@ -79,7 +79,7 @@ export function HomeProgressBlock({ studentId, requesterId }: HomeProgressBlockP
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <ProgressStat label="Занятий" value={summary.lessonsCompleted} />
-            <ProgressStat label="ДЗ" value={summary.assignmentsReviewed} />
+            <ProgressStat label="ДЗ" value={summary.assignmentsTotal} />
             <ProgressStat
               label="Посещаемость"
               value={summary.attendanceRate !== null ? `${summary.attendanceRate}%` : '—'}

@@ -23,6 +23,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { BookLessonLink } from '@/components/ui/BookLessonLink';
 
 import { HomeAssignmentsBlock } from '@/components/assignments/HomeAssignmentsBlock';
+import { isProgressFeatureEnabled } from '@/config/features';
 import { HomeProgressBlock } from '@/components/progress/HomeProgressBlock';
 
 import { getNextUpcomingEvent } from '@/services/events/helpers';
@@ -246,7 +247,7 @@ export default function HomePage() {
   const showBookCta = can(user, 'lessons:book') && !isAdmin;
 
   const showAssignmentsBlock = can(user, 'assignments:view-own');
-  const showProgressBlock = can(user, 'progress:view-own');
+  const showProgressBlock = isProgressFeatureEnabled() && can(user, 'progress:view-own');
 
 
 

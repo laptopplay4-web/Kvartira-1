@@ -18,6 +18,7 @@ interface AuthState {
   logout: () => Promise<void>;
   setSession: (session: AuthSession | null) => void;
   updateSessionUser: (user: User) => void;
+  syncSession: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -75,6 +76,23 @@ export const useAuthStore = create<AuthState>()(
         set((state) =>
           state.session ? { session: { ...state.session, user } } : state,
         ),
+
+      syncSession: async () => {
+        const session = await api.auth.refreshSession();
+        if (!session) return;
+
+        set((state) => {
+          const roleChanged =
+            state.session?.user.role != null &&
+            state.session.user.role !== session.user.role;
+          if (roleChanged) queryClient.clear();
+          return { session };
+        });
+
+        if (isPocketBaseMode()) {
+          setPocketBaseAuth(session.token, session.user);
+        }
+      },
     }),
     {
       name: 'kvartira-auth',

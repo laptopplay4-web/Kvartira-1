@@ -194,7 +194,7 @@ export default function HelpPage() {
   return (
     <div className="page-container max-w-lg">
       <div className="mb-6">
-        <BackLink label="Профиль" fallbackTo="/profile" className="mb-0 flex items-center gap-1 text-sm focus-ring rounded" />
+        <BackLink label="Профиль" fallbackTo="/profile" className="mb-0" />
       </div>
 
       <h1 className="text-h1 mb-6">Помощь</h1>

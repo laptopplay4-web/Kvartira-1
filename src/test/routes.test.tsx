@@ -49,12 +49,16 @@ vi.mock('@/hooks/useOnlineStatus', () => ({
   useOnlineStatus: () => true,
 }));
 
+vi.mock('@/hooks/useAuthSessionSync', () => ({
+  useAuthSessionSync: vi.fn(),
+}));
+
 let mockUser: User | null;
 
 vi.mock('@/stores/authStore', () => ({
   useCurrentUser: () => mockUser,
-  useAuthStore: (selector: (s: { logout: () => void; updateSessionUser: () => void }) => unknown) =>
-    selector({ logout: vi.fn(), updateSessionUser: vi.fn() }),
+  useAuthStore: (selector: (s: { logout: () => void; updateSessionUser: () => void; syncSession: () => Promise<void> }) => unknown) =>
+    selector({ logout: vi.fn(), updateSessionUser: vi.fn(), syncSession: vi.fn() }),
 }));
 
 const adminUser: User = {
@@ -190,7 +194,7 @@ describe('admin navigation links', () => {
   it('Sidebar Admin link points to /home', () => {
     render(
       <MemoryRouter>
-        <SidebarNav chatBadge={0} notifBadge={0} />
+        <SidebarNav chatBadge={0} />
       </MemoryRouter>,
     );
 

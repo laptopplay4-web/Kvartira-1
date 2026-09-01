@@ -29,6 +29,7 @@ import {
   mapSecurityAlertRecord,
   mapNotificationRecord,
   mapNotificationPreferencesRecord,
+  mapSchoolSettingsRecord,
   mapUserRecord,
   userToPbRecord,
 } from '@/services/api/pocketbase/mappers';
@@ -39,12 +40,12 @@ import { pocketbaseLessonsApi } from '@/services/api/pocketbase/lessons';
 import { pocketbaseAvailabilityApi } from '@/services/api/pocketbase/availability';
 import { pocketbaseEventsApi } from '@/services/api/pocketbase/events';
 import { pocketbaseChatApi } from '@/services/api/pocketbase/chat';
-import { pocketbaseAssignmentsApi } from '@/services/api/pocketbase/assignments';
 import { pocketbaseProgressApi } from '@/services/api/pocketbase/progress';
 import { pocketbaseSupportApi } from '@/services/api/pocketbase/support';
 import { pocketbaseLegalApi } from '@/services/api/pocketbase/legal';
 import { pocketbaseSecurityApi } from '@/services/api/pocketbase/security';
 import { pocketbaseNotificationsApi } from '@/services/api/pocketbase/notifications';
+import { pocketbaseSchoolSettingsApi } from '@/services/api/pocketbase/schoolSettings';
 import { fromPbSkillLevel, toPbSkillLevel } from '@/services/progress/skillLevel';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -299,12 +300,16 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     );
     expect(client.events.getEvents).toBe(pocketbaseEventsApi.getEvents);
     expect(client.chat.getConversations).toBe(pocketbaseChatApi.getConversations);
-    expect(client.assignments.getAssignments).toBe(pocketbaseAssignmentsApi.getAssignments);
+    expect(client.assignments.getAssignments).toBeTypeOf('function');
+    expect(client.assignmentGroups.getGroups).toBeTypeOf('function');
     expect(client.progress.getSummary).toBe(pocketbaseProgressApi.getSummary);
     expect(client.support.getTickets).toBe(pocketbaseSupportApi.getTickets);
     expect(client.legal.getDocuments).toBe(pocketbaseLegalApi.getDocuments);
     expect(client.security.getOverview).toBe(pocketbaseSecurityApi.getOverview);
     expect(client.notifications.getNotifications).toBe(pocketbaseNotificationsApi.getNotifications);
+    expect(client.schoolSettings.getSchoolSettings).toBe(
+      pocketbaseSchoolSettingsApi.getSchoolSettings,
+    );
     vi.unstubAllEnvs();
   });
 
@@ -530,7 +535,7 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('syncReadReceipts');
   });
 
-  it('mapAssignmentRecord maps relations, dates, materials and optional submission', () => {
+  it('mapAssignmentRecord maps group, dates and content blocks', () => {
     const assignment = mapAssignmentRecord({
       id: 'asgn-1',
       collectionId: 'assignments',
@@ -540,34 +545,23 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       title: 'Этюд №3',
       description: 'Отработайте 16 тактов',
       teacher: 'user-teacher-1',
-      student: 'user-student',
-      lesson: 'lesson-1',
+      group: 'grp-vocalists',
       dueDate: '2026-09-05 00:00:00.000Z',
-      responseType: 'audio',
-      status: 'submitted',
-      materials: [
-        { id: 'mat-1', filename: 'notes.pdf', mimeType: 'application/pdf', url: '#' },
+      contentBlocks: [
+        { id: 'blk-1', type: 'text', order: 0, text: 'Текст' },
+        { id: 'blk-2', type: 'pdf', order: 1, filename: 'notes.pdf', mimeType: 'application/pdf', url: '#' },
       ],
-      submission: {
-        text: 'Готово',
-        submittedAt: '2026-08-02T11:00:00.000Z',
-      },
     });
 
     expect(assignment).toMatchObject({
       id: 'asgn-1',
       title: 'Этюд №3',
       teacherId: 'user-teacher-1',
-      studentId: 'user-student',
-      lessonId: 'lesson-1',
+      groupId: 'grp-vocalists',
       dueDate: '2026-09-05',
-      responseType: 'audio',
-      status: 'submitted',
     });
-    expect(assignment.materials).toHaveLength(1);
-    expect(assignment.submission?.text).toBe('Готово');
+    expect(assignment.contentBlocks).toHaveLength(2);
     expect(assignment.createdAt).toBe('2026-08-01T10:00:00.000Z');
-    expect(assignment.feedback).toBeUndefined();
   });
 
   it('assignment hooks lock create teacher and submit/review fields', () => {
@@ -771,6 +765,37 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(ticket.createdAt).toBe('2026-08-01T10:00:00.000Z');
   });
 
+  it('mapSchoolSettingsRecord maps contacts json', () => {
+    const settings = mapSchoolSettingsRecord({
+      id: 'school-1',
+      collectionId: 'school_settings',
+      collectionName: 'school_settings',
+      created: '',
+      updated: '',
+      name: 'Квартира',
+      tagline: 'Школа музыки',
+      about: 'Описание школы',
+      contacts: {
+        phone: '+7 (900) 123-45-67',
+        email: 'hello@kvartira-music.ru',
+        address: 'г. Москва',
+        workingHours: 'Пн–Сб: 10:00–20:00',
+      },
+    });
+
+    expect(settings).toMatchObject({
+      name: 'Квартира',
+      tagline: 'Школа музыки',
+      about: 'Описание школы',
+      contacts: {
+        phone: '+7 (900) 123-45-67',
+        email: 'hello@kvartira-music.ru',
+        address: 'г. Москва',
+        workingHours: 'Пн–Сб: 10:00–20:00',
+      },
+    });
+  });
+
   it('support hooks lock ticket create user and admin-only reply', () => {
     const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/support.pb.js'), 'utf8');
     const lib = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraSupport.js'), 'utf8');
@@ -915,6 +940,7 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('assertSecuritySessionUpdate');
     expect(lib).toContain('assertSecurityAlertUpdate');
     expect(lib).toContain('recordSecuritySession');
+    expect(lib).toContain('markOnlyCurrentSession');
     expect(authHook).toContain('recordSecuritySession');
   });
 

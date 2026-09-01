@@ -135,8 +135,8 @@
     "semantic_hash": ""
   },
   "src/pages/events/EventDetailPage.tsx": {
-    "mtime": 1788256794.447028,
-    "ast_hash": "55688a81d25f852be5d0ed3178499024",
+    "mtime": 1788260173.947953,
+    "ast_hash": "b3ed0942594053344b7a177ca22cd4dd",
     "semantic_hash": ""
   },
   "src/pages/events/EventsPage.tsx": {
@@ -335,8 +335,8 @@
     "semantic_hash": ""
   },
   "src/pages/profile/AvailabilityPage.tsx": {
-    "mtime": 1788256804.014963,
-    "ast_hash": "44e2c02cd80cce4acbed0c29b4bfc94a",
+    "mtime": 1788260138.4678144,
+    "ast_hash": "3fd2d02afe3ff545e8cd788fe5943359",
     "semantic_hash": ""
   },
   "src/services/availability/formHelpers.ts": {
@@ -655,8 +655,8 @@
     "semantic_hash": ""
   },
   "src/pages/assignments/AssignmentDetailPage.tsx": {
-    "mtime": 1788256782.2170334,
-    "ast_hash": "f885a810024def5900c66e3d0a98ac06",
+    "mtime": 1788260138.218577,
+    "ast_hash": "54e9f222ae9611ad4c9c06e557e2fa1b",
     "semantic_hash": ""
   },
   "src/pages/assignments/AssignmentsPage.tsx": {
@@ -665,8 +665,8 @@
     "semantic_hash": ""
   },
   "src/services/api/mock/assignments.ts": {
-    "mtime": 1788159031.388841,
-    "ast_hash": "a81297c1aa8d9a46caff66b9947b347d",
+    "mtime": 1788260145.101989,
+    "ast_hash": "999efdff492229014371ba63824889b3",
     "semantic_hash": ""
   },
   "src/services/assignments/access.ts": {
@@ -690,8 +690,8 @@
     "semantic_hash": ""
   },
   "src/pages/assignments/CreateAssignmentPage.tsx": {
-    "mtime": 1788256785.4049416,
-    "ast_hash": "d21baf6d43072a4eba1eda62476539e9",
+    "mtime": 1788260135.5146635,
+    "ast_hash": "f8ae91b42b07a40688542239adde9a1c",
     "semantic_hash": ""
   },
   "src/components/assignments/AssignmentFilePicker.tsx": {
@@ -730,8 +730,8 @@
     "semantic_hash": ""
   },
   "src/services/api/mock/progress.ts": {
-    "mtime": 1788146731.789707,
-    "ast_hash": "cf59b1638ccd1f9bf74d8b412aa2cf2f",
+    "mtime": 1788260208.554739,
+    "ast_hash": "ef6b20d3ebfbddf65006c187963d2d7c",
     "semantic_hash": ""
   },
   "src/services/progress/access.ts": {
@@ -745,13 +745,13 @@
     "semantic_hash": ""
   },
   "src/test/progress.test.ts": {
-    "mtime": 1788147070.3906357,
-    "ast_hash": "c22d356811a4b8067f8864215bcb11a3",
+    "mtime": 1788260176.502841,
+    "ast_hash": "c33e23021d9c0d545b8241281466668b",
     "semantic_hash": ""
   },
   "src/services/progress/achievements.ts": {
-    "mtime": 1788251949.3940732,
-    "ast_hash": "9a17a5498ecc6e5e9c3cd42403b1f717",
+    "mtime": 1788260145.1507113,
+    "ast_hash": "f56e0fe4cc37cba390d48b36ce6d4f0e",
     "semantic_hash": ""
   },
   "src/components/progress/HomeProgressBlock.tsx": {
@@ -780,8 +780,8 @@
     "semantic_hash": ""
   },
   "src/pages/profile/HelpTicketDetailPage.tsx": {
-    "mtime": 1788256817.142009,
-    "ast_hash": "6c953fba29e3d15288745d95b4a9d2fa",
+    "mtime": 1788260138.9820468,
+    "ast_hash": "36fea445039ceadc20708d53184a44b5",
     "semantic_hash": ""
   },
   "src/services/api/mock/support.ts": {
@@ -855,8 +855,8 @@
     "semantic_hash": ""
   },
   "src/pages/profile/SecurityPage.tsx": {
-    "mtime": 1788256813.0470164,
-    "ast_hash": "f707768a3b6b86b3f804320b21f9446b",
+    "mtime": 1788260145.101989,
+    "ast_hash": "2d36ac4369d53111014d9a2b4b4925af",
     "semantic_hash": ""
   },
   "src/services/api/mock/security.ts": {
@@ -885,8 +885,8 @@
     "semantic_hash": ""
   },
   "src/test/security.test.ts": {
-    "mtime": 1788154336.6017215,
-    "ast_hash": "faa8d247051a4a480a4b6928cea28d6e",
+    "mtime": 1788260145.1507113,
+    "ast_hash": "50cee3b4e87a010d934642fa5b6d9feb",
     "semantic_hash": ""
   },
   "src/pages/legal/LegalDocumentDetailPage.tsx": {
@@ -1315,8 +1315,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/mappers.ts": {
-    "mtime": 1788185042.4282796,
-    "ast_hash": "7942db85e6ae276c1a657ee1bf8f8a57",
+    "mtime": 1788260162.1085126,
+    "ast_hash": "1adfe0534eef0d2c26187408b77132ad",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/users.ts": {
@@ -1340,8 +1340,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/helpers.ts": {
-    "mtime": 1788185054.9302201,
-    "ast_hash": "faa10d3c082cdbea3cebe7c813966197",
+    "mtime": 1788260162.1074882,
+    "ast_hash": "7865ea9c61ab74b5793be77938cacfe4",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/lessons.ts": {
@@ -1480,8 +1480,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/notifications.ts": {
-    "mtime": 1788183922.1899664,
-    "ast_hash": "2bdd6c5bda65e11088a6ca7c3b6480db",
+    "mtime": 1788260164.3810363,
+    "ast_hash": "b49b7d80304f5e3ea16c3fbc40f72359",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/files.pb.js": {

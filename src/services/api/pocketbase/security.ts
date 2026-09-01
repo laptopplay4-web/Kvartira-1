@@ -16,8 +16,8 @@ import {
   canViewSecurity,
 } from '@/services/security/access';
 import {
-  countUnreadAlerts,
   getLastSuccessfulLogin,
+  resolveSecuritySessions,
   sortLoginHistoryByDate,
 } from '@/services/security/helpers';
 import { MIN_PASSWORD_LENGTH } from '@/services/security/constants';
@@ -48,13 +48,30 @@ function userFilter(userId: string): string {
 
 async function getPasswordChangedAt(userId: string): Promise<string | undefined> {
   const pb = getPocketBase();
-  const records = await pb.collection('security_alerts').getList(1, 1, {
-    filter: `${userFilter(userId)} && type = "password_changed"`,
+  const records = await pb.collection('notifications').getList(1, 1, {
+    filter: `${userFilter(userId)} && type = "system" && title = "Пароль изменён"`,
     sort: '-id',
   });
-  const alert = records.items[0];
-  if (!alert) return undefined;
-  return mapSecurityAlertRecord(alert).createdAt;
+  const notification = records.items[0];
+  if (!notification) return undefined;
+  return notification.getString('created') || notification.getString('createdAt');
+}
+
+async function createSecurityNotification(
+  userId: string,
+  title: string,
+  body: string,
+  link = '/profile/settings/security',
+): Promise<void> {
+  const pb = getPocketBase();
+  await pb.collection('notifications').create({
+    user: userId,
+    type: 'system',
+    title,
+    body,
+    link,
+    read: false,
+  });
 }
 
 export const pocketbaseSecurityApi: SecurityApi = {
@@ -64,17 +81,16 @@ export const pocketbaseSecurityApi: SecurityApi = {
       assertViewAccess(requesterId, user);
 
       const pb = getPocketBase();
-      const [sessions, alerts, history, passwordChangedAt] = await Promise.all([
+      const [sessions, history, passwordChangedAt] = await Promise.all([
         pb.collection('security_sessions').getFullList({ filter: userFilter(requesterId) }),
-        pb.collection('security_alerts').getFullList({ filter: userFilter(requesterId) }),
         pb.collection('login_history').getFullList({ filter: userFilter(requesterId) }),
         getPasswordChangedAt(requesterId),
       ]);
 
       const loginEntries = history.map(mapLoginHistoryRecord);
+      const sessionsResolved = resolveSecuritySessions(sessions.map(mapSecuritySessionRecord));
       const overview: SecurityOverview = {
-        activeSessions: sessions.length,
-        unreadAlerts: countUnreadAlerts(alerts.map(mapSecurityAlertRecord)),
+        activeSessions: sessionsResolved.length,
         lastLoginAt: getLastSuccessfulLogin(loginEntries),
         passwordChangedAt,
       };
@@ -106,13 +122,11 @@ export const pocketbaseSecurityApi: SecurityApi = {
         passwordConfirm: input.newPassword,
       });
 
-      await pb.collection('security_alerts').create({
-        user: requesterId,
-        type: 'password_changed',
-        title: 'Пароль изменён',
-        message: 'Пароль вашего аккаунта был успешно обновлён.',
-        read: false,
-      });
+      await createSecurityNotification(
+        requesterId,
+        'Пароль изменён',
+        'Пароль вашего аккаунта был успешно обновлён.',
+      );
     });
   },
 
@@ -126,7 +140,7 @@ export const pocketbaseSecurityApi: SecurityApi = {
         filter: userFilter(requesterId),
         sort: '-lastActiveAt',
       });
-      return records.map(mapSecuritySessionRecord);
+      return resolveSecuritySessions(records.map(mapSecuritySessionRecord));
     });
   },
 
@@ -148,7 +162,8 @@ export const pocketbaseSecurityApi: SecurityApi = {
         throw error;
       }
 
-      const session = mapSecuritySessionRecord(record);
+      const sessions = resolveSecuritySessions([mapSecuritySessionRecord(record)]);
+      const session = sessions[0];
       if (session.userId !== requesterId) {
         throw new ApiError('Сессия не найдена', 'NOT_FOUND', 404);
       }
@@ -157,13 +172,6 @@ export const pocketbaseSecurityApi: SecurityApi = {
       }
 
       await pb.collection('security_sessions').delete(sessionId);
-      await pb.collection('security_alerts').create({
-        user: requesterId,
-        type: 'session_revoked',
-        title: 'Сессия завершена',
-        message: `Завершена сессия: ${session.deviceLabel}.`,
-        read: false,
-      });
     });
   },
 
@@ -176,21 +184,15 @@ export const pocketbaseSecurityApi: SecurityApi = {
 
       const pb = getPocketBase();
       const records = await pb.collection('security_sessions').getFullList({
-        filter: `${userFilter(requesterId)} && isCurrent = false`,
+        filter: userFilter(requesterId),
+        sort: '-lastActiveAt',
       });
+      const sessions = resolveSecuritySessions(records.map(mapSecuritySessionRecord));
 
-      for (const record of records) {
-        await pb.collection('security_sessions').delete(record.id);
-      }
-
-      if (records.length > 0) {
-        await pb.collection('security_alerts').create({
-          user: requesterId,
-          type: 'session_revoked',
-          title: 'Другие сессии завершены',
-          message: `Завершено сессий: ${records.length}.`,
-          read: false,
-        });
+      for (const session of sessions) {
+        if (!session.isCurrent) {
+          await pb.collection('security_sessions').delete(session.id);
+        }
       }
     });
   },

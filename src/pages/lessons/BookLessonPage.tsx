@@ -9,6 +9,7 @@ import { format, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 import { ChevronLeft, Check } from 'lucide-react';
+import { backNavButtonClassName } from '@/components/ui/BackLink';
 import { useBackNavigation } from '@/hooks/useBackNavigation';
 
 import { useCurrentUser } from '@/stores/authStore';
@@ -178,7 +179,7 @@ export default function BookLessonPage() {
 
             onClick={goBack}
 
-            className="mb-4 flex min-h-11 items-center gap-1 text-sm text-text-secondary hover:text-brand focus-ring rounded"
+            className={cn('mb-4', backNavButtonClassName)}
 
           >
 

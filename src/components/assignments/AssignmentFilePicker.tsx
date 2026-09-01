@@ -1,7 +1,8 @@
 import { useRef } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { MAX_MATERIALS_PER_ASSIGNMENT } from '@/services/assignments/constants';
+
+const DEFAULT_MAX_FILES = 5;
 
 export interface PendingAssignmentFile {
   id: string;
@@ -31,7 +32,7 @@ export function AssignmentFilePicker({
   onRemove,
   disabled,
   error,
-  maxFiles = MAX_MATERIALS_PER_ASSIGNMENT,
+  maxFiles = DEFAULT_MAX_FILES,
 }: AssignmentFilePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const canAdd = files.length < maxFiles;

@@ -11,6 +11,7 @@ const MAX_LOGIN_HISTORY = 100;
 const FAILED_LOGIN_TITLE = 'Неудачная попытка входа';
 const FAILED_LOGIN_MESSAGE =
   'Кто-то пытался войти в аккаунт с неверным паролем.';
+const SECURITY_SETTINGS_LINK = '/profile/settings/security';
 
 /**
  * @param {string} phone
@@ -82,12 +83,14 @@ function recordLoginAttempt(app, userId, success, e) {
   trimLoginHistory(app, userId);
 
   if (!success) {
-    pushSecurityAlert(
+    const notifications = require(`${__hooks}/lib/kvartiraNotifications.js`);
+    notifications.createNotificationForUser(
       app,
       userId,
-      'failed_login',
+      'system',
       FAILED_LOGIN_TITLE,
       FAILED_LOGIN_MESSAGE,
+      SECURITY_SETTINGS_LINK,
     );
   }
 }
@@ -119,6 +122,7 @@ function trimLoginHistory(app, userId) {
  * @param {'new_device' | 'password_changed' | 'failed_login' | 'session_revoked'} type
  * @param {string} title
  * @param {string} message
+ * @deprecated Use createNotificationForUser in kvartiraNotifications.js
  */
 function pushSecurityAlert(app, userId, type, title, message) {
   const alertsCol = app.findCollectionByNameOrId('security_alerts');

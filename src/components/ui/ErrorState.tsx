@@ -16,7 +16,10 @@ export function ErrorState({
   className,
 }: ErrorStateProps) {
   return (
-    <div className={cn('flex flex-col items-center justify-center py-12 text-center', className)}>
+    <div
+      role="alert"
+      className={cn('flex flex-col items-center justify-center py-12 text-center select-text', className)}
+    >
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-muted">
         <AlertCircle className="h-7 w-7 text-danger" aria-hidden />
       </div>

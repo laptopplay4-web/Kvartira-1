@@ -19,24 +19,40 @@ function relId(value) {
 }
 
 /**
+ * PocketBase JSVM may not persist bool `false` on optional fields — clear via null.
  * @param {import('pocketbase').PocketBase} app
  * @param {string} userId
+ * @param {string} currentSessionId
  */
-function clearCurrentSessions(app, userId) {
+function markOnlyCurrentSession(app, userId, currentSessionId) {
   /** @type {Record[]} */
   const rows = [];
   app.findRecordsByFilter(
     'security_sessions',
-    'user = {:userId} && isCurrent = true',
+    'user = {:userId}',
     '',
     200,
     0,
     { userId },
     rows,
   );
+
   for (const row of rows) {
-    row.set('isCurrent', false);
-    app.save(row);
+    const shouldBeCurrent = row.id === currentSessionId;
+    const wasCurrent = row.getBool('isCurrent');
+
+    if (shouldBeCurrent) {
+      if (!wasCurrent) {
+        row.set('isCurrent', true);
+        app.save(row);
+      }
+      continue;
+    }
+
+    if (wasCurrent) {
+      row.set('isCurrent', null);
+      app.save(row);
+    }
   }
 }
 
@@ -62,9 +78,9 @@ function recordSecuritySession(app, userId, e) {
     existingRows,
   );
 
-  clearCurrentSessions(app, userId);
-
   const sessionsCol = app.findCollectionByNameOrId('security_sessions');
+  let currentSessionId;
+  let isNewDevice = false;
 
   if (existingRows.length > 0) {
     const session = existingRows[0];
@@ -72,25 +88,33 @@ function recordSecuritySession(app, userId, e) {
     session.set('ipAddress', ipAddress);
     session.set('isCurrent', true);
     app.save(session);
-    return;
+    currentSessionId = session.id;
+  } else {
+    const session = new Record(sessionsCol);
+    session.set('user', userId);
+    session.set('deviceLabel', deviceLabel);
+    session.set('platform', 'web');
+    session.set('ipAddress', ipAddress);
+    session.set('lastActiveAt', now);
+    session.set('isCurrent', true);
+    app.save(session);
+    currentSessionId = session.id;
+    isNewDevice = true;
   }
 
-  const session = new Record(sessionsCol);
-  session.set('user', userId);
-  session.set('deviceLabel', deviceLabel);
-  session.set('platform', 'web');
-  session.set('ipAddress', ipAddress);
-  session.set('lastActiveAt', now);
-  session.set('isCurrent', true);
-  app.save(session);
+  markOnlyCurrentSession(app, userId, currentSessionId);
 
-  auth.pushSecurityAlert(
-    app,
-    userId,
-    'new_device',
-    'Вход с нового устройства',
-    `Обнаружен вход с ${deviceLabel}.`,
-  );
+  if (isNewDevice) {
+    const notifications = require(`${__hooks}/lib/kvartiraNotifications.js`);
+    notifications.createNotificationForUser(
+      app,
+      userId,
+      'system',
+      'Вход в аккаунт',
+      `Обнаружен вход с ${deviceLabel}.`,
+      '/profile/settings/security',
+    );
+  }
 }
 
 /**
@@ -149,6 +173,7 @@ function assertSecurityAlertUpdate(e) {
 module.exports = {
   relId,
   recordSecuritySession,
+  markOnlyCurrentSession,
   assertSecuritySessionCreate,
   assertSecuritySessionUpdate,
   assertSecurityAlertUpdate,

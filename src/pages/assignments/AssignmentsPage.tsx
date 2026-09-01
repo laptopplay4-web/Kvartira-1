@@ -1,32 +1,28 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Calendar, Plus } from 'lucide-react';
+import { BookOpen, Plus, Users } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
 import { can } from '@/permissions';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { AssignmentStatusBadge } from '@/components/ui/AssignmentStatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatFullDate } from '@/utils/dates';
+import { getAssignmentGroupLabel } from '@/services/assignments/groups/helpers';
 import { formatUserName } from '@/utils';
 
 export default function AssignmentsPage() {
   const user = useCurrentUser()!;
-
-  const needsUsers = user.role !== 'student';
 
   const { data: assignments, isLoading, error, refetch } = useQuery({
     queryKey: ['assignments', user.id, user.role],
     queryFn: () => api.assignments.getAssignments({ requesterId: user.id }),
   });
 
-  const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => api.users.getAllUsers(),
-    enabled: needsUsers,
+  const { data: groups } = useQuery({
+    queryKey: ['assignment-groups', user.id],
+    queryFn: () => api.assignmentGroups.getGroups(user.id),
   });
 
   const { data: teachers } = useQuery({
@@ -35,20 +31,21 @@ export default function AssignmentsPage() {
     enabled: user.role === 'student',
   });
 
-  const getPersonName = (id: string, role?: 'teacher' | 'student') => {
-    if (role === 'teacher' || user.role === 'student') {
-      const teacher = teachers?.find((u) => u.id === id);
-      if (teacher) return formatUserName(teacher);
-    }
-    const person = users?.find((u) => u.id === id);
-    return person ? formatUserName(person) : '';
+  const getGroupName = (groupId: string) =>
+    groups ? getAssignmentGroupLabel(groupId, groups) : '';
+  const getTeacherName = (teacherId: string) => {
+    const teacher = teachers?.find((u) => u.id === teacherId);
+    return teacher ? formatUserName(teacher) : '';
   };
 
   const subtitle = () => {
-    if (user.role === 'student') return 'Ваши задания от преподавателей';
-    if (user.role === 'teacher') return 'Задания ваших учеников';
-    return 'Все задания школы';
+    if (user.role === 'student') return 'Материалы от преподавателей по вашим группам';
+    if (user.role === 'teacher') return 'Материалы для ваших групп';
+    return 'Все материалы школы';
   };
+
+  const canCreate = can(user, 'assignments:create');
+  const canManageGroups = can(user, 'assignments:manage-groups');
 
   if (error) {
     return (
@@ -58,8 +55,6 @@ export default function AssignmentsPage() {
     );
   }
 
-  const canCreate = can(user, 'assignments:create');
-
   return (
     <div className="page-container">
       <div className="mb-6 flex items-start justify-between gap-4">
@@ -67,14 +62,24 @@ export default function AssignmentsPage() {
           <h1 className="text-h1 mb-1">Домашние задания</h1>
           <p className="text-body-sm text-text-secondary">{subtitle()}</p>
         </div>
-        {canCreate && (
-          <Link to="/assignments/create" className="shrink-0">
-            <Button size="sm">
-              <Plus className="h-4 w-4" aria-hidden />
-              Создать
-            </Button>
-          </Link>
-        )}
+        <div className="flex shrink-0 gap-2">
+          {canManageGroups && (
+            <Link to="/assignments/groups">
+              <Button size="sm" variant="secondary">
+                <Users className="h-4 w-4" aria-hidden />
+                Группы
+              </Button>
+            </Link>
+          )}
+          {canCreate && (
+            <Link to="/assignments/create">
+              <Button size="sm">
+                <Plus className="h-4 w-4" aria-hidden />
+                Создать
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -88,31 +93,18 @@ export default function AssignmentsPage() {
           {assignments.map((assignment) => (
             <Link key={assignment.id} to={`/assignments/${assignment.id}`}>
               <Card interactive>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <AssignmentStatusBadge assignment={assignment} />
-                    <h2 className="mt-2 text-h3">{assignment.title}</h2>
-                    <p className="mt-1 line-clamp-2 text-body-sm text-text-secondary">
-                      {assignment.description}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-3 text-caption text-text-muted">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" aria-hidden />
-                        Срок: {formatFullDate(assignment.dueDate)}
-                      </span>
-                      {user.role === 'teacher' && (
-                        <span>{getPersonName(assignment.studentId)}</span>
-                      )}
-                      {user.role === 'student' && (
-                        <span>{getPersonName(assignment.teacherId, 'teacher')}</span>
-                      )}
-                      {can(user, 'assignments:view-all') && (
-                        <span>
-                          {getPersonName(assignment.teacherId)} → {getPersonName(assignment.studentId)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                <h2 className="text-h3">{assignment.title}</h2>
+                <p className="mt-1 line-clamp-2 text-body-sm text-text-secondary">
+                  {assignment.description}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3 text-caption text-text-muted">
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5" aria-hidden />
+                    {getGroupName(assignment.groupId)}
+                  </span>
+                  {user.role === 'student' && (
+                    <span>{getTeacherName(assignment.teacherId)}</span>
+                  )}
                 </div>
               </Card>
             </Link>
@@ -124,8 +116,8 @@ export default function AssignmentsPage() {
           title="Нет заданий"
           description={
             user.role === 'student'
-              ? 'Когда преподаватель выдаст задание, оно появится здесь'
-              : 'Создайте задание для ученика'
+              ? 'Когда преподаватель опубликует материалы для вашей группы, они появятся здесь'
+              : 'Создайте группу и добавьте материалы для учеников'
           }
           action={
             canCreate ? (

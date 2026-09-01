@@ -152,36 +152,19 @@ export async function resolveMessages(messages: Message[]): Promise<Message[]> {
 }
 
 export async function resolveAssignment(assignment: Assignment): Promise<Assignment> {
-  const materials = assignment.materials?.length
+  const contentBlocks = assignment.contentBlocks?.length
     ? await Promise.all(
-        assignment.materials.map(async (material) => {
-          const url = await resolveStoredFileUrl(material.url);
-          return url && url !== material.url ? { ...material, url } : material;
+        assignment.contentBlocks.map(async (block) => {
+          if (!block.url) return block;
+          const url = await resolveStoredFileUrl(block.url);
+          return url && url !== block.url ? { ...block, url } : block;
         }),
       )
-    : assignment.materials;
-
-  let submission = assignment.submission;
-  if (submission?.attachmentUrl) {
-    const attachmentUrl = await resolveStoredFileUrl(submission.attachmentUrl);
-    if (attachmentUrl && attachmentUrl !== submission.attachmentUrl) {
-      submission = { ...submission, attachmentUrl };
-    }
-  }
-
-  let feedback = assignment.feedback;
-  if (feedback?.audioUrl) {
-    const audioUrl = await resolveStoredFileUrl(feedback.audioUrl);
-    if (audioUrl && audioUrl !== feedback.audioUrl) {
-      feedback = { ...feedback, audioUrl };
-    }
-  }
+    : assignment.contentBlocks;
 
   return {
     ...assignment,
-    materials: materials ?? assignment.materials,
-    submission,
-    feedback,
+    contentBlocks: contentBlocks ?? assignment.contentBlocks,
   };
 }
 

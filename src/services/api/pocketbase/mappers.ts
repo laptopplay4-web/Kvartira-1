@@ -3,11 +3,8 @@ import type {
   AchievementDefinition,
   AppNotification,
   Assignment,
-  AssignmentFeedback,
-  AssignmentMaterial,
-  AssignmentResponseType,
-  AssignmentStatus,
-  AssignmentSubmission,
+  AssignmentContentBlock,
+  AssignmentGroup,
   CompetitionApplication,
   Conversation,
   ConversationLastMessage,
@@ -33,6 +30,7 @@ import type {
   ProgressGoalStatus,
   ProgressHistoryEntry,
   ProgressHistoryType,
+  PublicSchoolInfo,
   SchoolEvent,
   Skill,
   StudentSkillProgress,
@@ -76,6 +74,7 @@ export interface PbUserRecord extends RecordModel {
   avatarUrl?: string;
   avatarOriginalUrl?: string;
   bio?: string;
+  directionIds?: string[];
 }
 
 export function mapUserRecord(record: PbUserRecord | RecordModel): User {
@@ -91,6 +90,8 @@ export function mapUserRecord(record: PbUserRecord | RecordModel): User {
   if (r.avatarUrl) user.avatarUrl = r.avatarUrl;
   if (r.avatarOriginalUrl) user.avatarOriginalUrl = r.avatarOriginalUrl;
   if (r.bio) user.bio = r.bio;
+  const directionIds = (r as { directionIds?: string[] }).directionIds;
+  if (directionIds?.length) user.directionIds = directionIds;
 
   return user;
 }
@@ -109,6 +110,7 @@ export function userToPbRecord(user: User): PbUserRecord {
     avatarUrl: user.avatarUrl ?? '',
     avatarOriginalUrl: user.avatarOriginalUrl ?? '',
     bio: user.bio ?? '',
+    directionIds: user.directionIds ?? [],
   };
 }
 
@@ -468,44 +470,43 @@ export interface PbAssignmentRecord extends RecordModel {
   title: string;
   description: string;
   teacher: string | RecordModel;
-  student: string | RecordModel;
-  lesson?: string | RecordModel | null;
-  dueDate: string;
-  responseType: AssignmentResponseType;
-  status: AssignmentStatus;
-  materials?: AssignmentMaterial[];
-  submission?: AssignmentSubmission | null;
-  feedback?: AssignmentFeedback | null;
+  group?: string | RecordModel | null;
+  dueDate?: string;
+  contentBlocks?: AssignmentContentBlock[];
 }
 
 export function mapAssignmentRecord(record: PbAssignmentRecord | RecordModel): Assignment {
   const r = record as PbAssignmentRecord;
-  const assignment: Assignment = {
+  const groupId = emptyToUndefined(relId(r.group)) ?? '';
+  return {
     id: record.id,
     title: r.title,
     description: r.description,
     teacherId: relId(r.teacher),
-    studentId: relId(r.student),
-    dueDate: normalizePbDate(r.dueDate),
-    responseType: r.responseType,
-    status: r.status,
-    materials: Array.isArray(r.materials) ? r.materials : [],
-    createdAt: getPbRecordCreatedAt(record, normalizePbDate(r.dueDate)),
-    updatedAt: getPbRecordUpdatedAt(record, normalizePbDate(r.dueDate)),
+    groupId,
+    dueDate: r.dueDate ? normalizePbDate(r.dueDate) : undefined,
+    contentBlocks: Array.isArray(r.contentBlocks) ? r.contentBlocks : [],
+    createdAt: getPbRecordCreatedAt(record, normalizePbDate(r.dueDate ?? '')),
+    updatedAt: getPbRecordUpdatedAt(record, normalizePbDate(r.dueDate ?? '')),
   };
+}
 
-  const lessonId = emptyToUndefined(relId(r.lesson));
-  if (lessonId) assignment.lessonId = lessonId;
+export interface PbAssignmentGroupRecord extends RecordModel {
+  name: string;
+  teacher: string | RecordModel;
+  memberIds?: string[];
+}
 
-  if (r.submission && typeof r.submission === 'object') {
-    assignment.submission = r.submission;
-  }
-
-  if (r.feedback && typeof r.feedback === 'object') {
-    assignment.feedback = r.feedback;
-  }
-
-  return assignment;
+export function mapAssignmentGroupRecord(record: PbAssignmentGroupRecord | RecordModel): AssignmentGroup {
+  const r = record as PbAssignmentGroupRecord;
+  return {
+    id: record.id,
+    name: r.name,
+    teacherId: relId(r.teacher),
+    memberIds: Array.isArray(r.memberIds) ? r.memberIds : [],
+    createdAt: getPbRecordCreatedAt(record),
+    updatedAt: getPbRecordUpdatedAt(record),
+  };
 }
 
 export interface PbSkillRecord extends RecordModel {
@@ -858,5 +859,37 @@ export function mapNotificationPreferencesRecord(
   return {
     userId: relId(r.user),
     pushEnabled: Boolean(r.pushEnabled),
+  };
+}
+
+interface PbSchoolSettingsRecord {
+  name: string;
+  tagline?: string;
+  about?: string;
+  contacts: unknown;
+}
+
+function parseSchoolContacts(value: unknown): PublicSchoolInfo['contacts'] {
+  if (!value || typeof value !== 'object') {
+    return { phone: '', email: '', address: '', workingHours: '' };
+  }
+  const contacts = value as Record<string, unknown>;
+  return {
+    phone: typeof contacts.phone === 'string' ? contacts.phone : '',
+    email: typeof contacts.email === 'string' ? contacts.email : '',
+    address: typeof contacts.address === 'string' ? contacts.address : '',
+    workingHours: typeof contacts.workingHours === 'string' ? contacts.workingHours : '',
+  };
+}
+
+export function mapSchoolSettingsRecord(
+  record: PbSchoolSettingsRecord | RecordModel,
+): PublicSchoolInfo {
+  const r = record as PbSchoolSettingsRecord;
+  return {
+    name: typeof r.name === 'string' ? r.name : '',
+    tagline: typeof r.tagline === 'string' ? r.tagline : '',
+    about: typeof r.about === 'string' ? r.about : '',
+    contacts: parseSchoolContacts(r.contacts),
   };
 }

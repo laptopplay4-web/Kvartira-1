@@ -23,7 +23,7 @@ function relId(value) {
 function assertNotificationCreate(e) {
   const auth = e.auth;
   if (!auth) {
-    throw new ApiError(403, 'Нет доступа');
+    return;
   }
 
   const userId = relId(e.record.get('user'));
@@ -104,4 +104,26 @@ module.exports = {
   assertNotificationUpdate,
   assertNotificationPreferencesCreate,
   assertNotificationPreferencesUpdate,
+  createNotificationForUser,
 };
+
+/**
+ * @param {import('pocketbase').PocketBase} app
+ * @param {string} userId
+ * @param {string} type
+ * @param {string} title
+ * @param {string} body
+ * @param {string} [link]
+ */
+function createNotificationForUser(app, userId, type, title, body, link) {
+  const col = app.findCollectionByNameOrId('notifications');
+  const record = new Record(col);
+  record.set('user', userId);
+  record.set('type', type);
+  record.set('title', title);
+  record.set('body', body);
+  if (link) {
+    record.set('link', link);
+  }
+  app.save(record);
+}

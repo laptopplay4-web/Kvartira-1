@@ -1,5 +1,6 @@
 import type {
   Assignment,
+  AssignmentGroup,
   Lesson,
   ProgressGoal,
   Skill,
@@ -91,20 +92,26 @@ export function computeProgressSummary(params: {
   studentId: string;
   lessons: Lesson[];
   assignments: Assignment[];
+  assignmentGroups?: AssignmentGroup[];
   goals: ProgressGoal[];
   skillProgress: StudentSkillProgress[];
   achievements: AchievementDefinition[];
   userAchievements: UserAchievement[];
 }): StudentProgressSummary {
-  const { studentId, lessons, assignments, goals, skillProgress, achievements, userAchievements } = params;
+  const { studentId, lessons, assignments, assignmentGroups, goals, skillProgress, achievements, userAchievements } =
+    params;
 
   const studentLessons = lessons.filter((l) => l.studentId === studentId);
   const completed = studentLessons.filter((l) => isLessonCompleted(l));
   const upcoming = studentLessons.filter((l) => !isLessonPast(l) && l.status !== 'cancelled');
   const attendance = computeAttendanceStats(lessons, studentId);
 
-  const studentAssignments = assignments.filter((a) => a.studentId === studentId);
-  const reviewed = studentAssignments.filter((a) => a.status === 'reviewed');
+  const studentAssignments = assignmentGroups
+    ? assignments.filter((a) => {
+        const group = assignmentGroups.find((g) => g.id === a.groupId);
+        return group?.memberIds.includes(studentId);
+      })
+    : assignments;
 
   const studentGoals = goals.filter((g) => g.studentId === studentId);
   const activeGoals = studentGoals.filter((g) => g.status === 'active');
@@ -124,7 +131,6 @@ export function computeProgressSummary(params: {
     lessonsUpcoming: upcoming.length,
     lessonsTotal: studentLessons.length,
     ...attendance,
-    assignmentsReviewed: reviewed.length,
     assignmentsTotal: studentAssignments.length,
     activeGoals: activeGoals.length,
     completedGoals: completedGoals.length,

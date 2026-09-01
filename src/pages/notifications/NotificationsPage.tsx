@@ -33,7 +33,7 @@ export default function NotificationsPage() {
   return (
     <div className="page-container max-w-lg">
       <div className="mb-6 flex items-center justify-between">
-        <BackLink label="Профиль" fallbackTo="/profile" className="mb-0 flex items-center gap-1 text-sm focus-ring rounded" />
+        <BackLink label="Профиль" fallbackTo="/profile" className="mb-0" />
         {unread > 0 && (
           <Button variant="ghost" size="sm" onClick={() => markAllMutation.mutate()} loading={markAllMutation.isPending}>
             Прочитать все

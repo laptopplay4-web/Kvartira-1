@@ -81,7 +81,7 @@ export default function LessonsPage() {
         <h1 className="text-h1">Занятия</h1>
         <div className="flex items-center gap-2">
           {can(user, 'availability:manage') && (
-            <Link to="/profile/availability">
+            <Link to="/lessons/availability">
               <Button variant="secondary" size="sm">График работы</Button>
             </Link>
           )}

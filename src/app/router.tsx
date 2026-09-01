@@ -1,5 +1,6 @@
 import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { isProgressFeatureEnabled } from '@/config/features';
 import { AppLayout, AdminRoute, GuestRoute, ProtectedRoute } from './layouts';
 
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
@@ -14,7 +15,9 @@ const ChatPage = lazy(() => import('@/pages/chat/ChatPage'));
 const EventsPage = lazy(() => import('@/pages/events/EventsPage'));
 const EventDetailPage = lazy(() => import('@/pages/events/EventDetailPage'));
 const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
-const SettingsPage = lazy(() => import('@/pages/profile/SettingsPage'));
+const SettingsLayout = lazy(() => import('@/pages/profile/settings/SettingsLayout'));
+const AccountSettingsPage = lazy(() => import('@/pages/profile/settings/AccountSettingsPage'));
+const SystemSettingsPage = lazy(() => import('@/pages/profile/settings/SystemSettingsPage'));
 const AvailabilityPage = lazy(() => import('@/pages/profile/AvailabilityPage'));
 const ProgressPage = lazy(() => import('@/pages/profile/ProgressPage'));
 const HelpPage = lazy(() => import('@/pages/profile/HelpPage'));
@@ -23,6 +26,8 @@ const SecurityPage = lazy(() => import('@/pages/profile/SecurityPage'));
 const AssignmentsPage = lazy(() => import('@/pages/assignments/AssignmentsPage'));
 const AssignmentDetailPage = lazy(() => import('@/pages/assignments/AssignmentDetailPage'));
 const CreateAssignmentPage = lazy(() => import('@/pages/assignments/CreateAssignmentPage'));
+const AssignmentGroupsPage = lazy(() => import('@/pages/assignments/AssignmentGroupsPage'));
+const AssignmentGroupDetailPage = lazy(() => import('@/pages/assignments/AssignmentGroupDetailPage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
 const AdminSchedulePage = lazy(() => import('@/pages/admin/AdminSchedulePage'));
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
@@ -37,10 +42,6 @@ const LegalDocumentDetailPage = lazy(() => import('@/pages/legal/LegalDocumentDe
 const LegalConsentsPage = lazy(() => import('@/pages/profile/LegalConsentsPage'));
 
 export const appRoutes = [
-  {
-    path: '/',
-    element: <LandingPage />,
-  },
   { path: '/directions/:id', element: <DirectionDetailPage /> },
   { path: '/teachers/:id', element: <TeacherDetailPage /> },
   { path: '/legal', element: <LegalDocumentsPage /> },
@@ -48,6 +49,7 @@ export const appRoutes = [
   {
     element: <GuestRoute />,
     children: [
+      { path: '/', element: <LandingPage /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
@@ -63,20 +65,39 @@ export const appRoutes = [
           { path: '/home', element: <HomePage /> },
           { path: '/lessons', element: <LessonsPage /> },
           { path: '/lessons/book', element: <BookLessonPage /> },
+          { path: '/lessons/availability', element: <AvailabilityPage /> },
           { path: '/lessons/:id', element: <LessonDetailPage /> },
           { path: '/chat', element: <ChatPage /> },
           { path: '/chat/:id', element: <ChatPage /> },
           { path: '/events', element: <EventsPage /> },
           { path: '/events/:id', element: <EventDetailPage /> },
           { path: '/profile', element: <ProfilePage /> },
-          { path: '/profile/settings', element: <SettingsPage /> },
-          { path: '/profile/security', element: <SecurityPage /> },
+          {
+            path: '/profile/settings',
+            element: <SettingsLayout />,
+            children: [
+              { index: true, element: <Navigate to="account" replace /> },
+              { path: 'account', element: <AccountSettingsPage /> },
+              { path: 'system', element: <SystemSettingsPage /> },
+              { path: 'security', element: <SecurityPage /> },
+            ],
+          },
+          { path: '/profile/security', element: <Navigate to="/profile/settings/security" replace /> },
           { path: '/profile/legal', element: <LegalConsentsPage /> },
-          { path: '/profile/availability', element: <AvailabilityPage /> },
-          { path: '/profile/progress', element: <ProgressPage /> },
+          { path: '/profile/availability', element: <Navigate to="/lessons/availability" replace /> },
+          {
+            path: '/profile/progress',
+            element: isProgressFeatureEnabled() ? (
+              <ProgressPage />
+            ) : (
+              <Navigate to="/profile" replace />
+            ),
+          },
           { path: '/profile/help', element: <HelpPage /> },
           { path: '/profile/help/:id', element: <HelpTicketDetailPage /> },
           { path: '/assignments', element: <AssignmentsPage /> },
+          { path: '/assignments/groups', element: <AssignmentGroupsPage /> },
+          { path: '/assignments/groups/:id', element: <AssignmentGroupDetailPage /> },
           { path: '/assignments/create', element: <CreateAssignmentPage /> },
           { path: '/assignments/:id', element: <AssignmentDetailPage /> },
           { path: '/notifications', element: <NotificationsPage /> },

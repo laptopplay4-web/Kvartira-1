@@ -9,6 +9,8 @@ export interface User {
   avatarUrl?: string;
   avatarOriginalUrl?: string;
   bio?: string;
+  /** Направления обучения (ученик) или преподавания (teacher). */
+  directionIds?: string[];
 }
 
 export type LessonStatus =
@@ -309,32 +311,32 @@ export interface RescheduleLessonInput {
   startTime: string;
 }
 
-// Stage 2 — Assignments (homework)
-export type AssignmentStatus = 'assigned' | 'submitted' | 'reviewed';
-export type AssignmentResponseType = 'text' | 'audio' | 'video' | 'image' | 'file';
+// Stage 2 — Assignments (homework materials for groups)
+export type AssignmentContentType = 'voice' | 'text' | 'pdf' | 'video';
 
-export interface AssignmentMaterial {
+export interface AssignmentContentBlock {
   id: string;
-  filename: string;
-  mimeType: string;
-  url: string;
+  type: AssignmentContentType;
+  order: number;
+  text?: string;
+  url?: string;
+  filename?: string;
+  mimeType?: string;
 }
 
-export interface AssignmentSubmission {
-  text?: string;
-  attachmentUrl?: string;
-  attachmentFilename?: string;
-  attachmentMimeType?: string;
-  submittedAt: string;
-}
-
-export interface AssignmentFeedback {
-  text?: string;
-  rating?: number;
-  audioUrl?: string;
-  audioFilename?: string;
-  audioMimeType?: string;
+export interface AssignmentGroup {
+  id: string;
+  name: string;
+  teacherId: string;
+  memberIds: string[];
   createdAt: string;
+  updatedAt: string;
+}
+
+/** Group detail with resolved members for UI (hybrid PB + mock). */
+export interface AssignmentGroupDetail extends AssignmentGroup {
+  members: User[];
+  canManage: boolean;
 }
 
 export interface Assignment {
@@ -342,19 +344,12 @@ export interface Assignment {
   title: string;
   description: string;
   teacherId: string;
-  studentId: string;
-  lessonId?: string;
-  dueDate: string;
-  responseType: AssignmentResponseType;
-  status: AssignmentStatus;
-  materials: AssignmentMaterial[];
-  submission?: AssignmentSubmission;
-  feedback?: AssignmentFeedback;
+  groupId: string;
+  dueDate?: string;
+  contentBlocks: AssignmentContentBlock[];
   createdAt: string;
   updatedAt: string;
 }
-
-export type AssignmentDisplayStatus = AssignmentStatus | 'overdue';
 
 // Stage 2 — Progress & Achievements
 export interface Skill {
@@ -430,8 +425,7 @@ export interface StudentProgressSummary {
   lessonsCancelled: number;
   /** 0–100; null when no past lessons to measure */
   attendanceRate: number | null;
-  assignmentsReviewed: number;
-  assignmentsTotal: number;
+    assignmentsTotal: number;
   activeGoals: number;
   completedGoals: number;
   achievementsUnlocked: number;
@@ -583,7 +577,6 @@ export interface SecurityAlert {
 
 export interface SecurityOverview {
   activeSessions: number;
-  unreadAlerts: number;
   lastLoginAt?: string;
   passwordChangedAt?: string;
 }

@@ -28,7 +28,7 @@ export default function LegalDocumentsPage() {
           <BackLink
             label={user ? 'Профиль' : 'Главная'}
             fallbackTo={user ? '/profile' : '/'}
-            className="mb-0 flex items-center gap-1 text-sm focus-ring rounded"
+            className="mb-0"
           />
           <Logo size="sm" />
           {user ? (

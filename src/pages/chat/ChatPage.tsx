@@ -15,6 +15,7 @@ import { useChatDraft } from '@/hooks/useChatDraft';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useSearchMessages } from '@/hooks/useSearchMessages';
+import { useBackNavigation } from '@/hooks/useBackNavigation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { canCreateGroupChat, canCreatePersonalChat } from '@/services/chat/access';
 import { isGroupLike } from '@/services/chat/helpers';
@@ -39,6 +40,7 @@ export default function ChatPage() {
   const { id: activeId } = useParams<{ id: string }>();
   const user = useCurrentUser()!;
   const navigate = useNavigate();
+  const goBackToChatList = useBackNavigation('/chat');
   const queryClient = useQueryClient();
   const messageListRef = useRef<MessageListHandle>(null);
   const isOnline = useOnlineStatus();
@@ -134,7 +136,7 @@ export default function ChatPage() {
   const handleBack = () => {
     setReplyTo(null);
     setEditingMessage(null);
-    navigate('/chat');
+    goBackToChatList();
   };
 
   const handleSend = useCallback(

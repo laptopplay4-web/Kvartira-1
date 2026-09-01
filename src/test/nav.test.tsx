@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { SidebarNav } from '@/components/ui/BottomNav';
+import { BottomNav, SidebarNav } from '@/components/ui/BottomNav';
 import type { User } from '@/types';
 
 const studentUser: User = {
@@ -25,6 +25,22 @@ let mockUser: User = studentUser;
 vi.mock('@/stores/authStore', () => ({
   useCurrentUser: () => mockUser,
 }));
+
+describe('BottomNav active state', () => {
+  it('highlights active item with brand palette', () => {
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <BottomNav chatBadge={0} />
+      </MemoryRouter>,
+    );
+
+    const chatLink = screen.getByRole('link', { name: /Чат/ });
+    expect(chatLink).toHaveAttribute('aria-current', 'page');
+    expect(chatLink.className).toMatch(/bg-brand-muted/);
+    expect(chatLink.className).toMatch(/text-brand/);
+    expect(screen.getByRole('link', { name: /Главная/ })).not.toHaveAttribute('aria-current');
+  });
+});
 
 describe('SidebarNav P1 notifications', () => {
   beforeEach(() => {

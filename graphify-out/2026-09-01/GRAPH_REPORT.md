@@ -1,11 +1,11 @@
-# Graph Report - Kvartira 1  (2026-08-31)
+# Graph Report - Kvartira 1  (2026-09-01)
 
 ## Corpus Check
-- 312 files · ~136,203 words
+- 314 files · ~135,572 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2018 nodes · 2135 edges · 296 communities (191 shown, 105 thin omitted)
+- 2032 nodes · 2155 edges · 296 communities (192 shown, 104 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 73 edges (avg confidence: 0.58)
 - Token cost: 0 input · 0 output
 
@@ -226,8 +226,8 @@
 3. `КВАРТИРА — DESIGN SYSTEM` - 26 edges
 4. `ChatApi` - 25 edges
 5. `compilerOptions` - 20 edges
-6. `compilerOptions` - 16 edges
-7. `runSeed()` - 15 edges
+6. `runSeed()` - 16 edges
+7. `compilerOptions` - 16 edges
 8. `PocketBase schema — «Квартира»` - 14 edges
 9. `scripts` - 13 edges
 10. `LessonsApi` - 11 edges
@@ -247,7 +247,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (296 total, 105 thin omitted)
+## Communities (296 total, 104 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -291,7 +291,7 @@ Nodes (19): ES2023, vite.config.ts, compilerOptions, allowImportingTsExtensions,
 
 ### Community 10 - "run.ts"
 Cohesion: 0.05
-Nodes (52): ID_ALIASES, IdMap, passwordForPhone(), phoneToEmail(), remapLink(), remapMetadata(), env(), main() (+44 more)
+Nodes (53): ID_ALIASES, IdMap, passwordForPhone(), patchRecordTimestamps(), phoneToEmail(), remapLink(), remapMetadata(), env() (+45 more)
 
 ### Community 11 - "mock/index.ts"
 Cohesion: 0.08
@@ -550,8 +550,8 @@ Cohesion: 0.40
 Nodes (4): MIGRATION, REQUIRED_COLLECTIONS, ROOT, SCHEMA_DOC
 
 ### Community 226 - "kvartiraAuth.js"
-Cohesion: 0.13
-Nodes (15): getClientIp(), getDeviceLabel(), isValidPhone(), normalizePhone(), phoneToEmail(), pushSecurityAlert(), recordLoginAttempt(), trimLoginHistory() (+7 more)
+Cohesion: 0.08
+Nodes (16): getClientIp(), getDeviceLabel(), isValidPhone(), normalizePhone(), phoneToEmail(), pushSecurityAlert(), recordLoginAttempt(), trimLoginHistory() (+8 more)
 
 ### Community 227 - "pocketbaseAuth.test.ts"
 Cohesion: 0.33
@@ -588,6 +588,10 @@ Nodes (5): extractPbFieldError(), mapPocketBaseError(), PB_FIELD_MESSAGE_MAP, PB
 ### Community 242 - "mappers.ts"
 Cohesion: 0.05
 Nodes (26): PbAchievementDefinitionRecord, PbAssignmentRecord, PbAvailabilityRecord, PbConversationMemberRecord, PbConversationRecord, PbDirectionRecord, PbEventRecord, PbEventRegistrationRecord (+18 more)
+
+### Community 249 - "pocketbase/helpers.ts"
+Cohesion: 0.33
+Nodes (5): escapePbFilter(), getPbRecordCreatedAt(), getPbRecordUpdatedAt(), normalizePbDateTime(), pbEqOr()
 
 ### Community 251 - "events.ts"
 Cohesion: 0.38
@@ -666,21 +670,21 @@ Cohesion: 0.52
 Nodes (6): dispatchPushForNotification(), getSubscriptionsForUser(), isPushEnabledForUser(), relId(), removeSubscription(), sendViaRelay()
 
 ## Knowledge Gaps
-- **758 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+753 more)
+- **759 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+754 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **105 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **104 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `devDependencies` to `dependencies`?**
   _High betweenness centrality (0.002) - this node is a cross-community bridge._
-- **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
+- **Why does `ProgressApi` connect `ProgressApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `LegalApi` connect `LegalApi` to `types.ts`?**
+- **Why does `SupportApi` connect `SupportApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _758 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _759 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

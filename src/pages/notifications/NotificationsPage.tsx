@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Bell } from 'lucide-react';
+import { Bell } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
 import { Card } from '@/components/ui/Card';
@@ -32,10 +33,7 @@ export default function NotificationsPage() {
   return (
     <div className="page-container max-w-lg">
       <div className="mb-6 flex items-center justify-between">
-        <Link to="/profile" className="flex items-center gap-1 text-sm text-text-secondary hover:text-brand focus-ring rounded">
-          <ChevronLeft className="h-4 w-4" aria-hidden />
-          Профиль
-        </Link>
+        <BackLink label="Профиль" fallbackTo="/profile" className="mb-0 flex items-center gap-1 text-sm focus-ring rounded" />
         {unread > 0 && (
           <Button variant="ghost" size="sm" onClick={() => markAllMutation.mutate()} loading={markAllMutation.isPending}>
             Прочитать все

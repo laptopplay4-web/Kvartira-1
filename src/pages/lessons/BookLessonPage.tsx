@@ -9,6 +9,7 @@ import { format, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 import { ChevronLeft, Check } from 'lucide-react';
+import { useBackNavigation } from '@/hooks/useBackNavigation';
 
 import { useCurrentUser } from '@/stores/authStore';
 
@@ -45,6 +46,7 @@ export default function BookLessonPage() {
   const queryClient = useQueryClient();
 
   const isOnline = useOnlineStatus();
+  const goBackToLessons = useBackNavigation('/lessons');
 
   const [step, setStep] = useState<Step>('direction');
 
@@ -148,7 +150,7 @@ export default function BookLessonPage() {
 
   const goBack = () => {
 
-    if (step === 'direction') navigate('/lessons');
+    if (step === 'direction') goBackToLessons();
 
     else if (step === 'teacher') setStep('direction');
 

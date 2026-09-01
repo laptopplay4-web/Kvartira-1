@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { ChevronLeft, CalendarClock } from 'lucide-react';
+import { CalendarClock } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
 
 import { useAuthStore, useCurrentUser } from '@/stores/authStore';
 
@@ -251,13 +252,7 @@ export default function SettingsPage() {
 
     <div className="page-container max-w-lg">
 
-      <Link to="/profile" className="mb-4 flex items-center gap-1 text-sm text-text-secondary hover:text-brand focus-ring rounded">
-
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-
-        Профиль
-
-      </Link>
+      <BackLink label="Профиль" fallbackTo="/profile" className="mb-4 flex items-center gap-1 text-sm focus-ring rounded" />
 
       <h1 className="text-h1 mb-6">Настройки</h1>
 

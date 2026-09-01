@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
 import { format } from 'date-fns';
 import { api } from '@/services/api';
 import { LEGAL_DOCUMENT_TYPE_LABELS } from '@/services/legal/constants';
@@ -25,10 +25,7 @@ export default function LegalDocumentDetailPage() {
     <div className="min-h-dvh">
       <header className="border-b border-border-subtle px-4 py-4">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
-          <Link to="/legal" className="flex items-center gap-1 text-sm text-text-secondary hover:text-brand focus-ring rounded">
-            <ChevronLeft className="h-4 w-4" aria-hidden />
-            Документы
-          </Link>
+          <BackLink label="Документы" fallbackTo="/legal" className="mb-0 flex items-center gap-1 text-sm focus-ring rounded" />
           <Logo size="sm" />
           {user ? (
             <Link to="/profile/legal" className="text-sm text-brand hover:underline">

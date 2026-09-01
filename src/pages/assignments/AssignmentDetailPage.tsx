@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, FileText, Mic, Paperclip, X } from 'lucide-react';
+import { FileText, Mic, Paperclip, X } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { api } from '@/services/api';
@@ -211,14 +212,7 @@ export default function AssignmentDetailPage() {
 
   return (
     <div className="page-container max-w-lg">
-      <button
-        type="button"
-        onClick={() => navigate('/assignments')}
-        className="mb-4 flex min-h-11 items-center gap-1 rounded text-sm text-text-secondary hover:text-brand focus-ring"
-      >
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-        К заданиям
-      </button>
+      <BackLink label="К заданиям" fallbackTo="/assignments" />
 
       <div className="mb-4 flex items-start justify-between gap-3">
         <h1 className="text-h1">{assignment.title}</h1>

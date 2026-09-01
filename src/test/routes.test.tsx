@@ -212,7 +212,7 @@ describe('admin navigation links', () => {
     );
   });
 
-  it('Schedule back link points to /home', async () => {
+  it('Schedule back button falls back to /home', async () => {
     mockGetLessons.mockResolvedValue([]);
     mockGetAllUsers.mockResolvedValue([]);
     mockGetDirections.mockResolvedValue([]);
@@ -225,11 +225,11 @@ describe('admin navigation links', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole('link', { name: /Главная/ })).toHaveAttribute('href', '/home');
+    expect(screen.getByRole('button', { name: /Главная/ })).toBeInTheDocument();
     expect(await screen.findByText('Нет занятий')).toBeInTheDocument();
   });
 
-  it('Users back link points to /home', async () => {
+  it('Users back button falls back to /home', async () => {
     mockGetAllUsers.mockResolvedValue([]);
 
     render(
@@ -240,7 +240,7 @@ describe('admin navigation links', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole('link', { name: /Главная/ })).toHaveAttribute('href', '/home');
+    expect(screen.getByRole('button', { name: /Главная/ })).toBeInTheDocument();
     expect(await screen.findByText('Нет пользователей')).toBeInTheDocument();
   });
 

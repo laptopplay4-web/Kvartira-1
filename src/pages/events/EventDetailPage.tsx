@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Clock, MapPin, Music2, Users } from 'lucide-react';
+import { Clock, MapPin, Music2, Users } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { api } from '@/services/api';
@@ -91,14 +92,7 @@ export default function EventDetailPage() {
 
   return (
     <div className="page-container max-w-lg">
-      <button
-        type="button"
-        onClick={() => navigate('/events')}
-        className="mb-4 flex items-center gap-1 text-sm text-text-secondary hover:text-brand focus-ring rounded"
-      >
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-        К мероприятиям
-      </button>
+      <BackLink label="К мероприятиям" fallbackTo="/events" className="mb-4 flex items-center gap-1 text-sm focus-ring rounded" />
 
       {event.imageUrl && (
         <img

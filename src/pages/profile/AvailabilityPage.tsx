@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addMonths, format, subMonths } from 'date-fns';
-import { ChevronLeft, Clock, Plus, Settings2, Trash2 } from 'lucide-react';
+import { Clock, Plus, Settings2, Trash2 } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
 import { useCurrentUser } from '@/stores/authStore';
 import { can } from '@/permissions';
 import { api } from '@/services/api';
@@ -218,13 +219,7 @@ export default function AvailabilityPage() {
 
   return (
     <div className="page-container max-w-lg">
-      <Link
-        to="/profile"
-        className="mb-4 flex min-h-11 items-center gap-1 text-sm text-text-secondary hover:text-brand focus-ring rounded"
-      >
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-        Профиль
-      </Link>
+      <BackLink label="Профиль" fallbackTo="/profile" />
 
       <header className="mb-6">
         <h1 className="text-h1">График работы</h1>

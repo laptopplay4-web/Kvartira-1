@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.70 Production Roadmap · 2026-09-01
+Версия: 1.72 Production Roadmap · 2026-09-01
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -106,7 +106,8 @@ kvartira/
 │   │   ├── useTypingIndicator.ts
 │   │   ├── useSearchMessages.ts
 │   │   ├── useConversationMembers.ts
-│   │   └── useCreateConversation.ts
+│   │   ├── useCreateConversation.ts
+│   │   └── useBackNavigation.ts
 │   ├── services/
 │   │   ├── api/
 │   │   │   ├── types.ts         # ApiClient contracts
@@ -141,6 +142,7 @@ kvartira/
 │   ├── types/index.ts
 │   ├── utils/
 │   │   ├── dates.ts
+│   │   ├── backNavigation.ts    # canNavigateBack() for history stack
 │   │   └── calendarRanges.ts    # day/week/month date ranges
 │   ├── styles/globals.css
 │   └── test/                    # vitest
@@ -183,6 +185,9 @@ kvartira/
 | `src/app/layouts.tsx` | App shell, ProtectedRoute, AdminRoute |
 | `src/components/ui/Logo.tsx` | Логотип `/assets/logo.png` |
 | `src/components/ui/MobileHeader.tsx` | Mobile shell: logo + notifications |
+| `src/hooks/useBackNavigation.ts` | `navigate(-1)` с fallback при отсутствии history |
+| `src/utils/backNavigation.ts` | `canNavigateBack()` — проверка `history.state.idx` |
+| `src/components/ui/BackLink.tsx` | Единая кнопка «назад» для detail/sub-pages |
 | `src/services/lessons/access.ts` | IDOR-safe access helpers для занятий |
 | `src/components/ui/LessonStatusBadge.tsx` | Единый badge статуса (текст + цвет + иконка) |
 | `src/utils/dates.ts` | Централизованные дата/время + `formatChatListTime`, `formatChatDateSeparator` |
@@ -346,7 +351,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 
 - Tokens: `src/styles/globals.css` (`@theme`).
 - Brand: `#00796b` (из логотипа), тёмный фон, DM Sans + Playfair Display.
-- UI: Button, Input, Card, Badge, Avatar, Logo, BottomNav, SidebarNav, MobileHeader, LessonCard, MessageBubble, Modal, Skeleton, EmptyState, ErrorState, AdminPageHeader.
+- UI: Button, Input, Card, Badge, Avatar, Logo, BottomNav, SidebarNav, MobileHeader, LessonCard, MessageBubble, Modal, Skeleton, EmptyState, ErrorState, AdminPageHeader, BackLink.
 
 ---
 
@@ -397,7 +402,8 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput (16 tests) |
 | `chat.test.ts` | access, send, edit, delete, reply, search, group, mute, pin, attachments, realtime, pagination, IDOR, notifications, cache isolation |
 | `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; Admin Home P1; progress block student-only (26 tests) |
-| `nav.test.tsx` | SidebarNav: notifications link/badge, aria-current, admin active on `/admin/*` (4 tests) |
+| `nav.test.tsx` | SidebarNav: notifications link/badge, aria-current, admin active on `/admin/*`; BottomNav active brand highlight (5 tests) |
+| `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back (5 tests) |
 | `routes.test.ts` | основные маршруты (+ `/assignments/create`) |
 | `routes.test.tsx` | admin shell: redirect, AppLayout, nav links, student block, shared users cache, EmptyState (11 tests) |
 | `offline.test.tsx` | BookLessonLink offline; AvailabilityPage save disabled offline (4 tests) |
@@ -418,7 +424,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `chatRealtime.test.ts` | PB subscription → ChatRealtimeEvent mappers (2 tests) |
 | `webPush.test.ts` | push helpers, subscription API, delivery gating (6 tests) |
 
-**Итого:** 457 tests (34 files).
+**Итого:** 463 tests (35 files).
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -674,7 +680,7 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 
 ### Admin header
 
-- `AdminPageHeader` (`src/components/ui/AdminPageHeader.tsx`): `← Главная` + `text-h1` for `/admin/schedule`, `/admin/users`.
+- `AdminPageHeader` (`src/components/ui/AdminPageHeader.tsx`): `BackLink` «Главная» + `text-h1` for `/admin/*`.
 - Admin Home (`/home`): greeting header без back link (unchanged).
 
 ### Navigation active states
@@ -1326,7 +1332,46 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2032 nodes, 2155 edges, 296 communities (graphify update 2026-09-01 post-§77).
+**Graphify stats:** 2041 nodes, 2160 edges, 300 communities (graphify update 2026-09-01 post-§79).
+
+---
+
+## 79. Back Navigation History (2026-09-01)
+
+**Scope:** кнопки «назад» возвращают в предыдущий экран (`navigate(-1)`), а не на жёстко заданный маршрут.
+
+**Graphify:** `BackLink()` → `useBackNavigation()` → `canNavigateBack()` → detail pages, `AdminPageHeader`, `PublicDetailHeader`, `ChatPage.handleBack`.
+
+### Domain (✅)
+
+- `utils/backNavigation.ts` — `canNavigateBack()` через `window.history.state.idx`.
+- `hooks/useBackNavigation.ts` — `navigate(-1)` или fallback route.
+
+### UI (✅)
+
+- `components/ui/BackLink.tsx` — единый компонент с ChevronLeft + label.
+- Заменены hardcoded `Link`/`navigate('/…')` на detail/sub-pages: lessons, events, assignments, profile, legal, notifications, admin, public detail, chat (mobile back).
+- `BookLessonPage`: первый шаг wizard → history back, fallback `/lessons`; внутренние шаги без изменений.
+
+### Tests
+
+`backNavigation.test.tsx` +5; `routes.test.tsx` admin back → button → **463 total** (35 files).
+
+---
+
+## 78. BottomNav Active Highlight (2026-09-01)
+
+**Scope:** подсветка выбранного пункта нижней навигации в brand-палитре (DESIGN_SYSTEM §8 active state).
+
+**Graphify:** `BottomNav()` → `NavLink` active class; паттерн согласован с `SidebarNav()` (`bg-brand-muted text-brand`).
+
+### Fix (✅)
+
+- `BottomNav`: active item — `bg-brand-muted`, `text-brand`, `font-medium`, `rounded-xl`; hover inactive — `hover:bg-surface-elevated`.
+
+### Tests
+
+`nav.test.tsx` +1 (BottomNav active brand palette) → **458 total** (34 files).
 
 ---
 

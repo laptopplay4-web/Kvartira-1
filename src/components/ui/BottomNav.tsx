@@ -39,8 +39,10 @@ export function BottomNav({ chatBadge = 0 }: BottomNavProps) {
             end={to === '/home'}
             className={({ isActive }) =>
               cn(
-                'relative flex min-h-[56px] min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-caption transition-colors focus-ring',
-                isActive ? 'text-brand' : 'text-text-muted hover:text-text-secondary',
+                'relative flex min-h-[56px] min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-caption transition-colors focus-ring',
+                isActive
+                  ? 'bg-brand-muted font-medium text-brand'
+                  : 'text-text-muted hover:bg-surface-elevated hover:text-text-secondary',
               )
             }
           >

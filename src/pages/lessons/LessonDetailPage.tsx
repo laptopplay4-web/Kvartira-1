@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { format, addDays } from 'date-fns';
 
-import { ChevronLeft, Calendar, Clock, MapPin, ArrowRightLeft, XCircle, FileText, MessageCircle, StickyNote } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
+import { Calendar, Clock, MapPin, ArrowRightLeft, XCircle, FileText, MessageCircle, StickyNote } from 'lucide-react';
 
 import { useCurrentUser } from '@/stores/authStore';
 
@@ -288,21 +289,7 @@ export default function LessonDetailPage() {
 
     <div className="page-container max-w-lg">
 
-      <button
-
-        type="button"
-
-        onClick={() => navigate('/lessons')}
-
-        className="mb-4 flex min-h-11 items-center gap-1 text-sm text-text-secondary hover:text-brand focus-ring rounded"
-
-      >
-
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-
-        К занятиям
-
-      </button>
+      <BackLink label="К занятиям" fallbackTo="/lessons" />
 
 
 

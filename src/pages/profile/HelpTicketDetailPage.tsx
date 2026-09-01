@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
@@ -74,13 +74,7 @@ export default function HelpTicketDetailPage() {
   return (
     <div className="page-container max-w-lg">
       <div className="mb-6">
-        <Link
-          to="/profile/help"
-          className="flex items-center gap-1 text-sm text-text-secondary hover:text-brand focus-ring rounded"
-        >
-          <ChevronLeft className="h-4 w-4" aria-hidden />
-          Помощь
-        </Link>
+        <BackLink label="Помощь" fallbackTo="/profile/help" className="mb-0 flex items-center gap-1 text-sm focus-ring rounded" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">

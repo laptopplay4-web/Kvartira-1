@@ -1,11 +1,11 @@
 # Graph Report - Kvartira 1  (2026-09-01)
 
 ## Corpus Check
-- 314 files · ~137,084 words
+- 318 files · ~135,855 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2032 nodes · 2155 edges · 296 communities (192 shown, 104 thin omitted)
+- 2041 nodes · 2160 edges · 300 communities (195 shown, 105 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 73 edges (avg confidence: 0.58)
 - Token cost: 0 input · 0 output
 
@@ -219,6 +219,7 @@
 - useWebPush.ts
 - webPush.test.ts
 - test-pb-progress.mjs
+- BackLink.tsx
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
@@ -247,7 +248,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (296 total, 104 thin omitted)
+## Communities (300 total, 105 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -670,21 +671,21 @@ Cohesion: 0.52
 Nodes (6): dispatchPushForNotification(), getSubscriptionsForUser(), isPushEnabledForUser(), relId(), removeSubscription(), sendViaRelay()
 
 ## Knowledge Gaps
-- **759 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+754 more)
+- **760 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+755 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **104 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **105 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `devDependencies` to `dependencies`?**
   _High betweenness centrality (0.002) - this node is a cross-community bridge._
-- **Why does `ProgressApi` connect `ProgressApi` to `types.ts`?**
+- **Why does `LessonsApi` connect `LessonsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `SupportApi` connect `SupportApi` to `types.ts`?**
+- **Why does `NotificationsApi` connect `NotificationsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _759 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _760 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

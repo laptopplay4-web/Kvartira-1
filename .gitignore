@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Env (secrets)
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+
+# PocketBase runtime data
+pocketbase/pb_data/*
+!pocketbase/pb_data/.gitignore
+
+# IDE / OS
+.DS_Store
+*.log

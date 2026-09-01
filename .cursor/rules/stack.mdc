@@ -1,0 +1,2274 @@
+---
+description: Стек, архитектура и структура проекта «Квартира»
+alwaysApply: true
+---
+
+# Квартира — Stack & Architecture
+
+Версия: 1.70 Production Roadmap · 2026-09-01
+
+> Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
+> Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
+
+---
+
+## 1. Текущий стек
+
+| Слой | Технология | Версия |
+|------|-----------|--------|
+| Runtime | Node.js | ≥ 20 LTS |
+| Язык | TypeScript | 5.8 |
+| Сборка | Vite | 6.x |
+| UI | React | 19.x |
+| Роутинг | React Router | 7.x |
+| Серверный стейт | TanStack Query | 5.x |
+| Клиентский стейт | Zustand | 5.x (auth) |
+| Стили | Tailwind CSS 4 + CSS variables | 4.x |
+| Формы | React Hook Form + Zod | — |
+| Даты | date-fns | 4.x |
+| Иконки | lucide-react | — |
+| PWA | vite-plugin-pwa + Workbox | — |
+| Тесты | Vitest + Testing Library | — |
+| Линт | ESLint + Prettier | — |
+| API (MVP) | `VITE_API_MODE=mock` | — |
+| API (prod) | PocketBase adapter в `services/api/pocketbase/` | — |
+
+---
+
+## 2. Архитектура
+
+```
+Pages (src/pages/*)
+  ↓
+Components UI (src/components/ui/*, src/components/calendar/*, src/components/chat/*)
+  ↓
+Hooks (src/hooks/useCalendarLessons.ts, src/hooks/useChat*.ts)
+  ↓
+Services API (src/services/api/*)  ←  contracts: types.ts, factory: index.ts
+  ↓
+Domain logic (src/services/slots/*, src/services/calendar/*, src/services/lessons/*, src/services/availability/*, src/services/chat/*, src/permissions/*)
+  ↓
+Types + Mocks (src/types/*, src/mocks/seed.ts)
+```
+
+**Принципы:**
+- UI без бизнес-правил; mock data только в `services/api/mock/` и `mocks/seed.ts`.
+- RBAC: `can(user, permission)` в `src/permissions/index.ts`.
+- Слоты: `calculateAvailableSlots()` в `src/services/slots/calculateSlots.ts` (перерывы, занятость, прошедшее время).
+- Доступ к занятиям: `canViewLesson` / `canRescheduleLesson` / `canCancelLesson` в `src/services/lessons/access.ts`.
+- Доступность преподавателя: `validateTeacherAvailability()` + `AvailabilityApi` в mock; UI `/profile/availability`.
+- Double-booking: `withBookingLock` + `slotsConflict` в mock API.
+- Календарь: единый `LessonCalendar` (day/week/month) → `getLessons({ from, to, requesterId })`; слоты только в booking через `calculateAvailableSlots`.
+- Чат: `ChatPage` (messenger layout) → `ChatApi` → `canAccessConversation` / IDOR в mock; unread через `ConversationMember.lastReadAt`; optimistic send через TanStack Query.
+- Каждый экран: loading / empty / error / retry / offline.
+
+---
+
+## 3. Структура директорий (фактическая)
+
+```
+kvartira/
+├── public/
+│   └── assets/logo.png          # единственный источник логотипа
+├── src/
+│   ├── app/
+│   │   ├── router.tsx           # lazy routes
+│   │   ├── layouts.tsx          # AppLayout, guards
+│   │   ├── queryClient.ts       # singleton QueryClient (login/logout cache clear)
+│   │   └── providers.tsx        # QueryClientProvider, auth init
+│   ├── pages/
+│   │   ├── auth/                # LoginPage, RegisterPage
+│   │   ├── public/              # LandingPage
+│   │   ├── home/                # HomePage
+│   │   ├── lessons/             # LessonsPage, BookLessonPage, LessonDetailPage
+│   │   ├── chat/                # ChatPage (list + active conversation)
+│   │   ├── events/              # EventsPage, EventDetailPage
+│   │   ├── profile/             # ProfilePage, SettingsPage, AvailabilityPage, ProgressPage, HelpPage
+│   │   ├── notifications/       # NotificationsPage
+│   │   ├── legal/               # LegalDocumentsPage, LegalDocumentDetailPage
+│   │   └── admin/               # AdminSchedule, AdminUsers, AdminLegal
+│   ├── components/
+│   │   ├── ui/                  # design system
+│   │   ├── chat/                # ConversationList, MessageList, MessageComposer, …
+│   │   ├── calendar/            # LessonCalendar, Day/Week/Month views
+│   │   ├── availability/        # AvailabilityMonthCalendar, AvailabilityIntervalModal
+│   │   └── legal/               # LegalDocumentEditModal, LegalPublishVersionModal
+│   ├── hooks/
+│   │   ├── useOnlineStatus.ts
+│   │   ├── useCalendarLessons.ts
+│   │   ├── useChatConversations.ts
+│   │   ├── useChatMessages.ts
+│   │   ├── useSendMessage.ts
+│   │   ├── useEditMessage.ts
+│   │   ├── useDeleteMessage.ts
+│   │   ├── useChatRealtime.ts
+│   │   ├── useChatDraft.ts
+│   │   ├── useTypingIndicator.ts
+│   │   ├── useSearchMessages.ts
+│   │   ├── useConversationMembers.ts
+│   │   └── useCreateConversation.ts
+│   ├── services/
+│   │   ├── api/
+│   │   │   ├── types.ts         # ApiClient contracts
+│   │   │   ├── index.ts         # createApiClient()
+│   │   │   └── mock/
+│   │   │       ├── index.ts     # mock DB, booking lock
+│   │   │       └── chat.ts      # mock ChatApi (edit/delete/reply/attachments/group/mute/pin)
+│   │   ├── calendar/
+│   │   │   └── helpers.ts       # groupLessonsByDate, isLessonPast, …
+│   │   ├── slots/
+│   │   │   └── calculateSlots.ts
+│   │   ├── availability/
+│   │   │   ├── validateAvailability.ts
+│   │   │   └── formHelpers.ts
+│   │   ├── lessons/
+│   │   │   └── access.ts        # canViewLesson, canRescheduleLesson, canCancelLesson
+│   │   ├── events/
+│   │   │   └── helpers.ts       # getNextUpcomingEvent (Home nearest event)
+│   │   └── chat/
+│   │       ├── access.ts        # canAccessConversation, canManageMembers, mute, …
+│   │       ├── helpers.ts       # filter, sort, grouping, message search helpers
+│   │       ├── constants.ts     # limits, MIME, typing debounce, draft prefix
+│   │       ├── messages.ts      # canEditMessage, canDeleteMessage, read receipts
+│   │       ├── validation.ts    # attachment + message server-side validation rules
+│   │       ├── attachments.ts   # file size formatting, type detection
+│   │       ├── realtime.ts      # ChatRealtimeService — mock emitter | PB subscriptions
+│   │       ├── realtimePocketbase.ts
+│   │       └── realtimeMappers.ts
+│   ├── permissions/
+│   ├── stores/authStore.ts
+│   ├── mocks/seed.ts
+│   ├── types/index.ts
+│   ├── utils/
+│   │   ├── dates.ts
+│   │   └── calendarRanges.ts    # day/week/month date ranges
+│   ├── styles/globals.css
+│   └── test/                    # vitest
+├── graphify-out/                # code graph (graphify)
+├── .cursor/rules/
+├── vite.config.ts
+└── package.json
+```
+
+---
+
+## 4. Ключевые файлы
+
+| Путь | Назначение |
+|------|-----------|
+| `src/services/api/index.ts` | Фабрика API по `VITE_API_MODE` |
+| `src/services/api/types.ts` | Контракты AuthApi, LessonsApi, AvailabilityApi, ChatApi, … |
+| `src/services/api/mock/index.ts` | Mock DB, booking lock, availability CRUD |
+| `src/services/api/pocketbase/chat.ts` | PocketBase ChatApi (фаза 2.4) |
+| `src/services/api/pocketbase/assignments.ts` | PocketBase AssignmentsApi (фаза 2.5) |
+| `src/services/api/pocketbase/progress.ts` | PocketBase ProgressApi (фаза 2.6) |
+| `src/services/api/pocketbase/support.ts` | PocketBase SupportApi (фаза 2.7) |
+| `src/services/api/pocketbase/legal.ts` | PocketBase LegalApi (фаза 2.8) |
+| `src/services/api/pocketbase/security.ts` | PocketBase SecurityApi (фаза 2.9) |
+| `src/services/api/pocketbase/notifications.ts` | PocketBase NotificationsApi (фаза 2.10) |
+| `src/services/availability/validateAvailability.ts` | Валидация расписания, перерывов, интервала |
+| `src/services/availability/formHelpers.ts` | Конвертация TeacherAvailability ↔ форма UI |
+| `src/components/calendar/LessonCalendar.tsx` | Единый календарь: day/week/month, навигация, role-aware |
+| `src/hooks/useCalendarLessons.ts` | TanStack Query для календаря с date range + filters |
+| `src/utils/calendarRanges.ts` | Диапазоны day/week/month, shift anchor |
+| `src/services/calendar/helpers.ts` | Группировка занятий, past detection, `getLessonCounterpartyName` (admin: teacher · student) |
+| `src/pages/profile/AvailabilityPage.tsx` | UI графика работы: календарь месяца, период, единое время, выходные |
+| `src/components/availability/AvailabilityMonthCalendar.tsx` | Месячный календарь периода и выходных |
+| `src/components/availability/AvailabilityIntervalModal.tsx` | Модалка интервала между занятиями |
+| `src/services/slots/calculateSlots.ts` | Алгоритм доступных слотов |
+| `src/permissions/index.ts` | RBAC матрица + `can()` |
+| `src/stores/authStore.ts` | Сессия, login, demoLogin, `queryClient.clear()` |
+| `src/app/queryClient.ts` | Singleton QueryClient для Provider и auth cache isolation |
+| `src/mocks/seed.ts` | Demo users, lessons, chats, events |
+| `src/app/layouts.tsx` | App shell, ProtectedRoute, AdminRoute |
+| `src/components/ui/Logo.tsx` | Логотип `/assets/logo.png` |
+| `src/components/ui/MobileHeader.tsx` | Mobile shell: logo + notifications |
+| `src/services/lessons/access.ts` | IDOR-safe access helpers для занятий |
+| `src/components/ui/LessonStatusBadge.tsx` | Единый badge статуса (текст + цвет + иконка) |
+| `src/utils/dates.ts` | Централизованные дата/время + `formatChatListTime`, `formatChatDateSeparator` |
+| `src/services/events/helpers.ts` | Ближайшее мероприятие: filter past + sort by date/time (`getNextUpcomingEvent`) |
+| `src/components/ui/LessonCard.tsx` | Карточка занятия; `personLabel` для admin overview |
+| `src/pages/home/HomePage.tsx` | Dashboard `/home`: student/teacher Home (P0+P1); admin branch (P1): KPI, school lesson, quick actions; role-aware queries |
+| `src/pages/chat/ChatPage.tsx` | Messenger: list + active conversation (responsive split) |
+| `src/components/chat/MessageList.tsx` | Сообщения, date separators, pagination, auto-scroll |
+| `src/services/chat/access.ts` | IDOR-safe access helpers для чатов |
+| `src/services/api/mock/chat.ts` | Mock ChatApi: edit/delete/reply/attachments/search/group/mute/pin/realtime events |
+| `src/services/chat/realtime.ts` | `ChatRealtimeService` — mock emitter или PB subscriptions по `VITE_API_MODE` |
+| `src/services/chat/realtimePocketbase.ts` | PB subscribe messages/conversations/conversation_members |
+| `src/services/chat/realtimeMappers.ts` | PB RecordSubscription → ChatRealtimeEvent |
+| `src/services/chat/validation.ts` | MIME/size/count validation для вложений |
+| `src/components/chat/MessageActions.tsx` | Reply/Copy/Edit/Delete — desktop menu + mobile sheet |
+| `src/components/chat/ConversationSettings.tsx` | Участники, mute, leave, delete, rename |
+| `src/components/chat/AttachmentList.tsx` | Image/doc/audio/video UI |
+| `src/hooks/useChatRealtime.ts` | Realtime → TanStack Query invalidation |
+| `src/hooks/useChatDraft.ts` | localStorage drafts per conversation |
+| `src/hooks/useEditMessage.ts` | Optimistic edit + rollback |
+| `src/hooks/useDeleteMessage.ts` | Soft-delete optimistic |
+| `src/test/chat.test.ts` | 45 tests: access, send, edit, delete, reply, search, group, mute, pin, attachments, realtime, IDOR |
+
+---
+
+## 5. App Shell
+
+- **Mobile:** `MobileHeader` (логотип + колокольчик уведомлений) + `BottomNav` (5 вкладок) + offline banner.
+- **Desktop:** `SidebarNav` (логотип + навигация + «Уведомления» + ссылка Админ) + контент без bottom nav.
+- **Guards:** `GuestRoute`, `ProtectedRoute`, `AdminRoute`.
+- **Логотип:** `Logo` component, `object-contain`, без перекраски и растягивания; `logo.png` — PNG с прозрачным фоном (без белого квадрата на тёмной теме).
+
+---
+
+## 6. Роли (RBAC)
+
+| Роль | Код | Ключевые permissions |
+|------|-----|---------------------|
+| Ученик | `student` | `lessons:book`, `lessons:reschedule-own`, `lessons:cancel-own`, `chat:*`, `events:register` |
+| Преподаватель | `teacher` | `lessons:manage-own`, `availability:manage`, `students:view-assigned` |
+| Администратор | `admin` | `admin:access`, `admin:users`, `admin:schedule`, `lessons:view-all` |
+
+---
+
+## 7. Авторизация (MVP)
+
+- Mock auth: телефон `+7...` + пароль.
+- Demo login: student / teacher / admin (кнопки на LoginPage).
+- Сессия: Zustand + localStorage token.
+- Демо-аккаунты: `DEMO_ACCOUNTS` в `mocks/seed.ts`.
+
+---
+
+## 8. Маршруты
+
+| Путь | Экран | Guard |
+|------|-------|-------|
+| `/` | Landing | — |
+| `/login`, `/register` | Auth | GuestRoute |
+| `/home` | Dashboard | Protected |
+| `/lessons`, `/lessons/book`, `/lessons/:id` | Занятия | Protected |
+| `/chat`, `/chat/:id` | Чат | Protected |
+| `/events`, `/events/:id` | Мероприятия | Protected |
+| `/profile`, `/profile/settings`, `/profile/security`, `/profile/availability` | Профиль | Protected (availability: teacher) |
+| `/notifications` | Уведомления | Protected |
+| `/admin` | Redirect → `/home` | AdminRoute (внутри AppLayout) |
+| `/admin/schedule`, `/admin/users` | Расписание / Пользователи | AdminRoute + AppLayout |
+| `/admin/legal` | Юридические документы (CMS) | AdminRoute (`legal:manage`) + AppLayout |
+| `/legal`, `/legal/:id` | Публичные документы | — |
+| `/profile/legal` | Согласия пользователя | Protected |
+
+---
+
+## 9. Booking flow (реализован)
+
+```
+Login → Home → Lessons → Book
+  → направление → преподаватель → дата → слот → подтверждение
+  → LessonDetail → перенос / отмена
+```
+
+- Слоты: рабочие часы, перерывы, занятые уроки, интервал 15/30/40/60, длительность, фильтр прошедшего времени.
+- Запись создаёт статус `scheduled` (без approval flow).
+- Mock: атомарность через `withBookingLock`, IDOR-check через `access.ts`, уведомления при book/reschedule/cancel.
+
+---
+
+## 9a. Calendar flow (реализован)
+
+```
+TeacherAvailability → calculateAvailableSlots → Book/Reschedule
+                              ↓
+Lesson ← getLessons({ from, to, requesterId }) ← LessonCalendar (day/week/month)
+                              ↓
+                    LessonDetailPage (/lessons/:id)
+```
+
+- Календарь показывает **занятия**, не свободные слоты (слоты — только в `/lessons/book`).
+- Teacher day view: рабочие часы + перерывы из `TeacherAvailability`.
+- Query keys: `['lessons', 'calendar', …]`; invalidation через `['lessons']` после book/reschedule/cancel.
+- Admin `/admin/schedule`: фильтры teacher/direction/date/status + календарь.
+
+---
+
+## 9b. Chat flow (реализован v1.5)
+
+```
+ChatPage (/chat, /chat/:id)
+  ↓
+hooks: useChatConversations, useChatMessages, useSendMessage, useEditMessage,
+       useDeleteMessage, useChatRealtime, useChatDraft, useTypingIndicator, useSearchMessages
+  ↓
+ChatApi (CRUD messages, attachments, search, group mgmt, mute, pin, typing)
+  ↓
+mock/chat.ts + ChatRealtimeService (event emitter)
+  ↓
+services/chat/{access,messages,validation,realtime,helpers}
+```
+
+**Message lifecycle:** send (optimistic + dedup `clientMutationId`) → sent → read; edit (`editedAt`); soft-delete (`deletedAt`); reply (`replyToMessageId`); system messages (`messageType: system`).
+
+**Realtime abstraction:** `ChatRealtimeService.subscribe()` / `.emit()` — события `message.created|updated|deleted|read`, `typing.started|stopped`, `member.joined|left`, `conversation.updated`. Mock: event emitter; PocketBase: PB subscriptions (`realtimePocketbase.ts`).
+
+**Attachments:** upload через `uploadAttachment` + server validation (MIME, size, count); UI preview, image viewer, audio player, drag & drop (desktop).
+
+**Read state:** `ConversationMember.lastReadAt`; unread не считает own messages / deleted / system; global badge через `getTotalUnread`.
+
+**Notifications:** suppress если чат открыт (`setOpenConversation`) или muted (`ConversationMember.muted` / `mutedUntil`).
+
+**Group management:** add/remove members, rename, leave, delete; роли `owner|admin|member` (отдельно от global RBAC).
+
+**Pinned messages:** `Conversation.pinnedMessageIds`; pin/unpin через API; bar в header area.
+
+**Lesson-linked:** `Conversation.metadata.lessonId` → context card в header → `/lessons/:id` (IDOR через `getLesson`).
+
+**Search:** conversations (title, participants) + `searchMessages` (debounced, IDOR-safe).
+
+**Scroll:** cursor pagination; preserve position on load older; `scrollToMessage` + highlight; «Новые сообщения» button.
+
+**Drafts:** `localStorage` key `chatDraft:{conversationId}`.
+
+**Permissions:** `chat:read|send|create|manage_members|delete|delete_message|pin_message`; admin без membership не видит personal chats.
+
+**Cache isolation:** `queryClient.clear()` (`src/app/queryClient.ts`) on login/logout/demoLogin.
+
+**Query keys:** `['conversations', userId]`, `['messages', convId, userId]`, `['chat-unread', userId]`, `['members', convId, userId]`, `['chat-search', userId, query]`.
+
+---
+
+## 10. Сущности данных
+
+**MVP (типы в `src/types/index.ts`):**
+`User`, `Direction`, `TeacherAvailability`, `Lesson`, `LessonHistoryEntry`, `Conversation`, `ConversationMember`, `Message`, `MessageAttachment`, `SchoolEvent`, `AppNotification`, `TimeSlot`.
+
+**Этап 2 (типы + UI частично):**
+`Assignment`, `Progress`, `Achievement`, `HelpArticle`, `SupportTicket`, `Attachment`, `AuditLog`, …
+
+---
+
+## 11. Дизайн-система
+
+- Tokens: `src/styles/globals.css` (`@theme`).
+- Brand: `#00796b` (из логотипа), тёмный фон, DM Sans + Playfair Display.
+- UI: Button, Input, Card, Badge, Avatar, Logo, BottomNav, SidebarNav, MobileHeader, LessonCard, MessageBubble, Modal, Skeleton, EmptyState, ErrorState, AdminPageHeader.
+
+---
+
+## 12. PWA
+
+- Manifest + SW через vite-plugin-pwa.
+- Icons: `/assets/logo.png`.
+- `theme-color`: `#00796b`.
+- Offline banner в AppLayout.
+
+---
+
+## 13. Mock vs Real
+
+| Реально (клиент) | Mock (API layer) |
+|------------------|------------------|
+| Навигация, guards, RBAC | Auth, сессии |
+| UI всех экранов | Lessons, booking, history |
+| Алгоритм слотов | Чаты, сообщения |
+| Формы + валидация | Events, notifications |
+| PWA shell | Профили пользователей |
+
+**Требует backend:** server RBAC, realtime chat, push, файлы, production auth, race-safe booking на сервере.
+
+---
+
+## 14. Подключение backend
+
+1. `src/services/api/<provider>/` — новый адаптер, реализующий `ApiClient`.
+2. Зарегистрировать в `createApiClient()` (`VITE_API_MODE=<provider>`).
+3. Контракты не менять без необходимости (`types.ts`).
+4. Seed/migration для начальных данных.
+
+---
+
+## 15. Тесты (`src/test/`)
+
+| Файл | Покрытие |
+|------|----------|
+| `auth.test.ts` | login, demoLogin, password recovery request/reset |
+| `permissions.test.ts` | can(), role guard |
+| `booking.test.ts` | book, double-booking, reschedule, cancel, IDOR |
+| `lessonDetail.test.ts` | materials, chat link, teacherNotes IDOR, updateTeacherNotes, findConversationForLesson (12 tests) |
+| `lessonAccess.test.ts` | canViewLesson, canReschedule, canCancel |
+| `slots.test.ts` | calculateSlots, slotsConflict, past slots, boundaries |
+| `availability.test.ts` | validation, period form, planningPeriod slots, permissions, exceptions, mock save (29 tests) |
+| `calendar.test.ts` | date ranges, IDOR filters, booking/reschedule/cancel → calendar data |
+| `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput (16 tests) |
+| `chat.test.ts` | access, send, edit, delete, reply, search, group, mute, pin, attachments, realtime, pagination, IDOR, notifications, cache isolation |
+| `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; Admin Home P1; progress block student-only (26 tests) |
+| `nav.test.tsx` | SidebarNav: notifications link/badge, aria-current, admin active on `/admin/*` (4 tests) |
+| `routes.test.ts` | основные маршруты (+ `/assignments/create`) |
+| `routes.test.tsx` | admin shell: redirect, AppLayout, nav links, student block, shared users cache, EmptyState (11 tests) |
+| `offline.test.tsx` | BookLessonLink offline; AvailabilityPage save disabled offline (4 tests) |
+| `assignments.test.ts` | access, list IDOR, submit, review, feedback audio, create, upload, validation, notification, overdue display (29 tests) |
+| `progress.test.ts` | access, helpers, summary, achievements, auto-unlock, teacher goals/skills CRUD, attendance (32 tests) |
+| `support.test.ts` | access, FAQ filter/CRUD, validation, tickets search/filters, attachments, IDOR, notifications, permissions (31 tests) |
+| `public.test.ts` | public helpers, API, detail pages, no phone on teachers, event filtering (8 tests) |
+| `security.test.ts` | access, password change, sessions revoke, login history, alerts, IDOR (16 tests) |
+| `legal.test.ts` | access, helpers, pending consents, accept, public docs, permissions, CMS update/publish, IDOR (21 tests) |
+| `pwa.test.tsx` | helpers, banner, usePwaInstall hook (8 tests) |
+| `notificationPreferences.test.ts` | preferences API, helpers, validation, delivery suppression (9 tests) |
+| `profile.test.ts` | profile validation, update name/phone, avatar upload/remove, crop helpers (18 tests) |
+| `audioPlayer.test.tsx` | formatAudioDuration, speed cycle, seek ratio, AudioPlayer UI (10 tests) |
+| `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md coverage (3 tests) |
+| `pocketbaseRbac.test.ts` | PB RBAC migration + kvmartiraRbac.js + RBAC.md coverage (8 tests) |
+| `pocketbaseSeed.test.ts` | PB seed script files, collections coverage, docs (5 tests) |
+| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/progress/support/legal/security/notifications/files/realtime, createApiClient pocketbase mode (41 tests) |
+| `chatRealtime.test.ts` | PB subscription → ChatRealtimeEvent mappers (2 tests) |
+| `webPush.test.ts` | push helpers, subscription API, delivery gating (6 tests) |
+
+**Итого:** 457 tests (34 files).
+
+Команды: `npm run typecheck`, `lint`, `test`, `build`.
+
+---
+
+## 16. Статус реализации
+
+| Этап | Статус |
+|------|--------|
+| Scaffold + tokens | ✅ |
+| Design system + App shell | ✅ |
+| Mock auth + demo login | ✅ |
+| RBAC | ✅ |
+| Home dashboard | ✅ student/teacher P0+P1; admin P1 2026-08-31 (см. §18–§19) |
+| Lessons + booking + reschedule/cancel | ✅ усилено (v1.1) |
+| Chat | ✅ v1.5 (edit/delete/reply, attachments, realtime abstraction, group mgmt, mute, pin, search, drafts, typing) |
+| Events | ✅ |
+| Profile + Settings + Availability | ✅ |
+| Calendar (day/week/month, Student/Teacher/Admin) | ✅ v1.3 |
+| Notifications | ✅ |
+| Admin (schedule, users) | ✅ |
+| Admin Home (role-specific overview) | ✅ P1 2026-08-31, см. §19 |
+| Admin shell + navigation | ✅ Iteration 1 2026-08-31, см. §20 |
+| Admin data consistency + cache | ✅ Iteration 2 2026-08-31, см. §21 |
+| UI Polish | ✅ Iteration 3 2026-08-31, см. §22 |
+| Admin Hardening | ✅ Iteration 4 2026-08-31, см. §23 |
+| Offline polish (AvailabilityPage save) | ✅ 2026-08-31, см. §24 |
+| Home quick actions dedup (student/teacher) | ✅ 2026-08-31, см. §25 |
+| Admin Home events quick action dedup | ✅ 2026-08-31, см. §26 |
+| Assignments (stage 2) | ✅ Iteration 3 2026-08-31, см. §27–§29 |
+| Progress + Achievements (stage 2) | ✅ Iteration 5 2026-08-31, см. §30–§34 |
+| Support / Help (stage 2) | ✅ Iteration 3 2026-08-31, см. §35–§37 |
+| Public site (stage 2) | ✅ Iteration 1 2026-08-31, см. §38 |
+| Security Center (stage 2) | ✅ Iteration 1 2026-08-31, см. §39 |
+| Legal docs (stage 2) | ✅ Iteration 1 2026-08-31, см. §40 |
+| Legal CMS admin (stage 2) | ✅ Iteration 1 2026-08-31, см. §41 |
+| Production roadmap doc | ✅ 2026-08-31, см. §42 |
+| Settings account UI name/phone (phase 0.1) | ✅ 2026-08-31, см. §53 |
+| Avatar upload + crop + fallback (phase 0.2) | ✅ 2026-08-31, см. §54 |
+| Audio player seek/duration/speed/volume (phase 0.3) | ✅ 2026-08-31, см. §55 |
+| Lesson detail polish (phase 0.4) | ✅ 2026-08-31, см. §43 |
+| Home assignments block (phase 0.5) | ✅ 2026-08-31, см. §44 |
+| Availability exceptions UI (phase 0.6) | ✅ 2026-08-31, см. §45 |
+| Assignment feedback audio (phase 0.7) | ✅ 2026-08-31, см. §46 |
+| Events competition form + imageUrl (phase 0.8) | ✅ 2026-08-31, см. §47 |
+| PWA install prompt (phase 0.9) | ✅ 2026-08-31, см. §48 |
+| Public detail pages (phase 0.10) | ✅ 2026-08-31, см. §49 |
+| Admin events CRUD + school settings (phase 0.11) | ✅ 2026-08-31, см. §50 |
+| Notification preferences UI (phase 0.12) | ✅ 2026-08-31, см. §51 |
+| Password recovery flow (phase 0.13) | ✅ 2026-08-31, см. §52 |
+| PocketBase infra (phase 1.1) | ✅ 2026-08-31, см. §56 |
+| PocketBase schema (phase 1.2) | ✅ 2026-08-31, см. §57 |
+| PocketBase RBAC rules (phase 1.4) | ✅ 2026-08-31, см. §60 |
+| PocketBase seed (phase 1.5) | ✅ 2026-08-31, см. §61 |
+| PocketBase adapter Auth+Users (phase 2.1) | ✅ 2026-08-31, см. §62 |
+| PocketBase adapter Lessons+Availability (phase 2.2) | ✅ 2026-08-31, см. §63 |
+| PocketBase adapter Events (phase 2.3) | ✅ 2026-08-31, см. §64 |
+| PocketBase adapter Chat (phase 2.4) | ✅ 2026-08-31, см. §65 |
+| PocketBase adapter Assignments (phase 2.5) | ✅ 2026-08-31, см. §66 |
+| PocketBase adapter Progress (phase 2.6) | ✅ 2026-08-31, см. §67 |
+| PocketBase adapter Support (phase 2.7) | ✅ 2026-08-31, см. §68 |
+| PocketBase adapter Legal (phase 2.8) | ✅ 2026-08-31, см. §69 |
+| PocketBase adapter Security (phase 2.9) | ✅ 2026-08-31, см. §70 |
+| PocketBase adapter Notifications (phase 2.10) | ✅ 2026-08-31, см. §71 |
+| File storage (phase 3.1) | ✅ 2026-08-31, см. §72 |
+| Chat realtime PB subscriptions (phase 3.2) | ✅ 2026-08-31, см. §73 |
+| Web Push (phase 3.3) | ✅ 2026-08-31, см. §74 |
+| PocketBase local dev + Home PB fix | ✅ 2026-08-31, см. §75 |
+| PB autodate + mapper timestamp hardening | ✅ 2026-08-31, см. §76 |
+| PocketBase auth hooks (phase 1.3) | ✅ 2026-08-31, см. §58 |
+| Availability calendar UI (period + month) | ✅ 2026-08-31, см. §59 |
+| ДЗ / прогресс / достижения (full) | ✅ этап 2 (mock) |
+| PWA | ✅ |
+| Logo integration | ✅ |
+| Production auth + backend | ⏳ |
+
+---
+
+## 17. Принятые решения
+
+| Вопрос | Решение |
+|--------|---------|
+| Backend | API abstraction; **PocketBase** через `VITE_API_MODE=pocketbase` (см. ROADMAP.md) |
+| State | TanStack Query (server) + Zustand (auth) |
+| Структура | pages-based (без отдельной `features/` на MVP) |
+| Логотип | `public/assets/logo.png` → `Logo` component |
+| Повторяющиеся занятия | Не в MVP |
+| ДЗ / прогресс | Iteration 1: assignments list/detail + mock API (§27); progress/achievements — этап 2 |
+
+---
+
+## 18. Home Audit (2026-08-31)
+
+**Файл:** единственный экран — `src/pages/home/HomePage.tsx` (без отдельных hooks/components).
+
+**Зависимости:** `AppLayout` (offline banner, nav badges, `MobileHeader` mobile / `SidebarNav` desktop notifications), `LessonCard`, `Card`, `Button`, `LessonCardSkeleton`, `ErrorState`, `can()`, `api.*` (lessons, events, users), `getNextUpcomingEvent`.
+
+**Graphify:** `HomePage()` → `router.tsx` (lazy `/home`); `SidebarNav` в `BottomNav.tsx` → `/notifications`; `MobileHeader` → mobile notification entry.
+
+**P0 (✅ 2026-08-31):**
+- Teacher Home: `LessonCard` с `student` + `showTeacher={false}`; users через `api.users.getAllUsers()` (паттерн LessonsPage, `enabled: role !== 'student'`).
+- Events: `getNextUpcomingEvent()` — filter past (`isSlotInPast`), sort date+time, без мутации массива.
+- ErrorState: per-block для lessons/events (`refetch()`); chat/conversations не блокируют Home.
+
+**P1 (✅ 2026-08-31):**
+- «Ближайшее занятие»: `LessonCardSkeleton` при `lessonsLoading`; empty/error без layout shift.
+- Home: убран emoji bell + query notifications (нет дубля с `MobileHeader`).
+- Desktop: `SidebarNav` — пункт «Уведомления» (`Bell`, `/notifications`) всегда; badge только при unread > 0; `notifBadge` из `AppLayout`.
+
+**P2 (✅ 2026-08-31, см. §25):**
+- Убрана сетка quick actions (Занятия/Чат/События) — дублировала `BottomNav`/`SidebarNav`; unread чата остаётся в shell nav.
+
+**Не трогать:** архитектура pages-based, API abstraction, RBAC через `can()`, `LessonCard` reuse, `page-container`, booking CTA pattern.
+
+---
+
+## 19. Admin Home (2026-08-31)
+
+**Файл:** `src/pages/home/HomePage.tsx` — ветка `isAdmin` (early return). Admin tools: `/admin/schedule`, `/admin/users` внутри `AppLayout` (§20).
+
+**Graphify:** `HomePage()` → `isAdmin` branch; `AdminRoute` nested in `AppLayout` → `/admin` redirect, `/admin/schedule`, `/admin/users`; `SidebarNav` «Админ» → `/home`.
+
+**Admin `/home` (✅ P1):**
+- Header: greeting + «Административный обзор».
+- KPI «Сегодня» (inline `StatCard`): занятий сегодня · предстоящих · преподавателей · учеников — client-side из existing queries; skeleton per stat.
+- «Ближайшее занятие школы»: `getLessons({ requesterId })` → sort → `[0]`; `LessonCard` + `personLabel` via `getLessonCounterpartyName(…, 'admin', teacher, student)`.
+- «Ближайшее мероприятие»: `getNextUpcomingEvent` + ErrorState/retry.
+- Quick actions: Расписание (`/admin/schedule`), Пользователи (`/admin/users`) — lucide icons, без dup BottomNav (§26).
+- **Убрано для admin:** book CTA, «Предстоящие занятия», chat/lessons tiles, `conversations` query.
+- **5 queries:** lessons, directions, teachers, users (counts only — no phone on dashboard), events.
+
+**Security:** dashboard — имена, counts, statuses, dates; phone только на `/admin/users`, не на Home.
+
+**Performance:** shared query keys с `LessonsPage` (`['lessons',…]`, `['directions']`, `['users']`, `['teachers']`); today-count — client filter `date === todayISO()`.
+
+**Оставшиеся находки (admin):**
+- P2: schedule list vs calendar — раздельные lessons queries (намеренно, см. §21).
+
+**Tests (`home.test.tsx` → Admin P1):** overview header, KPI stats, no book CTA, teacher · student, quick action links, skeleton.
+
+**Не трогать:** `AdminRoute`, RBAC matrix, mock API contracts, `AdminSchedulePage`/`AdminUsersPage`, chat IDOR rules.
+
+---
+
+## 20. Admin Hub + Navigation (2026-08-31)
+
+**Scope:** аудит (read-only) + **Iteration 1** (shell fix). Graphify: `graphify-out/` (2026-08-31 post-§24: **917 nodes**, 938 edges, 110 communities); update: `graphify update .` (global CLI, не `npx`).
+
+### Current architecture (post Iteration 1)
+
+```
+ProtectedRoute
+└── AppLayout (SidebarNav, MobileHeader, BottomNav, offline)
+    ├── /home              → HomePage (admin branch = Admin Overview)
+    ├── /lessons, /chat, /events, /profile, /notifications …
+    └── AdminRoute (role === 'admin')
+        ├── /admin         → Navigate /home
+        ├── /admin/schedule → AdminSchedulePage
+        └── /admin/users   → AdminUsersPage
+```
+
+- `/home` (admin) = **Admin Overview**: KPI, school lesson, event, quick actions.
+- `/admin` = **redirect alias** → `/home`.
+- Admin sub-routes **внутри `AppLayout`** — shell на desktop и mobile.
+- Back на sub-pages: `← Главная` → `/home`.
+- Sidebar «Админ» + Profile «Администрирование» → `/home`.
+
+### Route table
+
+| Route | Component | Guard | Layout | Purpose |
+|-------|-----------|-------|--------|---------|
+| `/home` | `HomePage` | ProtectedRoute | AppLayout | Admin Overview (role=admin) |
+| `/admin` | `Navigate` → `/home` | AdminRoute | AppLayout | Redirect alias |
+| `/admin/schedule` | `AdminSchedulePage` | AdminRoute | AppLayout | Filters + calendar + list |
+| `/admin/users` | `AdminUsersPage` | AdminRoute | AppLayout | User list + phones |
+
+Guard: `can(user, permission)` per route (`admin:access` | `admin:schedule` | `admin:users`).
+
+### Navigation (admin)
+
+| Item | Desktop | Mobile | Route | Duplicate? |
+|------|---------|--------|-------|------------|
+| Admin Overview | Sidebar «Главная» / «Админ» | BottomNav «Главная» | `/home` | — |
+| Schedule | Home QA | Home QA | `/admin/schedule` | — |
+| Users | Home QA | Home QA | `/admin/users` | — |
+| Events | Sidebar + «Все» в event block | BottomNav | `/events` | — |
+
+Mobile: admin tools через Home quick actions; BottomNav сохраняется на schedule/users.
+
+### Iteration 1 (✅ 2026-08-31)
+
+**Files:** `router.tsx` (`appRoutes` export), `BottomNav.tsx`, `ProfilePage.tsx`, `AdminSchedulePage.tsx`, `AdminUsersPage.tsx`, `routes.test.tsx`.
+
+**Done:** nest admin routes in AppLayout; `/admin` redirect; nav/back → `/home`; 10 new tests (133 total).
+
+### Remaining (post Iteration 4)
+
+| Priority | Problem | File |
+|----------|---------|------|
+| P2 | Schedule list vs calendar — separate lessons queries (intentional, §21) | `AdminSchedulePage.tsx` |
+
+### Tests
+
+`routes.test.tsx`: redirect, AppLayout shell, Sidebar/Profile/back links, student block, shared users cache (11 tests).
+
+---
+
+## 21. Admin Data Consistency + Performance (2026-08-31)
+
+**Scope:** Iteration 2 — React Query cache audit для admin users/schedule.
+
+### Admin Users cache (✅)
+
+- **Было:** `AdminUsersPage` → `['admin-users']`; `HomePage` / `AdminSchedulePage` / `LessonCalendar` / `LessonsPage` / `ChatPage` → `['users']`.
+- **API:** `api.users.getAllUsers()` — без `requesterId`, возвращает полный `User[]` (включая `phone`).
+- **Решение:** `AdminUsersPage` унифицирован на `['users']` — тот же API, те же данные; security на уровне UI (Home не рендерит `phone`).
+- **Invalidation:** `['users']` не инвалидируется мутациями в MVP; `queryClient.clear()` on login/logout.
+
+### Admin Schedule lessons (без изменений — намеренно)
+
+Два независимых lessons query на `AdminSchedulePage`:
+
+| Query key | Источник | Параметры | Назначение |
+|-----------|----------|-----------|------------|
+| `['lessons','admin-list', filters…]` | `AdminSchedulePage` | `from`/`to` = `dateFilter` или все; teacher/direction/status | Список внизу страницы |
+| `['lessons','calendar', userId, role, view, from, to, filters…]` | `LessonCalendar` → `useCalendarLessons` | диапазон view (day/week/month) + filters | Календарь |
+
+**Почему не объединять:** без `dateFilter` список показывает **все** занятия, календарь — только текущий view range (week по умолчанию). Разные query keys → React Query не дедуплицирует; это корректно. `['users']` и `['directions']` на странице уже shared с `LessonCalendar`.
+
+### Tests
+
+`routes.test.tsx`: `AdminUsersPage reuses shared users cache without refetch` (+1 test → 134 total).
+
+---
+
+## 22. UI Polish (2026-08-31)
+
+**Scope:** Iteration 3 — presentation-only polish; no API/RBAC/calendar/chat changes.
+
+### EmptyState conventions
+
+- Admin: `AdminSchedulePage` (filtered list), `AdminUsersPage` (empty DB).
+- Home: admin + student/teacher blocks (lessons, events, upcoming list).
+- Lessons: history filter empty → `EmptyState` with `History` icon.
+- Pattern: `title` + `description` + optional `action`; `className="py-8"` for inline sections.
+
+### Touch targets
+
+- Minimum interactive size: `min-h-11` / `min-w-11` (44px) via padding, not icon resize.
+- `MobileHeader` notifications: `min-h-11 min-w-11`.
+- `BottomNav`: `min-h-[56px] min-w-[56px]` (unchanged).
+- Home quick-action tiles: `min-h-11` on `Link` wrappers.
+
+### Admin header
+
+- `AdminPageHeader` (`src/components/ui/AdminPageHeader.tsx`): `← Главная` + `text-h1` for `/admin/schedule`, `/admin/users`.
+- Admin Home (`/home`): greeting header без back link (unchanged).
+
+### Navigation active states
+
+- `NavLink` + `end` on `/home` (exact match).
+- Sidebar «Админ»: `Link` + `useLocation`; `aria-current="page"` when `pathname.startsWith('/admin')`.
+- `NavLink` auto `aria-current` on main nav items.
+
+### Accessibility
+
+- Offline banner: `role="status"` + `aria-live="polite"`.
+- `MobileHeader`: dynamic `aria-label` with unread count.
+- Lessons history filters: `aria-pressed`.
+
+### Icons
+
+- Non-admin Home admin tile: `Shield` (lucide) вместо emoji ⚙️.
+
+### Tests
+
+`nav.test.tsx` +2 (aria-current, admin active); `routes.test.tsx` EmptyState assertions → **136 total** (pre-§23).
+
+---
+
+## 23. Admin Iteration 4 — Hardening (2026-08-31)
+
+**Scope:** granular admin guards + offline network CTAs + dead code cleanup.
+
+### Granular admin guards (✅)
+
+- `AdminRoute({ permission })` в `layouts.tsx` — `can(user, permission)` вместо `role === 'admin'`.
+- Router: `/admin` → `admin:access`; `/admin/schedule` → `admin:schedule`; `/admin/users` → `admin:users`.
+- Graphify: `AdminRoute()` → `permissions/index.ts` → `can()`.
+
+### Offline network CTAs (✅)
+
+- `OFFLINE_NETWORK_MESSAGE` в `useOnlineStatus.ts`.
+- `BookLessonLink` — disabled button offline вместо Link (`HomePage`, `LessonsPage`).
+- `BookLessonPage` confirm, `LessonDetailPage` reschedule/cancel (page + modals), `EventDetailPage` register/unregister, `AvailabilityPage` save.
+- Chat composer — без изменений (уже было).
+
+### Cleanup (✅)
+
+- Удалён `AdminDashboardPage.tsx` (deprecated, не в router).
+
+### Tests
+
+`layouts.test.tsx` +2; `permissions.test.ts` +1; `routes.test.tsx` +1; `offline.test.tsx` +2 → **142 total** (14 files).
+
+### Remaining P2/P3
+
+- P2: admin schedule dual queries (§21, intentional).
+- Production: фазы 0–6 в **`ROADMAP.md`** (следующий шаг: **0.4**).
+
+---
+
+## 24. Offline Polish — AvailabilityPage (2026-08-31)
+
+**Scope:** P3 из §20 — offline guard для сохранения доступности преподавателя.
+
+**Graphify:** `AvailabilityPage()` → `useOnlineStatus` → `OFFLINE_NETWORK_MESSAGE`; `offline.test.tsx` → AvailabilityPage.
+
+### AvailabilityPage save offline (✅)
+
+- `useOnlineStatus` + `OFFLINE_NETWORK_MESSAGE` — alert + disabled save/retry при offline.
+- `handleSave` early return если offline.
+- Паттерн согласован с `LessonDetailPage`, `BookLessonPage`, `EventDetailPage`.
+
+### Tests
+
+`offline.test.tsx` +2 (AvailabilityPage save disabled/enabled) → **144 total** (14 files).
+
+---
+
+## 25. Home Quick Actions Dedup (2026-08-31)
+
+**Scope:** P2 из §18 — убрать дублирующие student/teacher quick actions на Home.
+
+**Graphify:** `HomePage()` → `BottomNav()` / `SidebarNav()` (shell nav); admin branch quick actions — schedule/users (§26: events tile removed).
+
+### Student/teacher Home (✅)
+
+- Удалена сетка tiles: Занятия · Чат · События · Админ — дублировала `BottomNav`/`SidebarNav`.
+- Убран `conversations` query с Home (unread badge остаётся в `AppLayout` → nav).
+
+### Tests
+
+`home.test.tsx` +1 (no duplicate nav shortcuts) → **145 total** (14 files).
+
+---
+
+## 26. Admin Home Events Quick Action Dedup (2026-08-31)
+
+**Scope:** P2 из §25 — убрать дублирующую admin quick action «Мероприятия» на Home.
+
+**Graphify:** `HomePage()` → admin branch quick actions; `BottomNav()` / `SidebarNav()` → `/events`.
+
+### Admin Home quick actions (✅)
+
+- Удалена tile «Мероприятия» (`/events`) — дублировала `BottomNav`/`SidebarNav` «События».
+- Оставлены admin-only: Расписание · Пользователи (не в shell nav).
+- Блок «Ближайшее мероприятие» + link «Все» → `/events` без изменений.
+
+### Tests
+
+`home.test.tsx` +1 (no admin events QA dup) → **146 total** (14 files).
+
+### Remaining P2/P3
+
+- P2: admin schedule dual queries (§21, intentional).
+- Next layer: progress, achievements, backend adapter, support (PROJECT_SPEC §23–24).
+
+**Graphify stats:** 985 nodes, 1001 edges, 121 communities.
+
+---
+
+## 27. Stage 2 — Assignments Iteration 1 (2026-08-31)
+
+**Scope:** фундамент домашних заданий — типы, RBAC, API, mock, access, list/detail UI.
+
+**Graphify:** `AssignmentsPage()` / `AssignmentDetailPage()` → `AssignmentsApi` → `mock/assignments.ts` → `services/assignments/{access,helpers}`.
+
+### Types + API (✅)
+
+- `Assignment`, `AssignmentStatus`, `AssignmentResponseType`, materials/submission/feedback в `types/index.ts`.
+- `AssignmentsApi` в `services/api/types.ts`; mock в `mock/assignments.ts`; seed `initialAssignments`.
+- Permissions: `assignments:view-own|view-assigned|view-all|create|submit|review`.
+
+### Domain (✅)
+
+- `services/assignments/access.ts` — IDOR-safe `canViewAssignment`, `canSubmitAssignment`, `canReviewAssignment`.
+- `services/assignments/helpers.ts` — `getAssignmentDisplayStatus` (overdue), sort by due date.
+- `AssignmentStatusBadge` + `utils/assignmentStatus.ts`.
+
+### UI (✅)
+
+- `/assignments` — список (student/teacher/admin role-aware).
+- `/assignments/:id` — деталь; student submit text; teacher review; offline guard.
+- Profile → «Домашние задания» (не в BottomNav — §4 PROJECT_SPEC).
+
+### Tests
+
+`assignments.test.ts` +15; `routes.test.ts` +2 paths; `permissions.test.ts` +2 → **161 total** (15 files).
+
+---
+
+## 28. Stage 2 — Assignments Iteration 2 (2026-08-31)
+
+**Scope:** UI создания задания преподавателем.
+
+**Graphify:** `CreateAssignmentPage()` → `AssignmentsApi.createAssignment()` → `mock/assignments.ts`; `AssignmentsPage()` → `/assignments/create`.
+
+### Create UI (✅)
+
+- `/assignments/create` — форма: название, описание, ученик (из занятий teacher), срок, тип ответа, опционально связанное занятие.
+- Guard: `canCreateAssignment` → redirect `/assignments` для student/admin.
+- Offline guard на submit (паттерн AvailabilityPage).
+- `AssignmentsPage`: кнопка «Создать» + EmptyState action для teacher.
+- Успех → navigate `/assignments/:id`; invalidate `['assignments']`.
+
+### Tests
+
+`routes.test.ts` +1 path → **161 total** (15 files).
+
+---
+
+## 29. Stage 2 — Assignments Iteration 3 (2026-08-31)
+
+**Scope:** загрузка файлов + уведомление ученику при создании задания.
+
+**Graphify:** `uploadAssignmentFile()` → `services/assignments/validation.ts`; `createAssignment()` → `db.notifications`; `AssignmentFilePicker` → create/detail pages.
+
+### Upload API (✅)
+
+- `UploadAssignmentFileInput` + `AssignmentsApi.uploadAssignmentFile(purpose: material|submission)`.
+- `services/assignments/{validation,constants}.ts` — MIME/size; reuse chat limits.
+- Mock: upload + validation; submit требует файл для non-text; `AssignmentSubmission` + filename/mimeType.
+
+### Notifications (✅)
+
+- `NotificationType` + `'assignment'`.
+- `createAssignment` → push notification ученику (`/assignments/:id`).
+- Fix: mock API получает `db` by reference (reset-safe).
+
+### UI (✅)
+
+- `CreateAssignmentPage`: `AssignmentFilePicker` — до 5 материалов.
+- `AssignmentDetailPage`: file picker по `responseType`; preview image/audio/video.
+- Offline guard на upload/submit.
+
+### Tests
+
+`assignments.test.ts` +7 → **168 total** (15 files).
+
+### Remaining (stage 2)
+
+- Progress: teacher goal management, Home dashboard block.
+- Backend adapter.
+
+**Graphify stats:** 1036 nodes, 1049 edges, 130 communities.
+
+---
+
+## 30. Stage 2 — Progress & Achievements Iteration 1 (2026-08-31)
+
+**Scope:** фундамент прогресса и достижений — типы, RBAC, API, mock, access, UI `/profile/progress`.
+
+**Graphify:** `ProgressPage()` → `ProgressApi` → `mock/progress.ts` → `services/progress/{access,helpers}`.
+
+### Types + API (✅)
+
+- `Skill`, `StudentSkillProgress`, `ProgressGoal`, `ProgressHistoryEntry`, `AchievementDefinition`, `UserAchievement`, `StudentProgressSummary` в `types/index.ts`.
+- `ProgressApi` в `services/api/types.ts`; mock в `mock/progress.ts`; seed skills/goals/history/achievements.
+- Permissions: `progress:view-own|view-assigned|view-all`.
+
+### Domain (✅)
+
+- `services/progress/access.ts` — IDOR-safe `canViewStudentProgress`.
+- `services/progress/helpers.ts` — summary из lessons/assignments/goals/skills; `buildSkillsWithProgress`, `buildAchievementsWithStatus`.
+
+### UI (✅)
+
+- `/profile/progress` — student dashboard: обзор KPI, навыки, цели, достижения, история.
+- Teacher/admin: список учеников → `?student=` detail view.
+- Profile → «Прогресс» (не в BottomNav — §4 PROJECT_SPEC).
+
+### Tests
+
+`progress.test.ts` +15; `routes.test.ts` +1 path; `permissions.test.ts` +3 → **183 total** (16 files).
+
+### Remaining (stage 2)
+
+- Backend adapter.
+
+---
+
+## 31. Stage 2 — Progress & Achievements Iteration 2 (2026-08-31)
+
+**Scope:** auto-unlock достижений при событиях занятий/заданий/мероприятий.
+
+**Graphify:** `evaluateAndUnlockAchievements()` → `mock/{progress,assignments,index}.ts` → `services/progress/achievements.ts`.
+
+### Domain (✅)
+
+- `services/progress/achievements.ts` — критерии по `code`: `first_lesson`, `ten_lessons`, `skill_master`, `regularity`, `first_performance`.
+- `isLessonCompleted()` — `status === completed` или прошедший слот (не cancelled).
+- `evaluateAndUnlockAchievements()` — unlock + `progressHistory` + notification (`system`, link `/profile/progress`).
+
+### Triggers (✅)
+
+- `getSummary` / `getAchievements` — sync lesson-based achievements on read.
+- `reviewAssignment` — re-evaluate после проверки ДЗ.
+- `register` (events) — unlock `first_performance` для student.
+
+### Tests
+
+`progress.test.ts` +8 → **191 total** (16 files).
+
+### Remaining (stage 2)
+
+- Backend adapter.
+
+**Graphify stats:** 1052 nodes, 1073 edges, 131 communities.
+
+---
+
+## 32. Stage 2 — Progress & Achievements Iteration 3 (2026-08-31)
+
+**Scope:** блок прогресса на Home для ученика (PROJECT_SPEC §5).
+
+**Graphify:** `HomeProgressBlock()` → `HomePage()` → `ProgressApi.getSummary/getSkills`.
+
+### UI (✅)
+
+- `components/progress/HomeProgressBlock.tsx` — KPI, топ-2 навыка, счётчик достижений, ссылка `/profile/progress`.
+- `HomePage` — блок после мероприятий, только при `can(user, 'progress:view-own')` (student).
+- Shared query keys с `ProgressPage`: `['progress', 'summary|skills', studentId]`.
+- Per-block loading / error / retry; не блокирует остальной Home.
+
+### Tests
+
+`home.test.tsx` +4 → **195 total** (16 files).
+
+### Remaining (stage 2)
+
+- Backend adapter.
+
+**Graphify stats:** 1060 nodes, 1080 edges, 132 communities.
+
+---
+
+## 33. Stage 2 — Progress & Achievements Iteration 4 (2026-08-31)
+
+**Scope:** teacher/admin CRUD целей и навыков на `/profile/progress?student=`.
+
+**Graphify:** `TeacherProgressControls` → `ProgressPage` → `ProgressApi.createGoal/updateGoal/updateSkillProgress`.
+
+### Permissions + API (✅)
+
+- `progress:manage-goals`, `progress:manage-skills` — teacher, admin.
+- `canManageStudentGoals/Skills` в `services/progress/access.ts`.
+- `createGoal`, `updateGoal`, `updateSkillProgress` в `ProgressApi` + mock.
+- `services/progress/validation.ts` — title, skill level.
+
+### UI (✅)
+
+- `TeacherProgressControls` — CreateGoalModal, GoalManageActions (выполнено), SkillManageRow (slider + note).
+- `ProgressPage` — teacher view: все навыки, кнопки управления; student view без изменений.
+- Offline guard на мутации; invalidate `['progress']`.
+
+### Tests
+
+`progress.test.ts` +7; `permissions.test.ts` +2 → **202 total** (16 files).
+
+### Remaining (stage 2)
+
+- Backend adapter.
+
+**Graphify stats:** 1080 nodes, 1098 edges, 136 communities.
+
+---
+
+## 34. Stage 2 — Progress & Achievements Iteration 5 (2026-08-31)
+
+**Scope:** посещаемость в прогрессе (PROJECT_SPEC §13).
+
+**Graphify:** `computeAttendanceStats()` → `computeProgressSummary()` → `ProgressPage` / `HomeProgressBlock`.
+
+### Domain (✅)
+
+- `isLessonAttended` / `isLessonMissed` / `computeAttendanceStats` в `services/progress/helpers.ts`.
+- `StudentProgressSummary`: `lessonsAttended`, `lessonsMissed`, `lessonsCancelled`, `attendanceRate`.
+- `lessonsCompleted` через `isLessonCompleted` (без cancelled в completed).
+- Seed: `lesson-4` (`no_show`) для демо 50% посещаемости.
+
+### UI (✅)
+
+- `ProgressPage`: StatCard «Посещаемость» + детали (посещено/пропуски/отмены).
+- `HomeProgressBlock`: посещаемость в KPI и summary line.
+
+### Tests
+
+`progress.test.ts` +2 → **203 total** (16 files).
+
+### Remaining (stage 2)
+
+- Backend adapter.
+
+**Graphify stats:** 1084 nodes, 1105 edges, 134 communities.
+
+---
+
+## 35. Stage 2 — Support / Help Iteration 1 (2026-08-31)
+
+**Scope:** центр помощи — FAQ, поиск, обращения, ответы администрации (PROJECT_SPEC §23).
+
+**Graphify:** `HelpPage()` / `HelpTicketDetailPage()` → `SupportApi` → `mock/support.ts` → `services/support/{access,helpers,validation}`.
+
+### Types + API (✅)
+
+- `HelpArticle`, `SupportTicket`, `SupportTicketReply`, categories/status в `types/index.ts`.
+- `SupportApi` в `services/api/types.ts`; mock в `mock/support.ts`; seed `helpArticles`, `initialSupportTickets`.
+- Permissions: `support:view-faq|create-ticket|view-own-tickets|view-all-tickets|reply-ticket`.
+
+### Domain (✅)
+
+- `services/support/access.ts` — IDOR-safe `canViewTicket`, `canReplyToTicket`, `canCreateTicket`.
+- `services/support/helpers.ts` — FAQ filter, sort tickets, category/status labels.
+- `services/support/validation.ts` — subject/message/reply length.
+
+### UI (✅)
+
+- `/profile/help` — FAQ + search, ticket list, create form (offline guard).
+- `/profile/help/:id` — деталь обращения; admin reply + close option.
+- Profile → «Помощь» (не в BottomNav — §4 PROJECT_SPEC).
+- `SupportTicketStatusBadge` — единый badge статуса.
+
+### Notifications (✅)
+
+- Admin reply → `system` notification ученику (`/profile/help/:id`).
+
+### Tests
+
+`support.test.ts` +18; `routes.test.ts` +2 paths; `permissions.test.ts` +2 assertions → **221 total** (17 files).
+
+### Remaining (stage 2+)
+
+- Backend adapter.
+- Public site, Security Center, legal docs (PROJECT_SPEC §22–§24).
+
+**Graphify stats:** 1129 nodes, 1145 edges, 143 communities.
+
+---
+
+## 36. Stage 2 — Support / Help Iteration 2 (2026-08-31)
+
+**Scope:** вложения к обращениям + admin inbox filters (PROJECT_SPEC §23).
+
+**Graphify:** `SupportTicketFilters()` / `SupportAttachmentList()` → `HelpPage()` → `uploadSupportAttachment()` → `mock/support.ts`.
+
+### Types + API (✅)
+
+- `SupportTicketAttachment`; `SupportTicket.attachments[]`.
+- `uploadSupportAttachment`, `getTickets({ status?, category? })`, attachments в `createTicket`.
+- `services/support/constants.ts` — `MAX_ATTACHMENTS_PER_TICKET = 3`.
+
+### Domain (✅)
+
+- `validateSupportAttachment()` — reuse chat MIME/size rules.
+- `filterTickets()` — status + category filters для admin inbox.
+
+### UI (✅)
+
+- `HelpPage`: `AssignmentFilePicker` в форме создания; admin `SupportTicketFilters` (status pills + category select).
+- `HelpTicketDetailPage`: `SupportAttachmentList` — image/audio/video/doc preview.
+- Список: счётчик вложений в caption.
+
+### Tests
+
+`support.test.ts` +4 → **225 total** (17 files).
+
+### Remaining (stage 2+)
+
+- Backend adapter.
+- Public site, Security Center, legal docs (PROJECT_SPEC §22–§24).
+
+**Graphify stats:** 1145 nodes, 1158 edges, 145 communities.
+
+---
+
+## 37. Stage 2 — Support / Help Iteration 3 (2026-08-31)
+
+**Scope:** поиск обращений + FAQ CMS для администратора (PROJECT_SPEC §23).
+
+**Graphify:** `FaqArticleModal()` → `HelpPage()` → `createFaqArticle|updateFaqArticle|deleteFaqArticle` → `searchTickets()`.
+
+### Permissions + API (✅)
+
+- `support:manage-faq` — admin; `canManageFaq()`.
+- `getTickets({ query? })` — поиск по subject/message/имени вложения.
+- `createFaqArticle`, `updateFaqArticle`, `deleteFaqArticle` в `SupportApi` + mock.
+
+### Domain (✅)
+
+- `searchTickets()`, `parseFaqKeywords()` в `helpers.ts`.
+- `validateFaqArticleInput()` — question/answer length.
+- `TICKET_SEARCH_MIN_LENGTH = 2`.
+
+### UI (✅)
+
+- `HelpPage`: поиск по обращениям; admin — «Добавить» / edit / delete на FAQ-карточках.
+- `FaqArticleModal` — create/edit FAQ (category, keywords, offline guard).
+
+### Tests
+
+`support.test.ts` +9; `permissions.test.ts` +1 → **234 total** (17 files).
+
+### Remaining (stage 2+)
+
+- Backend adapter.
+- Public site, Security Center, legal docs (PROJECT_SPEC §22–§24).
+
+**Graphify stats:** 1186 nodes, 1196 edges, 154 communities.
+
+---
+
+## 38. Stage 2 — Public Site Iteration 1 (2026-08-31)
+
+**Scope:** публичная часть до авторизации (PROJECT_SPEC §24, DESIGN_SYSTEM §22).
+
+**Graphify:** `LandingPage()` → `PublicApi.getLandingData()` → `mock/public.ts` → `services/public/{helpers,constants}`.
+
+### Types + API (✅)
+
+- `PublicSchoolInfo`, `PublicTeacher`, `PublicEvent`, `PublicNewsItem`, `PublicLandingData` в `types/index.ts`.
+- `PublicApi` в `services/api/types.ts`; mock в `mock/public.ts`; seed `publicSchoolInfo`, `publicNews`.
+
+### Domain (✅)
+
+- `services/public/helpers.ts` — `toPublicTeacher` (без phone), `toPublicEvent` / `filterPublicEvents` (без invited, без прошедших).
+- `services/public/constants.ts` — labels типов мероприятий.
+
+### UI (✅)
+
+- `/` — `LandingPage`: hero, направления, преподаватели, мероприятия, новости, контакты, CTA login/register.
+- `PublicLandingContent` — секции с loading/error/retry; logged-in → redirect `/home`.
+
+### Tests
+
+`public.test.ts` +4 → **238 total** (18 files).
+
+### Remaining (stage 2+)
+
+- Backend adapter.
+- Security Center, legal docs (PROJECT_SPEC §20–§22).
+- Public site: детальные страницы направлений/преподавателей (опционально).
+
+---
+
+## 39. Stage 2 — Security Center Iteration 1 (2026-08-31)
+
+**Scope:** центр безопасности — смена пароля, сессии, история входов, оповещения (PROJECT_SPEC §20).
+
+**Graphify:** `SecurityPage()` → `SecurityApi` → `mock/security.ts` → `services/security/{access,helpers,validation}`; login → `recordAuthLogin()`.
+
+### Types + API (✅)
+
+- `SecuritySession`, `LoginHistoryEntry`, `SecurityAlert`, `SecurityOverview` в `types/index.ts`.
+- `SecurityApi` в `services/api/types.ts`; mock в `mock/security.ts`; seed `initialSecuritySessions`, `initialLoginHistory`, `initialSecurityAlerts`.
+- Permissions: `security:view-own`, `security:manage-password`, `security:manage-sessions` — все роли.
+
+### Domain (✅)
+
+- `services/security/access.ts` — own-data only `canViewSecurity`, `canChangePassword`, `canManageSessions`.
+- `services/security/validation.ts` — `validateChangePasswordInput`.
+- `services/security/helpers.ts` — sort history, unread alerts, alert labels.
+- Mock passwords в `db.passwords`; login/register → `recordAuthLogin()` + security alerts.
+
+### UI (✅)
+
+- `/profile/security` — обзор KPI, смена пароля, активные сессии (revoke / revoke others), оповещения, история входов; offline guard на мутации.
+- Profile → «Безопасность»; Settings → ссылка «Пароль и сессии».
+
+### Tests
+
+`security.test.ts` +16; `routes.test.ts` +1 path; `permissions.test.ts` +1 → **254 total** (19 files).
+
+### Remaining (stage 2+)
+
+- Backend adapter.
+- Security Center: admin extended view, push/email security alerts.
+- Public site: детальные страницы направлений/преподавателей (опционально).
+
+---
+
+## 40. Stage 2 — Legal Docs Iteration 1 (2026-08-31)
+
+**Scope:** документы и согласия — публичный просмотр, версии, история согласий (PROJECT_SPEC §22).
+
+**Graphify:** `LegalDocumentsPage()` / `LegalConsentsPage()` → `LegalApi` → `mock/legal.ts` → `services/legal/{access,helpers,constants}`.
+
+### Types + API (✅)
+
+- `LegalDocument`, `LegalDocumentVersionHistory`, `UserConsent`, `LegalDocumentType` в `types/index.ts`.
+- `LegalApi` в `services/api/types.ts`; mock в `mock/legal.ts`; seed `initialLegalDocuments`, `initialUserConsents`.
+- Permissions: `legal:view-own`, `legal:accept`, `legal:manage` (admin).
+
+### Domain (✅)
+
+- `services/legal/access.ts` — own-data `canViewOwnConsents`, `canAcceptDocument`, `canManageLegalDocuments`.
+- `services/legal/helpers.ts` — `getPendingConsents`, `hasCurrentConsent`, sort helpers.
+- `services/legal/constants.ts` — labels типов документов.
+- Seed: privacy v2.0 требует повторного согласия у student (демо pending).
+
+### UI (✅)
+
+- `/legal`, `/legal/:id` — публичный список и деталь с историей версий.
+- `/profile/legal` — pending consents + история; offline guard на accept.
+- Profile → «Документы и согласия»; Landing footer → `/legal`.
+- Register: checkbox согласия + `acceptDocuments` после регистрации.
+
+### Tests
+
+`legal.test.ts` +16; `routes.test.ts` +3 paths; `permissions.test.ts` +2 → **270 total** (20 files).
+
+### Remaining (stage 2+)
+
+- Backend adapter.
+- Security Center: admin extended view, push/email security alerts.
+- Public site: детальные страницы направлений/преподавателей (опционально).
+
+**Graphify stats:** 1283 nodes, 1296 edges, 173 communities.
+
+---
+
+## 41. Stage 2 — Legal CMS Iteration 1 (2026-08-31)
+
+**Scope:** админ-управление юридическими документами — редактирование, публикация версий (PROJECT_SPEC §22).
+
+**Graphify:** `AdminLegalPage()` → `LegalDocumentEditModal` / `LegalPublishVersionModal` → `LegalApi.updateDocument|publishVersion` → `mock/legal.ts` → `services/legal/{access,helpers,validation}`.
+
+### API (✅)
+
+- `UpdateLegalDocumentInput`, `PublishLegalVersionInput` в `services/api/types.ts`.
+- `updateDocument`, `publishVersion` в `LegalApi` + mock; `assertManageAccess` через `canManageLegalDocuments`.
+- `services/legal/validation.ts` — title/content/changeSummary/version/effectiveAt.
+- `bumpLegalVersion()` в `helpers.ts` — авто-инкремент minor.
+
+### UI (✅)
+
+- `/admin/legal` — `AdminLegalPage` (guard `legal:manage`, `AdminPageHeader`).
+- Список документов: тип, версия, согласие, preview; edit / publish / public link.
+- `LegalDocumentEditModal` — title, content, requiresConsent (без смены версии).
+- `LegalPublishVersionModal` — content, changeSummary, effectiveAt, version; offline guard.
+- Admin Home quick action «Документы» → `/admin/legal`.
+
+### Поведение версий (✅)
+
+- `publishVersion` — новая запись в `versionHistory`, обновление `currentVersion`/`effectiveAt`/`content`.
+- Смена версии → `hasCurrentConsent` false → pending consent для пользователей (демо: privacy v2.1).
+
+### Tests
+
+`legal.test.ts` +5; `routes.test.ts` +1 path; `home.test.tsx` admin QA → **275 total** (20 files).
+
+### Remaining (stage 2+)
+
+- Backend adapter.
+- Security Center: admin extended view, push/email security alerts.
+- Public site: детальные страницы направлений/преподавателей (опционально).
+
+**Graphify stats:** 1301 nodes, 1311 edges, 176 communities (graphify update 2026-08-31, без изменений топологии).
+
+---
+
+## 42. Production Roadmap Reference (2026-08-31)
+
+**Scope:** единый план до production — **`ROADMAP.md`** (`.cursor/rules/`).
+
+**Graphify:** `ROADMAP.md` → `stack.mdc` §16; `createApiClient()` → mock | pocketbase (all core modules); hybrid mock для public/schoolSettings.
+
+### Текущее положение
+
+| Поле | Значение |
+|------|----------|
+| MVP + этап 2 (mock) | ✅ |
+| Текущая фаза | **3** — Files + realtime + push |
+| Следующий шаг | **3.4** — Email channel (optional) |
+| Backend (решение) | **PocketBase** |
+| Production auth + backend | ⏳ фазы 3–6 |
+
+### Фазы (кратко)
+
+| Фаза | Название | Статус |
+|------|----------|--------|
+| 0 | Frontend polish (mock) | ✅ |
+| 1 | PocketBase foundation | ✅ |
+| 2 | API adapter по модулям | ✅ |
+| 3 | Files + realtime + push | ⏳ 3.4 next |
+| 4 | Admin & audit | ⏳ |
+| 5 | Production hardening | ⏳ |
+| 6 | Deploy | ⏳ |
+
+Полные таблицы задач, критерии приёмки, env checklist — **`ROADMAP.md`**.
+
+### Протокол новых чатов
+
+1. `ROADMAP.md` §2 + §6 — фаза и следующий пункт.
+2. `graphify query "<тема>"`.
+3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
+
+**Graphify stats:** 2032 nodes, 2155 edges, 296 communities (graphify update 2026-08-31 post-§76).
+
+---
+
+## 76. PB Autodate + Timestamp Hardening (2026-08-31)
+
+**Scope:** аудит и фикс ошибок `undefined.createdAt` / `.slice()` в PocketBase mode — чат, уведомления, прогресс, поддержка, безопасность.
+
+**Graphify:** `mapMessageRecord()` / `getPbRecordCreatedAt()` → `buildMessageListWithSeparators()` → `MessageList()`; `1789104000_kvartira_all_autodate.js` → все `base()` коллекции.
+
+### Root cause (✅)
+
+- Schema `base()` без autodate `created`/`updated` → мапперы возвращали `createdAt: undefined`.
+- UI: `buildMessageListWithSeparators` `.slice()`, `formatChatListTime`, сортировки `.localeCompare`.
+
+### Migrations (✅)
+
+- `1789017600_kvartira_messages_autodate.js` — messages.
+- `1789104000_kvartira_all_autodate.js` — 18 коллекций + backfill существующих записей.
+
+### Mappers (✅)
+
+- `getPbRecordCreatedAt` / `getPbRecordUpdatedAt` в `pocketbase/helpers.ts`.
+- Все PB mappers с `createdAt`/`updatedAt`/`joinedAt` — fallback на domain-поля (`editedAt`, `lastMessageAt`, `dueDate`, `lastActiveAt`, …).
+- `compareIsoDates` в `utils/dates.ts` — безопасная сортировка в chat adapters/helpers.
+
+### UI (✅)
+
+- `formatChatListTime` / `formatChatDateSeparator` / `formatFullDate` — guard на пустые даты.
+- `buildMessageListWithSeparators` — fallback epoch.
+- `RegisterPage` — import `Logo` (отдельный фикс).
+
+### Seed (✅)
+
+- `patchRecordTimestamps()` — lessons, history, conversations, members, messages, assignments, progress, support, security после create.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +2 (helper fallback, message editedAt) → **457 total** (34 files).
+
+### Не в scope
+
+- Email channel (ROADMAP 3.4).
+- Public/SchoolSettings PB adapter.
+
+---
+
+## 75. PocketBase Local Dev + Home Fix (2026-08-31)
+
+**Scope:** запуск PB без Docker, seed/login/register, ошибки на `/home` в `VITE_API_MODE=pocketbase`.
+
+**Graphify:** `HomeProgressBlock()` → `pocketbaseProgressApi.getSummary()` → `progress_history` sort; `createApiClient()` → pocketbase adapters sort fields.
+
+### Adapter sort fix (✅)
+
+- Коллекции из schema `base()` **без** системных `created`/`updated` — сортировка `-created` / `-updated` → HTTP 400.
+- Замена на `-id` в `pocketbase/{progress,notifications,chat,security,support,lessons}.ts`.
+- **Home:** блок «Прогресс» больше не показывает ErrorState после demo login.
+
+### Hooks + seed (✅)
+
+- `kvartiraProgress.js` / `kvartiraAssignments.js` — bypass для superuser (`!isUsersAuth(auth)`) при seed.
+- Ранее в сессии: hooks `require()` внутри handlers; bool migration `1788931200_kvartira_bool_fields.js`; register min password 8; `mapPocketBaseError` field errors.
+
+### Локальный запуск
+
+- `pocketbase/pocketbase.exe serve --dir=./pb_data --hooksDir=./pb_hooks --migrationsDir=./pb_migrations`
+- `.env`: `VITE_API_MODE=pocketbase`, `VITE_API_URL=http://127.0.0.1:8090`
+- `npm run pb:seed` (skip если demo phone уже есть; `--force` после очистки `pb_data`)
+
+### Tests
+
+Без новых тестов; `pocketbaseAdapter.test.ts` 43 passed (post-fix smoke).
+
+### Не в scope
+
+- Email channel (ROADMAP 3.4).
+- Полный `--force` reseed с progress seed data (superuser bypass готов).
+
+---
+
+## 74. Phase 3 — Web Push (2026-08-31)
+
+**Scope:** ROADMAP 3.3 — push_subscriptions, SW handlers, Settings subscribe, PB hook + optional relay.
+
+**Graphify:** `useWebPush()` → `SettingsPage()` → `NotificationsApi.registerPushSubscription`; `push-sw.js` → Workbox `importScripts`; `kvartiraPush.js` → `notifications.pb.js` onRecordAfterCreateSuccess.
+
+### Client (✅)
+
+- `public/push-sw.js` — push + notificationclick → open link.
+- `services/push/helpers.ts` — VAPID key, subscribe/unsubscribe, base64url.
+- `hooks/useWebPush.ts` — permission, server sync, Settings toggle integration.
+- `vite.config.ts` — Workbox `importScripts: ['push-sw.js']`.
+- `SettingsPage` — enable: permission → subscribe → API; disable: unsubscribe + API.
+
+### Backend (✅)
+
+- Migration `1788844800_kvartira_push_subscriptions.js` — endpoint, p256dh, auth, userAgent; own-row RBAC.
+- `pb_hooks/push.pb.js` + `lib/kvartiraPush.js` — dispatch on notification create via `WEB_PUSH_RELAY_URL`.
+- `pocketbase/push-relay.mjs` — optional `npm run push:relay` (web-push npm).
+- `NotificationsApi`: `registerPushSubscription`, `unregisterPushSubscription`, `hasPushSubscription`.
+- Mock: `pushSubscriptions[]`; delivery only when subscribed + pushEnabled.
+
+### Env (✅)
+
+- `VITE_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `WEB_PUSH_RELAY_URL` in `.env.example`.
+
+### Tests
+
+`webPush.test.ts` +6; `pocketbaseAdapter.test.ts` +2; `notificationPreferences.test.ts` update → **455 total** (34 files).
+
+### Не в scope 3.3
+
+- Email channel (фаза 3.4).
+
+---
+
+## 73. Phase 3 — Chat Realtime (2026-08-31)
+
+**Scope:** ROADMAP 3.2 — PocketBase realtime subscriptions → `ChatRealtimeService`.
+
+**Graphify:** `useChatRealtime()` → `chatRealtimeService` → `PocketBaseChatRealtimeService` → PB `messages` / `conversations` / `conversation_members` subscribe; `realtimeMappers.ts` → `mapMessageRecord` / `mapConversationRecord` / `mapConversationMemberRecord`.
+
+### Realtime (✅)
+
+- `realtimePocketbase.ts`: `PocketBaseChatRealtimeService` — PB `subscribe('*')` на messages, conversations, conversation_members; RBAC через PB rules.
+- `realtimeMappers.ts`: PB `RecordSubscription` → `ChatRealtimeEvent` (create/update/delete messages, member join/leave/read, conversation updated).
+- `realtime.ts`: `isPocketBaseMode()` → PB service; mock → `MockChatRealtimeService` (event emitter).
+- Typing — client-side через `sendTyping` / `emit` (без PB collection).
+- Локальные `emit` в `pocketbase/chat.ts` сохранены для мгновенного UI + remote через subscriptions.
+
+### Tests
+
+`chatRealtime.test.ts` +2; `pocketbaseAdapter.test.ts` +1 → **447 total** (33 files).
+
+### Не в scope 3.2
+
+- Email channel (фаза 3.4).
+- Reconnect/backoff при обрыве WS (фаза 5).
+
+---
+
+## 72. Phase 3 — File Storage (2026-08-31)
+
+**Scope:** ROADMAP 3.1 — `kvartira_files` collection; signed URLs; chat/assignment/support upload adapters.
+
+**Graphify:** `uploadStoredFile()` → `pocketbase/files.ts` → `kvartira_files`; `chat.ts` / `assignments.ts` / `support.ts` upload + resolve.
+
+### Storage (✅)
+
+- `kvartira_files`: owner, purpose (`chat`|`assignment`|`support`), contextId, file field (до 100 MB).
+- `pocketbase/files.ts`: `uploadStoredFile`, `resolveStoredFileUrl`, `linkStoredFilesToContext`, `pbfile:` refs.
+- Migration `1788758400_kvartira_files_storage.js` + RBAC (participants IDOR).
+- Hooks `files.pb.js` + `kvartiraFiles.js` — owner on create; metadata lock on update.
+- Adapters: upload → PB storage; read → signed URL via auth token.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +3 → **444 total** (32 files).
+
+### Не в scope 3.1
+
+- Web Push (фаза 3.3 ✅).
+- Avatar upload to `kvartira_files` (остаётся dataUrl на users).
+
+---
+
+## 71. Phase 2 — PocketBase Adapter Notifications (2026-08-31)
+
+**Scope:** ROADMAP 2.10 — `pocketbase/notifications.ts`; preferences create/update hooks; content field-lock on mark-as-read.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseNotificationsApi` → `NotificationsApi`; `pb_hooks/notifications.pb.js` + `kvartiraNotifications.js`.
+
+### Adapter (✅)
+
+- `pocketbaseNotificationsApi`: getNotifications, markAsRead, markAllAsRead, getPreferences, updatePreferences.
+- `mappers.ts`: `mapNotificationRecord`, `mapNotificationPreferencesRecord`.
+- Client guards: own-row IDOR на markAsRead; user existence check на get/update preferences.
+- Hooks: `assertNotificationCreate` (self / admin / teacher); `assertNotificationUpdate` (lock user/type/title/body/link); preferences user lock on create/update.
+- Hybrid: …+Notifications → PB; public/schoolSettings — mock.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +2 → **441 total** (32 files).
+
+### Не в scope 2.10
+
+- Public/SchoolSettings adapter (остаётся mock).
+- Web Push delivery (фаза 3.3 ✅).
+- PB hooks для server-side push queue.
+
+---
+
+## 70. Phase 2 — PocketBase Adapter Security (2026-08-31)
+
+**Scope:** ROADMAP 2.9 — `pocketbase/security.ts`; session create on login; alert field-lock hooks.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseSecurityApi` → `SecurityApi`; `canViewSecurity`; `pb_hooks/security.pb.js` + `auth.pb.js` → `recordSecuritySession`.
+
+### Adapter (✅)
+
+- `pocketbaseSecurityApi`: getOverview, changePassword, getSessions, revokeSession, revokeAllOtherSessions, getLoginHistory, getSecurityAlerts, markAlertRead.
+- `mappers.ts`: `mapSecuritySessionRecord`, `mapLoginHistoryRecord`, `mapSecurityAlertRecord`.
+- Client guards: `canViewSecurity`, `canChangePassword`, `canManageSessions`.
+- Hooks: `recordSecuritySession` on auth success; `assertSecuritySessionCreate/Update`; `assertSecurityAlertUpdate` (lock user/type/title/message).
+- Hybrid: …+Security → PB; public/schoolSettings — mock.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +3 → **439 total** (32 files).
+
+### Не в scope 2.9
+
+- Public/SchoolSettings adapter (mock).
+- Admin Security extended view (фаза 4.2).
+- PB password recovery (stub до SMS-провайдера).
+
+---
+
+## 69. Phase 2 — PocketBase Adapter Legal (2026-08-31)
+
+**Scope:** ROADMAP 2.8 — `pocketbase/legal.ts`; consent create hooks; document type lock on update.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseLegalApi` → `LegalApi`; `canManageLegalDocuments`; `pb_hooks/legal.pb.js`.
+
+### Adapter (✅)
+
+- `pocketbaseLegalApi`: getDocuments/getDocument, getUserConsents/getPendingConsents, acceptDocument/acceptDocuments, canManageDocuments, updateDocument, publishVersion.
+- `mappers.ts`: `mapLegalDocumentRecord`, `mapUserConsentRecord`.
+- Client guards: `canViewOwnConsents`, `canAcceptDocument`, `canManageLegalDocuments`.
+- Hooks: `assertConsentCreate` (user = auth, sync documentType/title/version from document); `assertLegalDocumentUpdate` (lock `type`).
+- Hybrid: …+Legal → PB; notifications/public — mock до 2.10+.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +2 → **436 total** (32 files).
+
+### Не в scope 2.8
+
+- Security adapter (фаза 2.9 ✅).
+- AuditLog on consent accept (фаза 4.1).
+- PB notifications при publishVersion (до Notifications adapter).
+
+---
+
+## 68. Phase 2 — PocketBase Adapter Support (2026-08-31)
+
+**Scope:** ROADMAP 2.7 — `pocketbase/support.ts`; ticket create/reply hooks; FAQ CRUD.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseSupportApi` → `SupportApi`; `canViewTicket`; `pb_hooks/support.pb.js`.
+
+### Adapter (✅)
+
+- `pocketbaseSupportApi`: getFaqArticles, getTickets/getTicket, createTicket, replyToTicket, upload, FAQ CRUD.
+- `mappers.ts`: `mapHelpArticleRecord`, `mapSupportTicketRecord`.
+- Client guards: `canViewTicket`, `canCreateTicket`, `canReplyToTicket`, `canManageFaq`.
+- Hooks: `assertTicketCreate` (user = auth, status open); `assertTicketUpdate` (admin → adminReply + status only).
+- Hybrid: …+Support → PB; legal/security/notifications/public — mock до 2.8+.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +2 → **434 total** (32 files).
+
+### Не в scope 2.7
+
+- Legal adapter (фаза 2.8).
+- File storage (фаза 3.1).
+- PB notifications при admin reply (best-effort create; full adapter фаза 2.10).
+
+---
+
+## 67. Phase 2 — PocketBase Adapter Progress (2026-08-31)
+
+**Scope:** ROADMAP 2.6 — `pocketbase/progress.ts`; skill 0–10↔0–100; assigned-student write hooks; own unlocks.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseProgressApi` → `ProgressApi`; `canViewStudentProgress`; `pb_hooks/progress.pb.js`.
+
+### Adapter (✅)
+
+- `pocketbaseProgressApi`: getAccessibleStudentIds, summary, skills, goals CRUD, history, achievements, updateSkillProgress.
+- `mappers.ts`: skill, skill progress, goals, history, achievement definitions, user achievements.
+- Skill scale: `toPbSkillLevel` / `fromPbSkillLevel` (PB 0–10, UI 0–100).
+- Client guards: `canViewStudentProgress`, `canManageStudentGoals`, `canManageStudentSkills` (teacher — только ученики из занятий).
+- Auto-unlock: `evaluateAndUnlockAchievements` on getSummary/getAchievements/updateSkillProgress; persist + notification.
+- Hooks: `teacherHasStudent` via lessons; student may create own `user_achievements` / `progress_history`.
+- Migration: `1788672000_kvartira_progress_adapter.js`.
+- Hybrid: …+Progress → PB; support/legal/security/notifications — mock до 2.7+.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +5 → **432 total** (32 files).
+
+### Не в scope 2.6
+
+- Support adapter (фаза 2.7).
+- Server-side achievement criteria (JSVM) — клиент + hook IDOR; fake self-unlock P2.
+- File storage (фаза 3.1).
+
+---
+
+## 66. Phase 2 — PocketBase Adapter Assignments (2026-08-31)
+
+**Scope:** ROADMAP 2.5 — `pocketbase/assignments.ts`; create/submit/review field-lock hooks.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseAssignmentsApi` → `AssignmentsApi`; `canViewAssignment`; `pb_hooks/assignments.pb.js`.
+
+### Adapter (✅)
+
+- `pocketbaseAssignmentsApi`: getAssignments/getAssignment, create, submit, review, upload (dataUrl).
+- `mappers.ts`: `mapAssignmentRecord` (`teacher`/`student`/`lesson` → *Id, dueDate, materials/submission/feedback JSON).
+- Client guards: `canViewAssignment`, `canCreateAssignment`, `canSubmitAssignment`, `canReviewAssignment`.
+- Hooks: `assertAssignmentCreate` (teacher = auth, student role); `assertAssignmentUpdate` (ученик → submission+submitted; преподаватель → feedback+reviewed).
+- Hybrid: Auth+Users+Lessons+Availability+Events+Chat+Assignments → PB; progress/… — mock до 2.6+.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +2 → **427 total** (32 files).
+
+### Не в scope 2.5
+
+- Progress adapter (фаза 2.6).
+- File storage (фаза 3.1).
+- PB notifications при новом задании (до Notifications adapter).
+- Achievements unlock on review (до Progress adapter).
+
+---
+
+## 65. Phase 2 — PocketBase Adapter Chat (2026-08-31)
+
+**Scope:** ROADMAP 2.4 — `pocketbase/chat.ts`; lastMessage + read receipt hooks; member deleteRule.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseChatApi` → `ChatApi`; `canAccessConversation`; `pb_hooks/chat.pb.js`.
+
+### Adapter (✅)
+
+- `pocketbaseChatApi`: conversations, messages (send/edit/delete/reply), members, mute, pin, search, typing, lesson-linked chat, attachments JSON.
+- `mappers.ts`: `mapConversationRecord`, `mapConversationMemberRecord`, `mapMessageRecord`.
+- Client guards: `canAccessConversation`, `canSendToConversation`, `canEditMessage`, `canDeleteMessage`, group RBAC.
+- Hooks: `syncConversationLastMessage`; `syncReadReceipts` (member cannot update others' messages).
+- Migration: owner/admin может удалять участников группы (`1788585600_kvartira_chat_adapter.js`).
+- Hybrid: Auth+Users+Lessons+Availability+Events+Chat → PB; assignments/… — mock до 2.5+.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +5 → **425 total** (32 files).
+
+### Не в scope 2.4
+
+- Assignments adapter (фаза 2.5).
+- File storage (фаза 3.1); PB realtime subscriptions (фаза 3.2).
+- PB notifications при новом сообщении (до Notifications adapter).
+
+---
+
+## 64. Phase 2 — PocketBase Adapter Events (2026-08-31)
+
+**Scope:** ROADMAP 2.3 — `pocketbase/events.ts`; hooks capacity + `registeredUserIds` sync.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseEventsApi` → `EventsApi`; `canViewSchoolEvent`; `pb_hooks/events.pb.js`.
+
+### Adapter (✅)
+
+- `pocketbaseEventsApi`: getEvents/getEvent (invited IDOR), register/unregister, getRegistration, admin CRUD.
+- `mappers.ts`: `mapEventRecord`, `mapEventRegistrationRecord`.
+- Client guards: `canViewSchoolEvent`, `canManageEventsAdmin`; validation reuse.
+- Capacity: client check + hook `assertRegistrationCapacity` → `FULL`; unique `idx_event_registration`.
+- Hook syncs `events.registeredUserIds` from `event_registrations` (own-row RBAC).
+- Hybrid: Auth+Users+Lessons+Availability+Events → PB; chat/assignments/… — mock до 2.4+.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +4; `events.test.ts` +2 → **420 total** (32 files).
+
+### Не в scope 2.3
+
+- Chat adapter (фаза 2.4 ✅).
+- Achievements unlock on register (до Progress adapter).
+- PB notifications при записи на мероприятие.
+
+---
+
+## 63. Phase 2 — PocketBase Adapter Lessons+Availability (2026-08-31)
+
+**Scope:** ROADMAP 2.2 — `pocketbase/{lessons,availability}.ts`; миграция полей + lesson_history RBAC.
+
+**Graphify:** `createPocketbaseApiClient()` → `pocketbaseLessonsApi` / `pocketbaseAvailabilityApi` → `calculateAvailableSlots`; `pocketbaseAdapter.test.ts`.
+
+### Adapter (✅)
+
+- `pocketbaseLessonsApi`: directions, teachers (directionIds filter), getLessons/book/reschedule/cancel, slots, history, teacherNotes.
+- `pocketbaseAvailabilityApi`: get/update teacher schedule; `getPocketBaseAvailability` для slot calc.
+- `mappers.ts`: direction, lesson, availability, lesson_history; `helpers.ts`: relId, normalizePbDate.
+- Client guards: `canViewLesson`, `canRescheduleLesson`, `canCancelLesson`, `canEditTeacherNotes`, `availability:manage`.
+- Double-booking: client `slotsConflict` + PB `idx_lessons_teacher_slot` → `SLOT_CONFLICT`.
+- Hybrid: Auth+Users+Lessons+Availability → PB; chat/… — mock до 2.3+ (Events ✅ 2.3).
+
+### Schema + RBAC (✅)
+
+- `pb_migrations/1788499200_kvartira_lessons_adapter.js` — `users.directionIds`, `teacher_availability.planningPeriod`, lesson_history participant access.
+- `kvartiraRbac.js` — `LESSON_HISTORY_ACCESS`; seed: `directionIds`, `planningPeriod`.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +6; `pocketbaseRbac.test.ts` +1 → **414 total** (32 files).
+
+### Не в scope 2.2
+
+- Events, chat, … adapters (фаза 2.3+).
+- PB notifications при book/reschedule/cancel (до Notifications adapter).
+- Server-side slot validation hook (фаза 2 / §31).
+
+---
+
+## 62. Phase 2 — PocketBase Adapter Auth+Users (2026-08-31)
+
+**Scope:** ROADMAP 2.1 — `src/services/api/pocketbase/` Auth + Users; `VITE_API_MODE=pocketbase`.
+
+**Graphify:** `createApiClient()` → `createPocketbaseApiClient()` → `pocketbase/{auth,users,client,mappers,errors}.ts`; `pocketbaseAdapter.test.ts`.
+
+### Adapter (✅)
+
+- `pocketbase` npm SDK; `getPocketBase()` + token sync через `setPocketBaseAuth` / `authStore` rehydrate.
+- `pocketbaseAuthApi`: login, demoLogin, register, logout, getSession; phone+password через PB `authWithPassword`.
+- `pocketbaseUsersApi`: getUser, getAllUsers, updateProfile, uploadAvatar, removeAvatar.
+- Password reset → `NOT_IMPLEMENTED` (stub до SMS/провайдера).
+- Hybrid: Auth+Users → PB; остальные модули — mock до 2.2+.
+
+### RBAC (✅)
+
+- `pb_migrations/1788412800_kvartira_users_auth_read.js` — list/view users для auth (lessons/chat UI).
+- `kvartiraRbac.js` + `RBAC.md` sync.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +6; `routes.test.tsx` ProfilePage fix → **407 total** (32 files).
+
+### Не в scope 2.1
+
+- Lessons, chat, events, … adapters (фаза 2.2+).
+- Password recovery через PB.
+
+---
+
+## 61. Phase 1 — PocketBase Seed (2026-08-31)
+
+**Scope:** ROADMAP 1.5 — порт `src/mocks/seed.ts` → PocketBase через `npm run pb:seed`.
+
+**Graphify:** `runSeed()` → `pocketbase/seed/run.ts` → `mocks/seed.ts`; `pocketbaseSeed.test.ts`.
+
+### Seed script (✅)
+
+- `pocketbase/seed/index.ts` — CLI, superuser auth (`PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD`).
+- `pocketbase/seed/run.ts` — 28 коллекций: users, directions, lessons, chat, events, assignments, progress, support, legal, security, notifications, school_settings, public_news.
+- `pocketbase/seed/helpers.ts` — `phoneToEmail`, `passwordForPhone`, `IdMap`, skill level 0–100 → 0–10.
+- `pocketbase/seed/pbClient.ts` — HTTP client `_superusers/auth-with-password`.
+- Идемпотентность: skip если `+79001234567` уже в `users`.
+- `.env.example` — `PB_URL`, `PB_ADMIN_*`; `package.json` — `pb:seed`, devDep `tsx`.
+
+### Не в scope 1.5
+
+- `src/services/api/pocketbase/` adapter (фаза 2.1).
+- `VITE_API_MODE=pocketbase` на фронте (фаза 2).
+
+### Tests
+
+`pocketbaseSeed.test.ts` +5 → **401 total** (31 files).
+
+---
+
+## 60. Phase 1 — PocketBase RBAC (2026-08-31)
+
+**Scope:** ROADMAP 1.4 — API rules на 29 коллекциях ↔ `permissions/index.ts` + `services/*/access.ts`.
+
+**Graphify:** `1788326400_kvartira_rbac_rules.js` → `kvartiraRbac.js` → `permissions/index.ts`; `pocketbaseRbac.test.ts`.
+
+### Rules (✅)
+
+- `pb_migrations/1788326400_kvartira_rbac_rules.js` — list/view/create/update/delete rules; down → `null`.
+- `pb_hooks/lib/kvartiraRbac.js` — `COLLECTION_RULES` + фрагменты (`ADMIN`, `LESSON_ACCESS`, `CONVERSATION_MEMBER`, …).
+- `pocketbase/RBAC.md` — таблица коллекций ↔ permissions.
+
+### IDOR-паттерны (✅)
+
+- Lessons/assignments: participant (`student`/`teacher`) или admin.
+- Chat: `@collection.conversation_members` membership; messages — sender edit/delete.
+- Security/notifications: own-row (`user = @request.auth.id`).
+- Public read: directions, events, legal, help_articles, school_settings, public_news.
+- `audit_logs`: read admin only; create/update/delete `null` (hooks).
+
+### Tests
+
+`pocketbaseRbac.test.ts` +7 → **396 total** (30 files).
+
+### Не в scope 1.4
+
+- Seed (1.5 ✅), `src/services/api/pocketbase/` adapter (фаза 2).
+- Teacher progress IDOR (assigned students only) — уточнение в adapter.
+
+---
+
+## 59. Availability Calendar UI (2026-08-31)
+
+**Scope:** перестройка `/profile/availability` — месячный календарь вместо карточек по дням недели.
+
+**Graphify:** `AvailabilityPage()` → `AvailabilityMonthCalendar` / `AvailabilityIntervalModal` → `formHelpers` (`planningPeriod`, `offDates`) → `calculateAvailableSlots` → `mockAvailabilityApi`.
+
+### Модель (✅)
+
+- `PlanningPeriod` + `TeacherAvailability.planningPeriod` — даты приёма занятий.
+- `calculateAvailableSlots`: слоты только внутри `planningPeriod`.
+- Форма: период + единое `workHours` + `offDates[]` → weekly schedule (7 дней) + exceptions.
+
+### UI (✅)
+
+- Месячный календарь: выбор периода (2 клика или поля дат), режим «Выходные» — маркеры в календаре.
+- Единый блок рабочего времени и перерывов на весь период.
+- Интервал между занятиями — отдельная модалка.
+- Offline guard на save без изменений.
+
+### Tests
+
+`availability.test.ts` +6 (planningPeriod slots, period form, validateAvailabilityForm) → **389 total** (29 files).
+
+---
+
+## 58. Phase 1 — PocketBase Auth (2026-08-31)
+
+**Scope:** ROADMAP 1.3 — phone+password auth hooks, JWT (built-in PB token), login history.
+
+**Graphify:** `auth.pb.js` → `kvartiraAuth.js` → `login_history` / `security_alerts`; `onRecordAuthWithPasswordRequest` → `users.phone`.
+
+### Hooks (✅)
+
+- `pocketbase/pb_hooks/auth.pb.js` — `onRecordAuthWithPasswordRequest` (lookup by `phone`), `onRecordAuthRequest` (success → `login_history`), `onRecordCreateRequest` (register: phone validate, synthetic email, role=student).
+- `pocketbase/pb_hooks/lib/kvartiraAuth.js` — `normalizePhone` (+7), `recordLoginAttempt`, `failed_login` alert, trim history (100).
+- `pocketbase/pb_migrations/1788235200_kvartira_auth_config.js` — `users.email` optional.
+
+### API (без frontend adapter — фаза 2)
+
+- Login: `POST /api/collections/users/auth-with-password` `{ identity: "+7...", password }`.
+- Register: `POST /api/collections/users/records` + phone, password, firstName, lastName.
+
+### Tests
+
+`pocketbaseAuth.test.ts` +4 → **383 total** (29 files).
+
+### Не в scope 1.3
+
+- API rules (1.4 ✅), seed (1.5 ✅), adapter (фаза 2).
+
+---
+
+## 57. Phase 1 — PocketBase Schema (2026-08-31)
+
+**Scope:** ROADMAP 1.2 — PB migrations: 28 collections + extend `users`.
+
+**Graphify:** `1788148800_kvartira_schema.js` → `types/index.ts`; `idx_lessons_teacher_slot` → §31 double-booking.
+
+### Schema (✅)
+
+- `pocketbase/pb_migrations/1788148800_kvartira_schema.js` — users extension + directions, lessons, availability, chat, events, assignments, progress, support, legal, security, notifications, audit.
+- `pocketbase/SCHEMA.md` — map PB ↔ TS types, indexes.
+- `src/test/pocketbaseSchema.test.ts` — migration + doc coverage (+3 tests).
+
+### Indexes (§31)
+
+- `idx_lessons_teacher_slot` UNIQUE — anti double-booking на уровне БД.
+- `idx_users_phone`, `idx_conv_member`, `idx_event_registration`, …
+
+### Не в scope 1.2
+
+- API rules (1.4), seed (1.5 ✅), adapter (фаза 2).
+
+---
+
+## 56. Phase 1 — PocketBase Infra (2026-08-31)
+
+**Scope:** ROADMAP 1.1 — docker-compose, `pocketbase/` layout, `.env.example`, npm scripts.
+
+**Graphify:** `docker-compose.yml` → `pocketbase/`; `vite-env.d.ts` → `VITE_API_URL`; `createApiClient()` → mock only (adapter фаза 2).
+
+### Infra (✅)
+
+- `docker-compose.yml` — PocketBase 0.28.4, port `${PB_HTTP_PORT:-8090}`, volumes `pb_data` / `pb_migrations` / `pb_hooks`, healthcheck.
+- `pocketbase/README.md` — quick start, env table, roadmap next steps.
+- `.env.example` — `VITE_API_MODE`, `VITE_API_URL`, `PB_HTTP_PORT`.
+- `.gitignore` — `pb_data`, `.env`, `node_modules`, `dist`.
+- `package.json` — `pb:up`, `pb:down`, `pb:logs`.
+- `vite-env.d.ts` — optional `VITE_API_URL`.
+
+### Не в scope 1.1
+
+- Collections schema (1.2), RBAC rules (1.4 ✅), seed (1.5 ✅).
+- `src/services/api/pocketbase/` adapter (фаза 2).
+
+---
+
+## 55. Phase 0 — Audio Player (2026-08-31)
+
+**Scope:** ROADMAP 0.3 — учебный аудиоплеер: seek, duration, speed, volume (PROJECT_SPEC §10, DESIGN_SYSTEM §14).
+
+**Graphify:** `AudioPlayer()` → `AttachmentList.tsx`, `AssignmentDetailPage.tsx`, `SupportAttachmentList.tsx`; helpers in `services/audio/helpers.ts`.
+
+### UI (✅)
+
+- `components/ui/AudioPlayer.tsx` — play/pause, seek bar, время, скорость (0.75–2×), громкость, скачивание; варианты `compact` (чат) / `default`.
+- Стиль messenger: округлая кнопка play, градиентный прогресс, pill-кнопки.
+
+### Интеграция (✅)
+
+- Чат: `AttachmentList` — compact + isOwn.
+- ДЗ: `AssignmentDetailPage` — ответ, feedback, preview при проверке.
+- Поддержка: `SupportAttachmentList`.
+
+### Tests
+
+`audioPlayer.test.tsx` +10 → **373 total** (27 files).
+
+---
+
+## 54. Phase 0 — Avatar Upload + Crop + Fallback (2026-08-31)
+
+**Scope:** ROADMAP 0.2 — загрузка, кадрирование, предпросмотр, замена, удаление, fallback по инициалам (PROJECT_SPEC §16 аватар).
+
+**Graphify:** `AvatarUpload()` → `AvatarCropModal()` → `UsersApi.uploadAvatar|removeAvatar` → `mock/index.ts` → `services/profile/{avatar,constants}.ts`; `Avatar()` fallback.
+
+### API (✅)
+
+- `UploadAvatarInput` + `uploadAvatar`, `removeAvatar` в `UsersApi` + mock; `syncUserInSessions()`.
+
+### Domain (✅)
+
+- `services/profile/constants.ts` — размер, MIME, crop viewport, JPEG quality.
+- `services/profile/avatar.ts` — `validateAvatarUpload`, `getInitialCropState`, `clampCropState`, `cropImageToDataUrl`, `loadImageFromFile`.
+
+### UI (✅)
+
+- `AvatarUpload` + `AvatarCropModal` в `SettingsPage` (замена «Скоро»); offline guard.
+- `ProfilePage` — показ `avatarUrl`; без фото — инициалы через `Avatar`.
+
+### Tests
+
+`profile.test.ts` +8 → **363 total** (26 files).
+
+---
+
+## 53. Phase 0 — Settings Account UI (2026-08-31)
+
+**Scope:** ROADMAP 0.1 — редактирование имени и телефона в настройках (PROJECT_SPEC §17 аккаунт).
+
+**Graphify:** `SettingsPage()` → `UsersApi.updateProfile()` → `mock/index.ts` → `services/profile/validation.ts`; `authStore.updateSessionUser()`.
+
+### API (✅)
+
+- `UpdateProfileInput` + `updateProfile(requesterId, data)` в `services/api/types.ts`.
+- Mock: валидация, duplicate phone, `syncUserInSessions()`.
+
+### Domain (✅)
+
+- `services/profile/validation.ts` — имя/фамилия min 2, телефон +7 (reuse auth validator).
+
+### UI (✅)
+
+- `SettingsPage`: формы «Имя и фамилия» + «Телефон»; offline guard; маска текущего телефона; аватар — «Скоро» (0.2).
+- `authStore.updateSessionUser()` — обновление сессии после сохранения.
+
+### Tests
+
+`profile.test.ts` +10 → **355 total** (26 files).
+
+---
+
+## 52. Phase 0 — Password Recovery Flow (2026-08-31)
+
+**Scope:** ROADMAP 0.13 — восстановление пароля: UI + mock stub (PROJECT_SPEC §21, SMS — stub до провайдера).
+
+**Graphify:** `ForgotPasswordPage()` / `ResetPasswordPage()` → `AuthApi.requestPasswordReset|completePasswordReset` → `mock/index.ts` → `services/auth/{constants,validation}`.
+
+### API (✅)
+
+- `PasswordResetRequestResult`, `CompletePasswordResetInput` в `services/api/types.ts`.
+- `AuthApi.requestPasswordReset`, `completePasswordReset` в mock; `db.passwordResets`.
+- Не раскрывает отсутствие аккаунта при запросе; неверный код/телефон — generic error при сбросе.
+
+### Domain (✅)
+
+- `services/auth/constants.ts` — demo code `000000`, TTL 15 мин.
+- `services/auth/validation.ts` — phone, code, new password.
+
+### UI (✅)
+
+- `/forgot-password` — ввод телефона; offline guard.
+- `/reset-password` — код + новый пароль; демо-код в mock; redirect → `/login` с success.
+- `LoginPage`: ссылка «Забыли пароль?».
+
+### Tests
+
+`auth.test.ts` +5; `routes.test.ts` +2 paths → **345 total** (25 files).
+
+---
+
+## 51. Phase 0 — Notification Preferences UI (2026-08-31)
+
+**Scope:** ROADMAP 0.12 — настройки уведомлений с mock-переключателями (PROJECT_SPEC §17–§18).
+
+**Graphify:** `SettingsPage()` → `NotificationsApi.getPreferences|updatePreferences` → `mock/notifications.ts` → `services/notifications/{constants,helpers,validation}`.
+
+### Types + API (✅)
+
+- `NotificationPreferences`, `NotificationCategoryPreferences`, `NotificationChannelPreferences` в `types/index.ts`.
+- `NotificationsApi.getPreferences`, `updatePreferences` в `services/api/types.ts`.
+- Mock: `mock/notifications.ts` + `db.notificationPreferences`; `tryPushNotification` учитывает настройки.
+
+### Domain (✅)
+
+- `services/notifications/constants.ts` — labels категорий и каналов.
+- `services/notifications/helpers.ts` — defaults, `shouldDeliverInAppNotification`, merge.
+- `services/notifications/validation.ts` — security нельзя отключить.
+
+### UI (✅)
+
+- `SettingsPage`: переключатели категорий (занятия, сообщения, мероприятия, ДЗ, системные, безопасность locked) + каналы (in-app, push, email).
+- `Toggle` component; offline guard на мутации.
+
+### Tests
+
+`notificationPreferences.test.ts` +9 → **342 total** (25 files).
+
+---
+
+## 50. Phase 0 — Admin Events CRUD + School Settings (2026-08-31)
+
+**Scope:** ROADMAP 0.11 — админ CRUD мероприятий + заглушка настроек школы (PROJECT_SPEC §15, admin §67–69).
+
+**Graphify:** `AdminEventsPage()` / `AdminSchoolSettingsPage()` → `EventsApi.create|update|delete|getAllEvents` / `SchoolSettingsApi` → `mock/index.ts` + `mock/schoolSettings.ts` → `services/events/{access,validation}`.
+
+### API (✅)
+
+- `EventsApi.getAllEvents`, `createEvent`, `updateEvent`, `deleteEvent`; `CreateEventInput` / `UpdateEventInput`.
+- `SchoolSettingsApi.getSchoolSettings`, `updateSchoolSettings`; `db.schoolInfo` в mock DB.
+- `mock/public.ts` — landing берёт `school` из `db.schoolInfo`.
+
+### Domain (✅)
+
+- `services/events/access.ts` — `canManageEventsAdmin`, `canManageSchoolSettings`.
+- `validateEventInput`, `validateSchoolSettingsInput` в `validation.ts`.
+- Permissions: `admin:events`, `admin:school-settings` (admin only).
+
+### UI (✅)
+
+- `/admin/events` — список, создание/редактирование (`EventFormModal`), удаление; offline guard.
+- `/admin/school` — форма названия, слогана, описания, контактов; изменения на landing.
+- Admin Home quick actions: Мероприятия · Школа.
+
+### Tests
+
+`events.test.ts` +5; `schoolSettings.test.ts` +3; `permissions.test.ts` +2; `routes.test.ts` +2 paths; `home.test.tsx` admin QA → **333 total** (24 files).
+
+**Scope:** ROADMAP 0.10 — детальные страницы направлений и преподавателей (PROJECT_SPEC §24).
+
+**Graphify:** `DirectionDetailPage()` / `TeacherDetailPage()` → `PublicApi.getDirection|getTeacher` → `mock/public.ts` → `PublicLandingContent` links.
+
+### API (✅)
+
+- `PublicDirectionDetail`, `PublicApi.getDirection`, `PublicApi.getTeacher` в `types.ts` / `services/api/types.ts`.
+- Mock: IDOR-safe public data, без phone; 404 для неизвестных id / non-teacher.
+
+### UI (✅)
+
+- `/directions/:id` — описание направления, список преподавателей, CTA register/login.
+- `/teachers/:id` — профиль преподавателя, направления, CTA.
+- `PublicDetailHeader` — back + logo + login/home.
+- `PublicLandingContent` — карточки направлений/преподавателей → detail routes.
+
+### Tests
+
+`public.test.ts` +4; `routes.test.ts` +2 paths → **325 total** (23 files).
+
+---
+
+## 48. Phase 0 — PWA Install Prompt (2026-08-31)
+
+**Scope:** ROADMAP 0.9 — ненавязчивый prompt установки PWA (PROJECT_SPEC §19).
+
+**Graphify:** `usePwaInstall()` → `AppLayout()` → `PwaInstallBanner`; `services/pwa/helpers.ts` → `beforeinstallprompt` / standalone detection.
+
+### Domain (✅)
+
+- `services/pwa/constants.ts` — dismiss cooldown 7d, show delay 3s.
+- `services/pwa/helpers.ts` — `isPwaInstalled`, `canShowInstallBanner`, `recordInstallPromptDismissal`.
+
+### Hook + UI (✅)
+
+- `hooks/usePwaInstall.ts` — `beforeinstallprompt`, `appinstalled`, deferred prompt.
+- `components/ui/PwaInstallBanner.tsx` — «Установить» / «Не сейчас» / закрыть.
+- `AppLayout` — banner над `BottomNav` (только если браузер поддерживает установку).
+
+### Поведение (✅)
+
+- Не показывается если уже установлено (standalone / iOS).
+- Не показывается 7 дней после «Не сейчас» или отказа в системном диалоге.
+- Задержка 3 секунды перед показом.
+
+### Tests
+
+`pwa.test.tsx` +8 → **321 total** (23 files).
+
+---
+
+## 47. Phase 0 — Events Competition Form + imageUrl (2026-08-31)
+
+**Scope:** ROADMAP 0.8 — картинки мероприятий + расширенная заявка на конкурс (PROJECT_SPEC §15).
+
+**Graphify:** `EventDetailPage()` → `CompetitionApplicationModal` → `mockEventsApi.register/getRegistration` → `services/events/{validation,constants}`.
+
+### Types + API (✅)
+
+- `CompetitionApplication`, `EventRegistration` в `types/index.ts`.
+- `EventsApi.getRegistration`, `register(..., application?)` в `services/api/types.ts`.
+- Mock: `db.eventRegistrations`, валидация заявки для `type: competition`.
+
+### Domain (✅)
+
+- `services/events/validation.ts` — `validateCompetitionApplication`, `normalizeCompetitionApplication`.
+- `services/events/constants.ts` — `EVENT_TYPE_LABELS`, `COMPETITION_CATEGORY_OPTIONS`.
+
+### UI (✅)
+
+- `EventDetailPage`: hero `imageUrl`, модалка заявки для конкурса, блок «Ваша заявка» после регистрации.
+- `EventsPage`: миниатюра `imageUrl` в списке; shared labels из constants.
+- `CompetitionApplicationModal`: произведение, композитор, длительность, категория, комментарий; offline guard.
+
+### Seed (✅)
+
+- `event-1/2/3` — demo `imageUrl` (Unsplash).
+
+### Tests
+
+`events.test.ts` +9 → **313 total** (22 files).
+
+## 46. Phase 0 — Assignment Feedback Audio (2026-08-31)
+
+**Scope:** ROADMAP 0.7 — аудиокомментарий преподавателя при проверке ДЗ (PROJECT_SPEC §12).
+
+**Graphify:** `AssignmentDetailPage()` → `reviewAssignment` / `uploadAssignmentFile(purpose: feedback)` → `mock/assignments.ts` → `validateAssignmentFeedbackAudio`.
+
+### Types + API (✅)
+
+- `AssignmentFeedback`: optional `text`, `audioUrl`, `audioFilename`, `audioMimeType`.
+- `ReviewAssignmentInput`: text optional; audio fields; mock — текст или аудио обязательны.
+- `uploadAssignmentFile` purpose `'feedback'` — teacher only (`assignments:review`).
+
+### Domain (✅)
+
+- `validateAssignmentFeedbackAudio()` в `services/assignments/validation.ts`.
+
+### UI (✅)
+
+- `AssignmentDetailPage`: преподаватель загружает аудио при проверке; ученик слушает в блоке «Обратная связь».
+- Offline guard на upload/review без изменений паттерна.
+
+### Seed (✅)
+
+- `asgn-4` — демо feedback с текстом + аудио.
+
+### Tests
+
+`assignments.test.ts` +5 → **304 total** (21 files).
+
+---
+
+## 45. Phase 0 — Availability Exceptions UI (2026-08-31)
+
+**Scope:** ROADMAP 0.6 — UI исключений/отпусков на `/profile/availability` (PROJECT_SPEC §166–175).
+
+**Graphify:** `AvailabilityPage()` → `formHelpers.exceptionsToApi` / `validateAvailabilityExceptions` → `mockAvailabilityApi.updateTeacherAvailability` → `calculateAvailableSlots`.
+
+### Domain (✅)
+
+- `ExceptionFormItem`, `exceptionsFromApi`, `exceptionsToApi`, `createDefaultExceptionItem` в `formHelpers.ts`.
+- `validateAvailabilityExceptions` — диапазон дат, прошлые даты, дубликаты, особое время.
+- `UpdateTeacherAvailabilityInput.exceptions`; mock сохраняет исключения.
+
+### UI (✅)
+
+- `AvailabilityPage`: секция «Исключения и отпуска» — диапазон дат, выходной/отпуск или особое время, добавление/удаление.
+- Сохранение вместе с расписанием; offline guard без изменений.
+
+### Tests
+
+`availability.test.ts` +7 → **299 total** (21 files).
+
+---
+
+## 44. Phase 0 — Home Assignments Block (2026-08-31)
+
+**Scope:** ROADMAP 0.5 — блок ближайших ДЗ на Home для ученика (PROJECT_SPEC §5).
+
+**Graphify:** `HomeAssignmentsBlock()` → `HomePage()` → `AssignmentsApi.getAssignments` → `services/assignments/helpers` → `mock/assignments.ts`.
+
+### Domain (✅)
+
+- `filterPendingAssignments`, `getUpcomingAssignmentsForHome`, `HOME_ASSIGNMENTS_LIMIT` в `services/assignments/helpers.ts`.
+- Показываются `assigned` / `submitted` (не `reviewed`); сортировка по сроку; лимит 3.
+
+### UI (✅)
+
+- `components/assignments/HomeAssignmentsBlock.tsx` — карточки с badge, срок, преподаватель; ссылка «Все» → `/assignments`.
+- `HomePage` — только при `can(user, 'assignments:view-own')`; после мероприятий, перед прогрессом.
+- Shared query keys: `['assignments', studentId, 'student']`, `['teachers']`; loading / error / empty per-block.
+
+### Tests
+
+`assignments.test.ts` +2 (home helpers); `home.test.tsx` +3 (student block, error isolation, teacher skip) → **292 total** (21 files).
+
+---
+
+## 43. Phase 0 — Lesson Detail Iteration 1 (2026-08-31)
+
+**Scope:** ROADMAP 0.4 — материалы занятия, ссылка на чат, внутренние заметки преподавателя (PROJECT_SPEC §6, §9).
+
+**Graphify:** `LessonDetailPage()` → `LessonsApi.updateTeacherNotes` / `ChatApi.getConversationForLesson` → `services/lessons/{helpers,access}` → `mock/{index,chat}.ts`.
+
+### Types + domain (✅)
+
+- `LessonMaterial`, `materials[]`, `teacherNotes` в `Lesson` (`types/index.ts`).
+- `findConversationForLesson`, `sanitizeLessonForViewer`, `canViewTeacherNotes` в `services/lessons/helpers.ts`.
+- `canEditTeacherNotes` в `services/lessons/access.ts`.
+
+### API (✅)
+
+- `LessonsApi.updateTeacherNotes` — mock; IDOR через `canEditTeacherNotes`.
+- `getLesson` — `sanitizeLessonForViewer` скрывает `teacherNotes` от student.
+- `ChatApi.getConversationForLesson` — metadata.lessonId → fallback personal chat student+teacher.
+
+### UI (✅)
+
+- `LessonDetailPage`: секция «Материалы», link «Чат по занятию» → `/chat/:id`, «Заметки преподавателя» (teacher edit + admin read-only; student не видит).
+
+### Seed (✅)
+
+- `lesson-1`, `lesson-3` — materials + teacherNotes; `conv-1.metadata.lessonId = lesson-1`.
+
+### Tests
+
+`lessonDetail.test.ts` +12 → **287 total** (21 files).

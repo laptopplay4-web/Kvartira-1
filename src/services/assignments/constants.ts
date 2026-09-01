@@ -1,0 +1,1 @@
+export const MAX_MATERIALS_PER_ASSIGNMENT = 5;

@@ -1,0 +1,41 @@
+import type { ApiClient } from '@/services/api/types';
+import { pocketbaseAuthApi } from '@/services/api/pocketbase/auth';
+import { pocketbaseUsersApi } from '@/services/api/pocketbase/users';
+import { pocketbaseLessonsApi } from '@/services/api/pocketbase/lessons';
+import { pocketbaseAvailabilityApi } from '@/services/api/pocketbase/availability';
+import { pocketbaseEventsApi } from '@/services/api/pocketbase/events';
+import { pocketbaseChatApi } from '@/services/api/pocketbase/chat';
+import { pocketbaseAssignmentsApi } from '@/services/api/pocketbase/assignments';
+import { pocketbaseProgressApi } from '@/services/api/pocketbase/progress';
+import { pocketbaseSupportApi } from '@/services/api/pocketbase/support';
+import { pocketbaseLegalApi } from '@/services/api/pocketbase/legal';
+import { pocketbaseSecurityApi } from '@/services/api/pocketbase/security';
+import { pocketbaseNotificationsApi } from '@/services/api/pocketbase/notifications';
+import {
+  mockPublicApi,
+  mockSchoolSettingsApi,
+} from '@/services/api/mock';
+
+/**
+ * PocketBase adapter (ROADMAP 2.1+).
+ * Auth + Users + Lessons + Availability + Events + Chat + Assignments + Progress + Support + Legal + Security + Notifications → PocketBase;
+ * остальные модули — mock до фазы 2.11+.
+ */
+export function createPocketbaseApiClient(): ApiClient {
+  return {
+    auth: pocketbaseAuthApi,
+    users: pocketbaseUsersApi,
+    lessons: pocketbaseLessonsApi,
+    chat: pocketbaseChatApi,
+    events: pocketbaseEventsApi,
+    notifications: pocketbaseNotificationsApi,
+    availability: pocketbaseAvailabilityApi,
+    assignments: pocketbaseAssignmentsApi,
+    progress: pocketbaseProgressApi,
+    support: pocketbaseSupportApi,
+    legal: pocketbaseLegalApi,
+    public: mockPublicApi,
+    security: pocketbaseSecurityApi,
+    schoolSettings: mockSchoolSettingsApi,
+  };
+}

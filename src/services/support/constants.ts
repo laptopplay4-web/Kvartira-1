@@ -1,0 +1,2 @@
+export const MAX_ATTACHMENTS_PER_TICKET = 3;
+export const TICKET_SEARCH_MIN_LENGTH = 2;

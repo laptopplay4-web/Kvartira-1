@@ -1,0 +1,521 @@
+import type {
+  AppNotification,
+  Assignment,
+  AssignmentResponseType,
+  AssignmentStatus,
+  AuthSession,
+  BookLessonInput,
+  Conversation,
+  ConversationMember,
+  ConversationType,
+  DayAvailability,
+  Direction,
+  AvailabilityException,
+  Lesson,
+  LessonHistoryEntry,
+  Message,
+  MessageAttachment,
+  MessageSearchResult,
+  RescheduleLessonInput,
+  SchoolEvent,
+  CompetitionApplication,
+  EventRegistration,
+  SlotInterval,
+  TimeSlot,
+  TeacherAvailability,
+  PlanningPeriod,
+  User,
+  AchievementWithStatus,
+  ProgressGoal,
+  ProgressGoalStatus,
+  ProgressHistoryEntry,
+  SkillWithProgress,
+  StudentProgressSummary,
+  StudentSkillProgress,
+  HelpArticle,
+  SupportTicket,
+  SupportTicketAttachment,
+  SupportTicketCategory,
+  SupportTicketStatus,
+  PublicLandingData,
+  PublicDirectionDetail,
+  PublicTeacher,
+  PublicSchoolInfo,
+  SecuritySession,
+  LoginHistoryEntry,
+  SecurityAlert,
+  SecurityOverview,
+  LegalDocument,
+  UserConsent,
+  NotificationPreferences,
+  PushSubscriptionInput,
+  UpdateNotificationPreferencesInput,
+} from '@/types';
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public status = 400,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export interface PasswordResetRequestResult {
+  resetId: string;
+  /** Mock stub: demo SMS code until a real provider is connected. */
+  demoCode?: string;
+}
+
+export interface CompletePasswordResetInput {
+  resetId: string;
+  code: string;
+  newPassword: string;
+}
+
+export interface AuthApi {
+  login(phone: string, password: string): Promise<AuthSession>;
+  demoLogin(role: 'student' | 'teacher' | 'admin'): Promise<AuthSession>;
+  register(phone: string, password: string, firstName: string, lastName: string): Promise<AuthSession>;
+  requestPasswordReset(phone: string): Promise<PasswordResetRequestResult>;
+  completePasswordReset(input: CompletePasswordResetInput): Promise<void>;
+  logout(): Promise<void>;
+  getSession(): Promise<AuthSession | null>;
+}
+
+export interface LessonsApi {
+  getDirections(): Promise<Direction[]>;
+  getTeachers(directionId?: string): Promise<User[]>;
+  getLessons(filters?: {
+    studentId?: string;
+    teacherId?: string;
+    directionId?: string;
+    status?: Lesson['status'];
+    from?: string;
+    to?: string;
+    upcoming?: boolean;
+    past?: boolean;
+    requesterId?: string;
+  }): Promise<Lesson[]>;
+  getLesson(id: string, userId: string): Promise<Lesson>;
+  getAvailableSlots(params: {
+    teacherId: string;
+    date: string;
+    durationMinutes?: number;
+    excludeLessonId?: string;
+  }): Promise<TimeSlot[]>;
+  bookLesson(input: BookLessonInput, studentId: string): Promise<Lesson>;
+  rescheduleLesson(id: string, input: RescheduleLessonInput, userId: string): Promise<Lesson>;
+  cancelLesson(id: string, userId: string, reason?: string): Promise<Lesson>;
+  getLessonHistory(lessonId: string, userId: string): Promise<LessonHistoryEntry[]>;
+  updateTeacherNotes(id: string, notes: string, userId: string): Promise<Lesson>;
+}
+
+export interface GetMessagesParams {
+  limit?: number;
+  cursor?: string;
+}
+
+export interface GetMessagesResult {
+  messages: Message[];
+  nextCursor?: string;
+  hasMore: boolean;
+}
+
+export interface CreateConversationInput {
+  type: ConversationType;
+  title?: string;
+  participantIds: string[];
+  metadata?: Conversation['metadata'];
+}
+
+export interface SendMessageOptions {
+  clientMutationId?: string;
+  suppressNotification?: boolean;
+  replyToMessageId?: string;
+  attachments?: MessageAttachment[];
+}
+
+export interface EditMessageInput {
+  text: string;
+}
+
+export interface UpdateConversationInput {
+  title?: string;
+  avatarUrl?: string;
+}
+
+export interface MuteConversationInput {
+  muted: boolean;
+  mutedUntil?: string | null;
+}
+
+export interface UploadAttachmentInput {
+  filename: string;
+  mimeType: string;
+  size: number;
+  dataUrl?: string;
+}
+
+export interface ChatApi {
+  getConversations(userId: string): Promise<Conversation[]>;
+  getConversation(conversationId: string, userId: string): Promise<Conversation>;
+  getMessages(conversationId: string, userId: string, params?: GetMessagesParams): Promise<GetMessagesResult>;
+  getMessage(conversationId: string, messageId: string, userId: string): Promise<Message>;
+  sendMessage(
+    conversationId: string,
+    userId: string,
+    text: string,
+    options?: SendMessageOptions,
+  ): Promise<Message>;
+  editMessage(
+    conversationId: string,
+    messageId: string,
+    userId: string,
+    input: EditMessageInput,
+  ): Promise<Message>;
+  deleteMessage(conversationId: string, messageId: string, userId: string): Promise<Message>;
+  markAsRead(conversationId: string, userId: string): Promise<void>;
+  setOpenConversation(userId: string, conversationId: string | null): Promise<void>;
+  createConversation(userId: string, input: CreateConversationInput): Promise<Conversation>;
+  getTotalUnread(userId: string): Promise<number>;
+  searchMessages(userId: string, query: string): Promise<MessageSearchResult[]>;
+  getMembers(conversationId: string, userId: string): Promise<ConversationMember[]>;
+  addMember(conversationId: string, userId: string, targetUserId: string): Promise<ConversationMember>;
+  removeMember(conversationId: string, userId: string, targetUserId: string): Promise<void>;
+  leaveConversation(conversationId: string, userId: string): Promise<void>;
+  updateConversation(
+    conversationId: string,
+    userId: string,
+    input: UpdateConversationInput,
+  ): Promise<Conversation>;
+  muteConversation(
+    conversationId: string,
+    userId: string,
+    input: MuteConversationInput,
+  ): Promise<ConversationMember>;
+  pinMessage(conversationId: string, messageId: string, userId: string): Promise<Conversation>;
+  unpinMessage(conversationId: string, messageId: string, userId: string): Promise<Conversation>;
+  deleteConversation(conversationId: string, userId: string): Promise<void>;
+  getConversationForLesson(lessonId: string, userId: string): Promise<Conversation | null>;
+  uploadAttachment(
+    conversationId: string,
+    userId: string,
+    input: UploadAttachmentInput,
+  ): Promise<MessageAttachment>;
+  sendTyping(conversationId: string, userId: string, isTyping: boolean): Promise<void>;
+}
+
+export interface EventsApi {
+  getEvents(userId: string): Promise<SchoolEvent[]>;
+  getEvent(id: string, userId: string): Promise<SchoolEvent>;
+  getAllEvents(requesterId: string): Promise<SchoolEvent[]>;
+  createEvent(input: CreateEventInput, requesterId: string): Promise<SchoolEvent>;
+  updateEvent(id: string, input: UpdateEventInput, requesterId: string): Promise<SchoolEvent>;
+  deleteEvent(id: string, requesterId: string): Promise<void>;
+  getRegistration(eventId: string, userId: string): Promise<EventRegistration | null>;
+  register(
+    eventId: string,
+    userId: string,
+    application?: CompetitionApplication,
+  ): Promise<SchoolEvent>;
+  unregister(eventId: string, userId: string): Promise<SchoolEvent>;
+}
+
+export interface CreateEventInput {
+  title: string;
+  description: string;
+  type: SchoolEvent['type'];
+  date: string;
+  startTime: string;
+  endTime?: string;
+  location: string;
+  imageUrl?: string;
+  maxParticipants?: number;
+  invitedUserIds?: string[];
+}
+
+export type UpdateEventInput = Partial<CreateEventInput>;
+
+export interface UpdateSchoolSettingsInput {
+  name?: string;
+  tagline?: string;
+  about?: string;
+  contacts?: Partial<PublicSchoolInfo['contacts']>;
+}
+
+export interface SchoolSettingsApi {
+  getSchoolSettings(requesterId: string): Promise<PublicSchoolInfo>;
+  updateSchoolSettings(
+    input: UpdateSchoolSettingsInput,
+    requesterId: string,
+  ): Promise<PublicSchoolInfo>;
+}
+
+export interface UpdateProfileInput {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+}
+
+export interface UploadAvatarInput {
+  filename: string;
+  mimeType: string;
+  size: number;
+  /** Круглая миниатюра для профиля */
+  dataUrl: string;
+  /** Полное фото до кадрирования */
+  originalDataUrl?: string;
+  /** Только обновить миниатюру, оригинал не трогать */
+  updateThumbnailOnly?: boolean;
+}
+
+export interface UsersApi {
+  getUser(id: string): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  updateProfile(requesterId: string, data: UpdateProfileInput): Promise<User>;
+  uploadAvatar(requesterId: string, input: UploadAvatarInput): Promise<User>;
+  removeAvatar(requesterId: string): Promise<User>;
+}
+
+export interface NotificationsApi {
+  getNotifications(userId: string): Promise<AppNotification[]>;
+  markAsRead(id: string, userId: string): Promise<void>;
+  markAllAsRead(userId: string): Promise<void>;
+  getPreferences(requesterId: string): Promise<NotificationPreferences>;
+  updatePreferences(
+    requesterId: string,
+    input: UpdateNotificationPreferencesInput,
+  ): Promise<NotificationPreferences>;
+  registerPushSubscription(requesterId: string, input: PushSubscriptionInput): Promise<void>;
+  unregisterPushSubscription(requesterId: string, endpoint?: string): Promise<void>;
+  hasPushSubscription(requesterId: string): Promise<boolean>;
+}
+
+export interface UpdateTeacherAvailabilityInput {
+  slotIntervalMinutes: SlotInterval;
+  schedule: DayAvailability[];
+  defaultLessonDurationMinutes?: number;
+  exceptions?: AvailabilityException[];
+  planningPeriod?: PlanningPeriod;
+}
+
+export interface AvailabilityApi {
+  getTeacherAvailability(teacherId: string, requesterId: string): Promise<TeacherAvailability | null>;
+  updateTeacherAvailability(
+    teacherId: string,
+    data: UpdateTeacherAvailabilityInput,
+    requesterId: string,
+  ): Promise<TeacherAvailability>;
+}
+
+export interface CreateAssignmentInput {
+  title: string;
+  description: string;
+  studentId: string;
+  lessonId?: string;
+  dueDate: string;
+  responseType: AssignmentResponseType;
+  materials?: Omit<Assignment['materials'][number], 'id'>[];
+}
+
+export interface SubmitAssignmentInput {
+  text?: string;
+  attachmentUrl?: string;
+  attachmentFilename?: string;
+  attachmentMimeType?: string;
+}
+
+export interface UploadAssignmentFileInput {
+  filename: string;
+  mimeType: string;
+  size: number;
+  dataUrl?: string;
+}
+
+export interface ReviewAssignmentInput {
+  text?: string;
+  rating?: number;
+  audioUrl?: string;
+  audioFilename?: string;
+  audioMimeType?: string;
+}
+
+export interface AssignmentsApi {
+  getAssignments(filters: {
+    requesterId: string;
+    studentId?: string;
+    teacherId?: string;
+    status?: AssignmentStatus;
+  }): Promise<Assignment[]>;
+  getAssignment(id: string, requesterId: string): Promise<Assignment>;
+  createAssignment(input: CreateAssignmentInput, teacherId: string): Promise<Assignment>;
+  uploadAssignmentFile(
+    input: UploadAssignmentFileInput,
+    userId: string,
+    purpose: 'material' | 'submission' | 'feedback',
+    responseType?: Assignment['responseType'],
+  ): Promise<Omit<Assignment['materials'][number], 'id'>>;
+  submitAssignment(id: string, input: SubmitAssignmentInput, studentId: string): Promise<Assignment>;
+  reviewAssignment(id: string, input: ReviewAssignmentInput, teacherId: string): Promise<Assignment>;
+}
+
+export interface ProgressApi {
+  getAccessibleStudentIds(requesterId: string): Promise<string[]>;
+  getSummary(studentId: string, requesterId: string): Promise<StudentProgressSummary>;
+  getSkills(studentId: string, requesterId: string): Promise<SkillWithProgress[]>;
+  getGoals(studentId: string, requesterId: string): Promise<ProgressGoal[]>;
+  getHistory(studentId: string, requesterId: string, limit?: number): Promise<ProgressHistoryEntry[]>;
+  getAchievements(studentId: string, requesterId: string): Promise<AchievementWithStatus[]>;
+  createGoal(input: CreateProgressGoalInput, requesterId: string): Promise<ProgressGoal>;
+  updateGoal(goalId: string, input: UpdateProgressGoalInput, requesterId: string): Promise<ProgressGoal>;
+  updateSkillProgress(input: UpdateSkillProgressInput, requesterId: string): Promise<StudentSkillProgress>;
+}
+
+export interface CreateProgressGoalInput {
+  studentId: string;
+  title: string;
+  description?: string;
+  targetDate?: string;
+}
+
+export interface UpdateProgressGoalInput {
+  title?: string;
+  description?: string;
+  targetDate?: string;
+  status?: ProgressGoalStatus;
+}
+
+export interface UpdateSkillProgressInput {
+  studentId: string;
+  skillId: string;
+  level: number;
+  note?: string;
+}
+
+export interface CreateSupportTicketInput {
+  subject: string;
+  message: string;
+  category: SupportTicketCategory;
+  attachments?: Omit<SupportTicketAttachment, 'id'>[];
+}
+
+export interface UploadSupportAttachmentInput {
+  filename: string;
+  mimeType: string;
+  size: number;
+  dataUrl?: string;
+}
+
+export interface ReplySupportTicketInput {
+  text: string;
+  close?: boolean;
+}
+
+export interface CreateHelpArticleInput {
+  question: string;
+  answer: string;
+  category: SupportTicketCategory;
+  keywords?: string[];
+}
+
+export interface UpdateHelpArticleInput {
+  question?: string;
+  answer?: string;
+  category?: SupportTicketCategory;
+  keywords?: string[];
+}
+
+export interface SupportApi {
+  getFaqArticles(query?: string): Promise<HelpArticle[]>;
+  getTickets(filters: {
+    requesterId: string;
+    status?: SupportTicketStatus;
+    category?: SupportTicketCategory;
+    query?: string;
+  }): Promise<SupportTicket[]>;
+  getTicket(id: string, requesterId: string): Promise<SupportTicket>;
+  uploadSupportAttachment(
+    input: UploadSupportAttachmentInput,
+    userId: string,
+  ): Promise<Omit<SupportTicketAttachment, 'id'>>;
+  createTicket(input: CreateSupportTicketInput, userId: string): Promise<SupportTicket>;
+  replyToTicket(id: string, input: ReplySupportTicketInput, adminId: string): Promise<SupportTicket>;
+  createFaqArticle(input: CreateHelpArticleInput, adminId: string): Promise<HelpArticle>;
+  updateFaqArticle(id: string, input: UpdateHelpArticleInput, adminId: string): Promise<HelpArticle>;
+  deleteFaqArticle(id: string, adminId: string): Promise<void>;
+}
+
+export interface PublicApi {
+  getLandingData(): Promise<PublicLandingData>;
+  getDirection(id: string): Promise<PublicDirectionDetail>;
+  getTeacher(id: string): Promise<PublicTeacher>;
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface SecurityApi {
+  getOverview(requesterId: string): Promise<SecurityOverview>;
+  changePassword(requesterId: string, input: ChangePasswordInput): Promise<void>;
+  getSessions(requesterId: string, currentToken?: string): Promise<SecuritySession[]>;
+  revokeSession(sessionId: string, requesterId: string, currentToken?: string): Promise<void>;
+  revokeAllOtherSessions(requesterId: string, currentToken: string): Promise<void>;
+  getLoginHistory(requesterId: string): Promise<LoginHistoryEntry[]>;
+  getSecurityAlerts(requesterId: string): Promise<SecurityAlert[]>;
+  markAlertRead(alertId: string, requesterId: string): Promise<void>;
+}
+
+export interface UpdateLegalDocumentInput {
+  title?: string;
+  content?: string;
+  requiresConsent?: boolean;
+}
+
+export interface PublishLegalVersionInput {
+  content: string;
+  changeSummary: string;
+  effectiveAt: string;
+  version?: string;
+}
+
+export interface LegalApi {
+  getDocuments(): Promise<LegalDocument[]>;
+  getDocument(id: string): Promise<LegalDocument>;
+  getUserConsents(requesterId: string): Promise<UserConsent[]>;
+  getPendingConsents(requesterId: string): Promise<LegalDocument[]>;
+  acceptDocument(documentId: string, requesterId: string): Promise<UserConsent>;
+  acceptDocuments(documentIds: string[], requesterId: string): Promise<UserConsent[]>;
+  canManageDocuments(requesterId: string): Promise<boolean>;
+  updateDocument(
+    id: string,
+    input: UpdateLegalDocumentInput,
+    adminId: string,
+  ): Promise<LegalDocument>;
+  publishVersion(
+    id: string,
+    input: PublishLegalVersionInput,
+    adminId: string,
+  ): Promise<LegalDocument>;
+}
+
+export interface ApiClient {
+  auth: AuthApi;
+  lessons: LessonsApi;
+  chat: ChatApi;
+  events: EventsApi;
+  users: UsersApi;
+  notifications: NotificationsApi;
+  availability: AvailabilityApi;
+  assignments: AssignmentsApi;
+  progress: ProgressApi;
+  support: SupportApi;
+  public: PublicApi;
+  security: SecurityApi;
+  legal: LegalApi;
+  schoolSettings: SchoolSettingsApi;
+}

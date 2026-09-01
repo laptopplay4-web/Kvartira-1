@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Mic, Paperclip, X } from 'lucide-react';
 import { BackLink } from '@/components/ui/BackLink';
@@ -30,7 +30,6 @@ const RESPONSE_TYPE_LABELS = {
 export default function AssignmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useCurrentUser()!;
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const [submitText, setSubmitText] = useState('');

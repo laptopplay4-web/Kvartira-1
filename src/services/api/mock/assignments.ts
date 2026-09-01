@@ -1,4 +1,4 @@
-import type { AppNotification, Assignment, User } from '@/types';
+import type { Assignment, User } from '@/types';
 import { canCreateAssignment, canReviewAssignment, canSubmitAssignment, canViewAssignment } from '@/services/assignments/access';
 import { can } from '@/permissions';
 import { MAX_MATERIALS_PER_ASSIGNMENT } from '@/services/assignments/constants';

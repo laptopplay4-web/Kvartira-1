@@ -19,7 +19,6 @@ import {
   users,
 } from '@/mocks/seed';
 import type { AuthSession } from '@/types';
-import { ApiError } from '@/services/api/types';
 
 const student = users.find((u) => u.id === 'user-student')!;
 const otherStudent = users.find((u) => u.id === 'user-student-2')!;

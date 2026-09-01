@@ -821,7 +821,7 @@ export function mapSecurityAlertRecord(
   };
 }
 
-interface PbNotificationRecord {
+interface PbNotificationRecord extends RecordModel {
   user: unknown;
   type: AppNotification['type'];
   title: string;

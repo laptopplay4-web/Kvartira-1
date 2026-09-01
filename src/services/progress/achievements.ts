@@ -35,7 +35,7 @@ const PERFORMANCE_EVENT_TYPES = new Set<SchoolEvent['type']>(['concert', 'compet
 export function isLessonCompleted(lesson: Lesson): boolean {
   if (lesson.status === 'cancelled') return false;
   if (lesson.status === 'completed') return true;
-  return isLessonPast(lesson) && lesson.status !== 'cancelled';
+  return isLessonPast(lesson);
 }
 
 export function countCompletedLessons(lessons: Lesson[], studentId: string): number {

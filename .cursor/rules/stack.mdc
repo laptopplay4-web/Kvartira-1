@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.72 Production Roadmap · 2026-09-01
+Версия: 1.73 Production Roadmap · 2026-09-01
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -499,6 +499,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | ДЗ / прогресс / достижения (full) | ✅ этап 2 (mock) |
 | PWA | ✅ |
 | Logo integration | ✅ |
+| Production build TypeScript fix | ✅ 2026-09-01, см. §80 |
 | Production auth + backend | ⏳ |
 
 ---
@@ -1332,7 +1333,28 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2041 nodes, 2160 edges, 300 communities (graphify update 2026-09-01 post-§79).
+**Graphify stats:** 2041 nodes, 2160 edges, 300 communities (graphify update 2026-09-01 post-§80).
+
+---
+
+## 80. Production Build TypeScript Fix (2026-09-01)
+
+**Scope:** `npm run build` (`tsc -b && vite build`) — unused imports после BackLink migration, типы PB mappers/progress mock.
+
+**Graphify:** `getPbRecordCreatedAt()` / `getPbRecordUpdatedAt()` → `mappers.ts`; `MockProgressDb` → `evaluateAndUnlockAchievements()`; detail pages unused `navigate`/`Link`.
+
+### Fixes (✅)
+
+- Detail pages: удалены неиспользуемые `useNavigate`/`Link` после `BackLink` (assignments, events, profile).
+- `MockProgressDb extends AchievementEvaluationData` (+ `users`, `skills`, `progressGoals`).
+- `helpers.ts`: `getPbRecordCreatedAt/UpdatedAt(record: unknown)` — совместимость с `RecordModel | Pb*Record`.
+- `PbNotificationRecord extends RecordModel`; `notifications.ts` — импорт `UpdateNotificationPreferencesInput` из `@/types`.
+- `isLessonCompleted`: убрана redundant `!== 'cancelled'` после early return.
+- `progress.test.ts`: `emptyData(): AchievementEvaluationData`.
+
+### Tests
+
+Без новых тестов; `npm run build` ✅; **463 total** (35 files).
 
 ---
 

@@ -1,5 +1,5 @@
 import { ClientResponseError } from 'pocketbase';
-import type { NotificationsApi, UpdateNotificationPreferencesInput } from '@/services/api/types';
+import type { NotificationsApi } from '@/services/api/types';
 import { ApiError } from '@/services/api/types';
 import { getPocketBase } from '@/services/api/pocketbase/client';
 import { withPbError } from '@/services/api/pocketbase/errors';
@@ -14,7 +14,7 @@ import {
   mergeNotificationPreferences,
 } from '@/services/notifications/helpers';
 import { validateNotificationPreferencesInput } from '@/services/notifications/validation';
-import type { NotificationPreferences, PushSubscriptionInput, User } from '@/types';
+import type { PushSubscriptionInput, UpdateNotificationPreferencesInput, User } from '@/types';
 
 async function getRequesterUser(userId: string): Promise<User> {
   const pb = getPocketBase();

@@ -9,6 +9,7 @@ import {
   hasSkillMasterLevel,
   isLessonCompleted,
   meetsAchievementCriteria,
+  type AchievementEvaluationData,
 } from '@/services/progress/achievements';
 import { computeProgressSummary, computeAttendanceStats, getAssignedStudentIds, isLessonAttended, isLessonMissed } from '@/services/progress/helpers';
 import { achievementDefinitions } from '@/mocks/seed';
@@ -210,7 +211,7 @@ describe('achievement evaluation', () => {
     };
   }
 
-  function emptyData() {
+  function emptyData(): AchievementEvaluationData {
     return {
       lessons: [] as Lesson[],
       assignments: [],

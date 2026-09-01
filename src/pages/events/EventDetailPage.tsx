@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Clock, MapPin, Music2, Users } from 'lucide-react';
 import { BackLink } from '@/components/ui/BackLink';
@@ -27,7 +27,6 @@ const EVENT_CTA: Record<EventType, string> = {
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useCurrentUser()!;
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const [applicationOpen, setApplicationOpen] = useState(false);

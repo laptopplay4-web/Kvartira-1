@@ -1,13 +1,8 @@
 import type {
-  AchievementDefinition,
-  Assignment,
-  Lesson,
   ProgressGoal,
-  ProgressHistoryEntry,
   Skill,
   StudentSkillProgress,
   User,
-  UserAchievement,
 } from '@/types';
 import { canViewStudentProgress, canManageStudentGoals, canManageStudentSkills } from '@/services/progress/access';
 import {
@@ -18,7 +13,7 @@ import {
 } from '@/services/progress/helpers';
 import { validateGoalTitle, validateSkillLevel } from '@/services/progress/validation';
 import { can } from '@/permissions';
-import { evaluateAndUnlockAchievements } from '@/services/progress/achievements';
+import { evaluateAndUnlockAchievements, type AchievementEvaluationData } from '@/services/progress/achievements';
 import { ApiError } from '@/services/api/types';
 import type {
   CreateProgressGoalInput,
@@ -31,16 +26,10 @@ function uid(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export interface MockProgressDb {
+export interface MockProgressDb extends AchievementEvaluationData {
   users: User[];
-  lessons: Lesson[];
-  assignments: Assignment[];
   skills: Skill[];
-  skillProgress: StudentSkillProgress[];
   progressGoals: ProgressGoal[];
-  progressHistory: ProgressHistoryEntry[];
-  achievementDefinitions: AchievementDefinition[];
-  userAchievements: UserAchievement[];
 }
 
 export function createMockProgressApi(

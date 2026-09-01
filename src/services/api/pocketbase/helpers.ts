@@ -40,11 +40,12 @@ export function normalizePbDateTime(value: unknown): string | undefined {
 }
 
 /** `created` autodate — custom base collections may omit it until migration. */
-export function getPbRecordCreatedAt(
-  record: { created?: string },
-  fallback?: string,
-): string {
-  const created = normalizePbDateTime(record.created);
+export function getPbRecordCreatedAt(record: unknown, fallback?: string): string {
+  const created = normalizePbDateTime(
+    record && typeof record === 'object' && 'created' in record
+      ? (record as { created?: string }).created
+      : undefined,
+  );
   if (created) return created;
   const fb = normalizePbDateTime(fallback);
   if (fb) return fb;
@@ -52,11 +53,12 @@ export function getPbRecordCreatedAt(
 }
 
 /** `updated` autodate — falls back to created or explicit field. */
-export function getPbRecordUpdatedAt(
-  record: { created?: string; updated?: string },
-  fallback?: string,
-): string {
-  const updated = normalizePbDateTime(record.updated);
+export function getPbRecordUpdatedAt(record: unknown, fallback?: string): string {
+  const updated = normalizePbDateTime(
+    record && typeof record === 'object' && 'updated' in record
+      ? (record as { updated?: string }).updated
+      : undefined,
+  );
   if (updated) return updated;
   const fb = normalizePbDateTime(fallback);
   if (fb) return fb;

@@ -1,6 +1,6 @@
 import type { AvailabilityApi, UpdateTeacherAvailabilityInput } from '@/services/api/types';
 import { ApiError } from '@/services/api/types';
-import { can } from '@/permissions';
+import { actsAsTeacher, can } from '@/permissions';
 import { getPocketBase } from '@/services/api/pocketbase/client';
 import { withPbError } from '@/services/api/pocketbase/errors';
 import { mapAvailabilityRecord, mapUserRecord } from '@/services/api/pocketbase/mappers';
@@ -75,7 +75,7 @@ export const pocketbaseAvailabilityApi: AvailabilityApi = {
       const pb = getPocketBase();
       const teacherRecord = await pb.collection('users').getOne(teacherId);
       const teacher = mapUserRecord(teacherRecord);
-      if (teacher.role !== 'teacher') {
+      if (!actsAsTeacher(teacher.role)) {
         throw new ApiError('Пользователь не является преподавателем', 'INVALID_USER', 400);
       }
 

@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.91 Production Roadmap · 2026-09-02
+Версия: 1.107 School social links + directions video · 2026-09-03
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -86,7 +86,7 @@ kvartira/
 │   │   ├── profile/             # ProfilePage, settings/*, AvailabilityPage, ProgressPage, HelpPage, SecurityPage
 │   │   ├── notifications/       # NotificationsPage
 │   │   ├── legal/               # LegalDocumentsPage, LegalDocumentDetailPage
-│   │   └── admin/               # AdminSchedule, AdminUsers, AdminLegal
+│   │   └── admin/               # AdminHub, AdminSchedule, AdminUsers, AdminLegal
 │   ├── components/
 │   │   ├── ui/                  # design system
 │   │   ├── chat/                # ConversationList, MessageList, MessageComposer, …
@@ -124,6 +124,8 @@ kvartira/
 │   │   │   └── formHelpers.ts
 │   │   ├── lessons/
 │   │   │   └── access.ts        # canViewLesson, canRescheduleLesson, canCancelLesson
+│   │   ├── users/
+│   │   │   └── access.ts        # canChangeUserRole student↔teacher (admin)
 │   │   ├── events/
 │   │   │   └── helpers.ts       # getNextUpcomingEvent (Home nearest event)
 │   │   └── chat/
@@ -162,13 +164,17 @@ kvartira/
 | `src/services/api/types.ts` | Контракты AuthApi, LessonsApi, AvailabilityApi, ChatApi, … |
 | `src/services/api/mock/index.ts` | Mock DB, booking lock, availability CRUD |
 | `src/services/api/pocketbase/chat.ts` | PocketBase ChatApi (фаза 2.4) |
-| `src/services/api/pocketbase/assignments.ts` | PocketBase AssignmentsApi (фаза 2.5) |
+| `src/services/api/pocketbase/assignments.ts` | PocketBase AssignmentsApi (группы + content blocks) |
+| `src/services/api/pocketbase/groups.ts` | PocketBase AssignmentGroupsApi |
+| `src/services/api/pocketbase/public.ts` | PocketBase PublicApi (landing, directions, teachers) |
 | `src/services/api/pocketbase/progress.ts` | PocketBase ProgressApi (фаза 2.6) |
 | `src/services/api/pocketbase/support.ts` | PocketBase SupportApi (фаза 2.7) |
 | `src/services/api/pocketbase/legal.ts` | PocketBase LegalApi (фаза 2.8) |
 | `src/services/api/pocketbase/security.ts` | PocketBase SecurityApi (фаза 2.9) |
 | `src/services/api/pocketbase/notifications.ts` | PocketBase NotificationsApi (фаза 2.10) |
 | `src/services/api/pocketbase/schoolSettings.ts` | PocketBase SchoolSettingsApi (admin `/admin/school`) |
+| `src/services/api/pocketbase/users.ts` | UsersApi: профиль, аватар, `updateUserRole` (admin student↔teacher) |
+| `src/services/users/access.ts` | IDOR: только admin, только student↔teacher, не себя |
 | `src/services/availability/validateAvailability.ts` | Валидация расписания, перерывов, интервала |
 | `src/services/availability/formHelpers.ts` | Конвертация TeacherAvailability ↔ форма UI |
 | `src/components/calendar/LessonCalendar.tsx` | Единый календарь: day/week/month, навигация, role-aware |
@@ -179,14 +185,17 @@ kvartira/
 | `src/components/availability/AvailabilityMonthCalendar.tsx` | Месячный календарь периода и выходных |
 | `src/components/availability/AvailabilityIntervalModal.tsx` | Модалка интервала между занятиями |
 | `src/services/slots/calculateSlots.ts` | Алгоритм доступных слотов |
-| `src/permissions/index.ts` | RBAC матрица + `can()` |
+| `src/permissions/index.ts` | RBAC матрица + `can()` + `actsAsTeacher()` |
+| `src/pages/admin/AdminHubPage.tsx` | Хаб админ-настроек `/admin` (без мероприятий — CRUD в `/events`) |
 | `src/stores/authStore.ts` | Сессия, login, demoLogin, `syncSession`, `queryClient.clear()` |
 | `src/hooks/useAuthSessionSync.ts` | PB realtime + focus: автообновление роли/профиля без relogin |
 | `src/app/queryClient.ts` | Singleton QueryClient для Provider и auth cache isolation |
 | `src/config/features.ts` | Feature flags (`PROGRESS_FEATURE_ENABLED`, `isProgressFeatureEnabled`) |
 | `src/mocks/seed.ts` | Demo users, lessons, chats, events |
-| `src/app/layouts.tsx` | App shell, ProtectedRoute, AdminRoute |
+| `src/app/layouts.tsx` | App shell, ProtectedRoute/GuestRoute hydration gate, AdminRoute |
 | `src/components/ui/Logo.tsx` | Логотип `/assets/logo.png` |
+| `src/components/school/SchoolAboutButton.tsx` | Кнопка «О школе» + модалка с данными школы |
+| `src/pages/admin/AdminSchoolSettingsPage.tsx` | Админ: редактирование данных школы |
 | `src/components/ui/PhoneInput.tsx` | Маска телефона +7 (999) 999-99-99; paste; только цифры |
 | `src/utils/phone.ts` | `formatPhoneDisplay`, `extractPhoneDigits`, `PHONE_STORAGE_REGEX` |
 | `src/components/ui/MobileHeader.tsx` | App shell header: logo (mobile) + `/assignments` (BookOpen + badge) + `/notifications` (bell + badge) |
@@ -198,7 +207,10 @@ kvartira/
 | `src/utils/dates.ts` | Централизованные дата/время + `formatChatListTime`, `formatChatDateSeparator` |
 | `src/services/events/helpers.ts` | Ближайшее мероприятие: filter past + sort by date/time (`getNextUpcomingEvent`) |
 | `src/components/ui/LessonCard.tsx` | Карточка занятия; `personLabel` для admin overview |
-| `src/pages/home/HomePage.tsx` | Dashboard `/home`: student/teacher Home (P0+P1); admin branch (P1): KPI, school lesson, quick actions; role-aware queries |
+| `src/pages/home/HomePage.tsx` | Dashboard `/home`: student/teacher Home (P0+P1); admin branch (P1): KPI, school lesson, quick actions; role-aware queries; `HomeEventCard` для ближайшего мероприятия |
+| `src/components/events/HomeEventCard.tsx` | Карточка мероприятия на Home: фон `imageUrl`, градиент + авто-контраст текста |
+| `src/services/images/contrast.ts` | `detectImageTextContrast` — luminance нижней половины изображения |
+| `src/hooks/useImageTextContrast.ts` | Hook для `HomeEventCard` |
 | `src/pages/chat/ChatPage.tsx` | Messenger: list + active conversation (responsive split) |
 | `src/components/chat/MessageList.tsx` | Сообщения, date separators, pagination, auto-scroll |
 | `src/services/chat/access.ts` | IDOR-safe access helpers для чатов |
@@ -233,16 +245,16 @@ kvartira/
 |------|-----|---------------------|
 | Ученик | `student` | `lessons:book`, `lessons:reschedule-own`, `lessons:cancel-own`, `chat:*`, `events:register` |
 | Преподаватель | `teacher` | `lessons:manage-own`, `availability:manage`, `students:view-assigned` |
-| Администратор | `admin` | `admin:access`, `admin:users`, `admin:schedule`, `lessons:view-all` |
+| Администратор | `admin` | все teacher-функции + `admin:*`; роль задаётся в PocketBase |
 
 ---
 
 ## 7. Авторизация (MVP)
 
-- Mock auth: телефон `+7...` + пароль.
-- Demo login: student / teacher / admin (кнопки на LoginPage).
+- Mock auth: телефон `+7...` + пароль (dev).
+- Production: телефон + пароль через PocketBase; демо-кнопки на LoginPage убраны.
 - Сессия: Zustand + localStorage token.
-- Демо-аккаунты: `DEMO_ACCOUNTS` в `mocks/seed.ts`.
+- Seed-аккаунты: `DEMO_ACCOUNTS` в `mocks/seed.ts` (`npm run pb:seed`).
 
 ---
 
@@ -252,17 +264,17 @@ kvartira/
 |------|-------|-------|
 | `/` | Landing | GuestRoute |
 | `/login`, `/register`, `/forgot-password`, `/reset-password` | Auth | GuestRoute |
-| `/home` | Dashboard | Protected |
-| `/lessons`, `/lessons/book`, `/lessons/availability`, `/lessons/:id` | Занятия (+ график работы teacher) | Protected |
+| `/home` | Dashboard (admin = teacher UI) | Protected |
+| `/lessons`, `/lessons/book`, `/lessons/availability`, `/lessons/:id` | Занятия (+ график работы teacher/admin) | Protected |
 | `/chat`, `/chat/:id` | Чат | Protected |
 | `/events`, `/events/:id` | Мероприятия | Protected |
 | `/profile`, `/profile/settings/account`, `/profile/settings/system`, `/profile/settings/security` | Профиль / настройки (вкладки) | Protected |
 | `/profile/security` | Redirect → settings/security | Protected |
 | `/profile/availability` | Redirect → `/lessons/availability` | Protected |
 | `/notifications` | Уведомления | Protected |
-| `/admin` | Redirect → `/home` | AdminRoute (внутри AppLayout) |
+| `/admin` | Админ-хаб настроек | AdminRoute (`admin:access`) + AppLayout |
 | `/admin/schedule`, `/admin/users` | Расписание / Пользователи | AdminRoute + AppLayout |
-| `/admin/legal` | Юридические документы (CMS) | AdminRoute (`legal:manage`) + AppLayout |
+| `/admin/events` | Redirect → `/events` | AdminRoute (`admin:events`) |
 | `/legal`, `/legal/:id` | Публичные документы | — |
 | `/profile/legal` | Согласия пользователя | Protected |
 
@@ -398,7 +410,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 
 | Файл | Покрытие |
 |------|----------|
-| `phone.test.ts` | mask display, paste variants, stored format, completeness (4 tests) |
+| `phone.test.ts` | mask display, paste variants, stored format, completeness, maskPhone null-safe (5 tests) |
 | `permissions.test.ts` | can(), role guard |
 | `booking.test.ts` | book, double-booking, reschedule, cancel, IDOR |
 | `lessonDetail.test.ts` | materials, chat link, teacherNotes IDOR, updateTeacherNotes, findConversationForLesson (12 tests) |
@@ -406,13 +418,13 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `slots.test.ts` | calculateSlots, slotsConflict, past slots, boundaries |
 | `availability.test.ts` | validation, period form, planningPeriod slots, permissions, exceptions, mock save (29 tests) |
 | `calendar.test.ts` | date ranges, IDOR filters, booking/reschedule/cancel → calendar data |
-| `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput (16 tests) |
+| `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput (15 tests) |
 | `chat.test.ts` | access, send, edit, delete, reply, search, group, mute, pin, attachments, realtime, pagination, IDOR, notifications, cache isolation |
-| `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; Admin Home P1; progress block (skipped when UI hidden, §85) (30 tests) |
-| `nav.test.tsx` | MobileHeader assignments + bell link/badge/active state; SidebarNav без notifications; aria-current; admin active on `/admin/*`; BottomNav active brand highlight (11 tests) |
+| `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; admin as teacher; progress block (skipped when UI hidden, §85) |
+| `nav.test.tsx` | MobileHeader assignments + bell + «О школе»; SidebarNav без notifications + «О школе»; aria-current; admin active; BottomNav brand (15 tests) |
 | `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back + outline style (6 tests) |
 | `routes.test.ts` | основные маршруты (+ `/assignments/create`) |
-| `routes.test.tsx` | admin shell: redirect, AppLayout, nav links, student block, shared users cache, EmptyState (11 tests) |
+| `routes.test.tsx` | admin shell: redirect, AppLayout, nav links, student block, shared users cache, EmptyState, role toggle (13 tests) |
 | `offline.test.tsx` | BookLessonLink offline; AvailabilityPage save disabled offline (4 tests) |
 | `assignments.test.ts` | access, list IDOR, submit, review, feedback audio, create, upload, validation, notification, overdue display (29 tests) |
 | `progress.test.ts` | access, helpers, summary, achievements, auto-unlock, teacher goals/skills CRUD, attendance (32 tests) |
@@ -422,18 +434,22 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `legal.test.ts` | access, helpers, pending consents, accept, public docs, permissions, CMS update/publish, IDOR (21 tests) |
 | `pwa.test.tsx` | helpers, banner, usePwaInstall hook (8 tests) |
 | `notificationPreferences.test.ts` | preferences API, helpers, validation, delivery suppression (9 tests) |
-| `profile.test.ts` | profile validation, update name/phone, avatar upload/remove, crop helpers (18 tests) |
+| `profile.test.ts` | profile validation, update name, avatar upload/remove, crop helpers, mime infer, displayable src guard (19 tests) |
 | `audioPlayer.test.tsx` | formatAudioDuration, speed cycle, seek ratio, AudioPlayer UI (10 tests) |
-| `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md coverage (3 tests) |
-| `pocketbaseAuth.test.ts` | phone login hooks, findRecordsByFilter return value, login side-effects isolation, PhoneInput on auth pages (8 tests) |
+| `adminUsers.test.ts` | canChangeUserRole student↔teacher, mock updateUserRole, IDOR, notification, phone privacy sanitize (8 tests) |
+| `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md + user cascade delete + avatar fields + role lock hook (11 tests) |
+| `pocketbaseAuth.test.ts` | phone login hooks, findRecordsByFilter return value, login side-effects isolation, PhoneInput on auth pages, no demo shortcuts (9 tests) |
 | `pocketbaseRbac.test.ts` | PB RBAC migration + kvmartiraRbac.js + RBAC.md coverage (8 tests) |
 | `pocketbaseSeed.test.ts` | PB seed script files, collections coverage, docs (5 tests) |
-| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/progress/support/legal/security/notifications/schoolSettings/files/realtime, createApiClient pocketbase mode (47 tests) |
+| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/groups/public/progress/support/legal/security/notifications/schoolSettings/files/realtime, createApiClient pocketbase mode, other-user avatar resolve, missing phone default (52 tests) |
 | `chatRealtime.test.ts` | PB subscription → ChatRealtimeEvent mappers (2 tests) |
 | `webPush.test.ts` | push helpers, subscription API, delivery gating (6 tests) |
-| `authSessionSync.test.ts` | refreshSession API, syncSession cache clear, PB subscribe hook (5 tests) |
+| `authSessionSync.test.ts` | refreshSession API, syncSession cache clear, PB subscribe hook, route hydration guard (6 tests) |
+| `bootstrapSession.test.ts` | resolveBootstrapSession zustand + pocketbase_auth fallback (3 tests) |
+| `authSessionStorage.test.ts` | sanitize persisted session/user, invalid role rejection (4 tests) |
+| `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 482 tests (37 files; 4 skipped when Progress UI hidden).
+**Итого:** 543 tests (44 files; 4 skipped when Progress UI hidden).
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -447,16 +463,16 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Design system + App shell | ✅ |
 | Mock auth + demo login | ✅ |
 | RBAC | ✅ |
-| Home dashboard | ✅ student/teacher P0+P1; admin P1 2026-08-31 (см. §18–§19) |
+| Home dashboard | ✅ student/teacher P0+P1; admin видит teacher UI, хаб `/admin` 2026-09-03 (§112) |
 | Lessons + booking + reschedule/cancel | ✅ усилено (v1.1) |
 | Chat | ✅ v1.5 (edit/delete/reply, attachments, realtime abstraction, group mgmt, mute, pin, search, drafts, typing) |
 | Events | ✅ |
 | Profile + Settings + Availability | ✅ |
 | Calendar (day/week/month, Student/Teacher/Admin) | ✅ v1.3 |
 | Notifications | ✅ |
-| Admin (schedule, users) | ✅ |
-| Admin Home (role-specific overview) | ✅ P1 2026-08-31, см. §19 |
-| Admin shell + navigation | ✅ Iteration 1 2026-08-31, см. §20 |
+| Admin (schedule, users) | ✅ + смена роли student↔teacher 2026-09-03, см. §109 |
+| Admin Home (role-specific overview) | ♻️ заменён teacher Home + `/admin` hub, см. §112 |
+| Admin shell + navigation | ✅ Iteration 1 2026-08-31, см. §20; хаб `/admin` 2026-09-03, см. §112 |
 | Admin data consistency + cache | ✅ Iteration 2 2026-08-31, см. §21 |
 | UI Polish | ✅ Iteration 3 2026-08-31, см. §22 |
 | Admin Hardening | ✅ Iteration 4 2026-08-31, см. §23 |
@@ -525,7 +541,25 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Admin school settings PB adapter | ✅ 2026-09-02, см. §97 |
 | Availability route lessons nav | ✅ 2026-09-02, см. §98 |
 | Production login hook + auth phone mask | ✅ 2026-09-02, см. §99 |
-| Production auth + backend | ⏳ |
+| Production cutover — no demo UI + PB assignments/public | ✅ 2026-09-02, см. §100 |
+| Seed: убраны тестовые файлы/картинки | ✅ 2026-09-02, см. §101 |
+| PB user delete cascade | ✅ 2026-09-02, см. §102 |
+| Avatar upload PB data URL fix | ✅ 2026-09-02, см. §103 |
+| Avatar kvmartira_files storage | ✅ 2026-09-02, см. §104 |
+| Home greeting header (avatar + role) | ✅ 2026-09-02, см. §105 |
+| Auth session sanitize + hydration gate | ✅ 2026-09-02, см. §105 |
+| Avatar display guard (white screen fix) | ✅ 2026-09-02, см. §105 |
+| Home nearest event image card + text contrast | ✅ 2026-09-02, см. §106 |
+| Auth refresh persist (no logout on reload) | ✅ 2026-09-02, см. §107 |
+| Other users avatar display (PB resolve + UI src) | ✅ 2026-09-02, см. §108 |
+| Admin user role switch student↔teacher | ✅ 2026-09-03, см. §109 |
+| Settings Account maskPhone crash | ✅ 2026-09-03, см. §110 |
+| Phone read-only + privacy | ✅ 2026-09-03, см. §111 |
+| Admin as teacher + admin hub | ✅ 2026-09-03, см. §112 |
+| Events CRUD on /events (teacher+admin) | ✅ 2026-09-03, см. §113 |
+| School About button (header/sidebar) | ✅ 2026-09-03, см. §114 |
+| School social links + directions video | ✅ 2026-09-03, см. §115 |
+| Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
 
@@ -569,9 +603,9 @@ services/chat/{access,messages,validation,realtime,helpers}
 
 ## 19. Admin Home (2026-08-31)
 
-**Файл:** `src/pages/home/HomePage.tsx` — ветка `isAdmin` (early return). Admin tools: `/admin/schedule`, `/admin/users` внутри `AppLayout` (§20).
+**Файл:** `src/pages/home/HomePage.tsx` — ветка `isAdmin` снята в §112: Home как у преподавателя. Админ-инструменты: `/admin` hub.
 
-**Graphify:** `HomePage()` → `isAdmin` branch; `AdminRoute` nested in `AppLayout` → `/admin` redirect, `/admin/schedule`, `/admin/users`; `SidebarNav` «Админ» → `/home`.
+**Graphify:** см. §112. Исторически: `HomePage()` → `isAdmin` branch (§19 P1 2026-08-31).
 
 **Admin `/home` (✅ P1):**
 - Header: greeting + «Административный обзор».
@@ -604,26 +638,26 @@ services/chat/{access,messages,validation,realtime,helpers}
 ```
 ProtectedRoute
 └── AppLayout (SidebarNav, MobileHeader, BottomNav, offline)
-    ├── /home              → HomePage (admin branch = Admin Overview)
+    ├── /home              → HomePage (admin = teacher UI, §112)
     ├── /lessons, /chat, /events, /profile, /notifications …
-    └── AdminRoute (role === 'admin')
-        ├── /admin         → Navigate /home
+    └── AdminRoute (can(user, permission))
+        ├── /admin         → AdminHubPage
         ├── /admin/schedule → AdminSchedulePage
         └── /admin/users   → AdminUsersPage
 ```
 
-- `/home` (admin) = **Admin Overview**: KPI, school lesson, event, quick actions.
-- `/admin` = **redirect alias** → `/home`.
+- `/home` (admin) = **teacher Home** (свои занятия), не KPI-обзор (§112).
+- `/admin` = **хаб настроек** (Профиль → Администрирование).
 - Admin sub-routes **внутри `AppLayout`** — shell на desktop и mobile.
-- Back на sub-pages: `← Главная` → `/home`.
-- Sidebar «Админ» + Profile «Администрирование» → `/home`.
+- Back на sub-pages: `← Администрирование` → `/admin`.
+- Sidebar «Админ» + Profile «Администрирование» → `/admin`.
 
 ### Route table
 
 | Route | Component | Guard | Layout | Purpose |
 |-------|-----------|-------|--------|---------|
-| `/home` | `HomePage` | ProtectedRoute | AppLayout | Admin Overview (role=admin) |
-| `/admin` | `Navigate` → `/home` | AdminRoute | AppLayout | Redirect alias |
+| `/home` | `HomePage` | ProtectedRoute | AppLayout | Teacher-like Home (admin, §112) |
+| `/admin` | `AdminHubPage` | AdminRoute | AppLayout | Admin settings hub |
 | `/admin/schedule` | `AdminSchedulePage` | AdminRoute | AppLayout | Filters + calendar + list |
 | `/admin/users` | `AdminUsersPage` | AdminRoute | AppLayout | User list + phones |
 
@@ -633,9 +667,9 @@ Guard: `can(user, permission)` per route (`admin:access` | `admin:schedule` | `a
 
 | Item | Desktop | Mobile | Route | Duplicate? |
 |------|---------|--------|-------|------------|
-| Admin Overview | Sidebar «Главная» / «Админ» | BottomNav «Главная» | `/home` | — |
-| Schedule | Home QA | Home QA | `/admin/schedule` | — |
-| Users | Home QA | Home QA | `/admin/users` | — |
+| Admin Overview | Sidebar «Админ» / Profile | Profile «Администрирование» | `/admin` | — |
+| Schedule | Admin hub | Admin hub | `/admin/schedule` | — |
+| Users | Admin hub | Admin hub | `/admin/users` | — |
 | Events | Sidebar + «Все» в event block | BottomNav | `/events` | — |
 
 Mobile: admin tools через Home quick actions; BottomNav сохраняется на schedule/users.
@@ -706,7 +740,7 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 
 ### Admin header
 
-- `AdminPageHeader` (`src/components/ui/AdminPageHeader.tsx`): `BackLink` «Главная» + `text-h1` for `/admin/*`.
+- `AdminPageHeader` (`src/components/ui/AdminPageHeader.tsx`): `BackLink` «Администрирование» → `/admin` + `text-h1` for `/admin/*`.
 - Admin Home (`/home`): greeting header без back link (unchanged).
 
 ### Navigation active states
@@ -1326,7 +1360,7 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 
 **Scope:** единый план до production — **`ROADMAP.md`** (`.cursor/rules/`).
 
-**Graphify:** `ROADMAP.md` → `stack.mdc` §16; `createApiClient()` → mock | pocketbase (all core modules); hybrid mock для public/schoolSettings.
+**Graphify:** `ROADMAP.md` → `stack.mdc` §16; `createApiClient()` → mock | pocketbase (all core modules including assignments/groups/public).
 
 ### Текущее положение
 
@@ -1336,7 +1370,7 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Текущая фаза | **3** — Files + realtime + push |
 | Следующий шаг | **3.4** — Email channel (optional) |
 | Backend (решение) | **PocketBase** |
-| Production auth + backend | ⏳ фазы 3–6 |
+| Production auth + backend | ⏳ фазы 3.4–6 |
 
 ### Фазы (кратко)
 
@@ -1358,7 +1392,448 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2139 nodes, 2265 edges, 318 communities (graphify update 2026-09-02 post-§99).
+**Graphify stats:** 2308 nodes, 2444 edges, 357 communities (graphify update 2026-09-03 post-§115).
+
+---
+
+## 115. School Social Links + Directions Video (2026-09-03)
+
+**Scope:** расширить настройки школы — ссылки (VK, Telegram, YouTube, сайт, 2ГИС, Яндекс Карты) + видео «Как добраться».
+
+**Graphify:** `AdminSchoolSettingsPage()` → `SchoolSettingsApi` → `socialLinks` / `directionsVideo`; `SchoolAboutButton()` → modal; PB `1789968000_*`.
+
+### Model + API (✅)
+
+- `SchoolSocialLinks`, `SchoolDirectionsVideo` в `PublicSchoolInfo`.
+- Admin: `/admin/school` — поля ссылок + upload/replace/remove видео (MP4/WebM/MOV ≤100 МБ).
+- `uploadDirectionsVideo` / `removeDirectionsVideo`; update сохраняет ссылки.
+- PB: extras пишутся **внутрь `contacts` JSON** (не зависят от отдельных полей схемы / миграции).
+- Mock + PB; purpose `school` в `kvartira_files` (для видео-файла нужна миграция purpose).
+
+### UI (✅)
+
+- Модалка «О школе» (`SchoolAboutContent`): контакты + ссылки + видео.
+- Публичный лендинг: секция «О школе» (`#about`) — тот же контент.
+- Ссылки опциональны; `vk.com/...` нормализуется в `https://…`.
+
+### Tests
+
+`schoolSettings.test.ts` +3; schema +1; mapper → **543 passed | 4 skipped** (44 files).
+
+**Deploy:** миграция `1789968000_kvartira_school_social_video.js` + pb_hooks, перезапуск PB.
+
+**Graphify stats:** 2308 nodes, 2444 edges, 357 communities (graphify update 2026-09-03 post-§115).
+
+---
+
+## 114. School About Button (2026-09-03)
+
+**Scope:** кнопка «О школе» сразу справа от логотипа; модалка с данными школы для всех авторизованных; редактирование — `/admin/school`.
+
+**Graphify:** `SchoolAboutButton()` → `MobileHeader()` / `SidebarNav()` → `SchoolSettingsApi.getSchoolSettings()` → mock/PB; admin edit → `AdminSchoolSettingsPage()`.
+
+### UI (✅)
+
+- Mobile: `MobileHeader` — Logo + «О школе».
+- Desktop: `SidebarNav` — Logo + «О школе».
+- `SchoolAboutButton` + Modal: название, слоган, about, контакты (телефон, email, адрес, часы).
+
+### API (✅)
+
+- `getSchoolSettings` — любой авторизованный пользователь (mock + PocketBase).
+- `updateSchoolSettings` — только admin (`admin:school-settings`), без изменений.
+- Query key `['school-settings']` shared с admin form.
+
+### Tests
+
+`schoolSettings.test.ts` student/teacher read + student update deny; `nav.test.tsx` button + modal → **539 passed | 4 skipped** (44 files).
+
+**Graphify stats:** 2286 nodes, 2424 edges, 354 communities (graphify update 2026-09-03 post-§114).
+
+---
+
+## 113. Events CRUD on /events (2026-09-03)
+
+**Scope:** teacher и admin создают/редактируют мероприятия из `/events` (+ в шапке); вкладка «Мероприятия» убрана из админ-хаба.
+
+**Graphify:** `EventsPage()` / `EventDetailPage()` → `EventFormModal()` → `canManageEvents()` → mock/PB `EventsApi`.
+
+### UI (✅)
+
+- `/events`: кнопка `+` (teacher/admin) → `EventFormModal` create.
+- `/events/:id`: редактирование и удаление для `events:manage`.
+- `/admin` hub без пункта «Мероприятия»; `/admin/events` → redirect `/events`.
+- Удалён `AdminEventsPage.tsx`.
+
+### Access + PB (✅)
+
+- `canManageEvents` = `events:manage` (teacher + admin).
+- Миграция `1789881600_kvartira_events_teacher_delete.js` — deleteRule teacher · admin.
+
+### Tests
+
+`events.test.ts` teacher CRUD; `routes.test.tsx` hub без Мероприятия + redirect; `permissions.test.ts` → **534 passed | 4 skipped** (44 files).
+
+**Graphify stats:** 2281 nodes, 2419 edges, 353 communities (graphify update 2026-09-03 post-§113).
+
+---
+
+## 112. Admin as Teacher + Admin Hub (2026-09-03)
+
+**Scope:** администратор работает в UI как преподаватель; школьные настройки — только в Профиль → «Администрирование». Роль `admin` задаётся вручную в PocketBase (не через `/admin/users`).
+
+**Graphify:** `actsAsTeacher()` → `HomePage()` / `LessonsPage()` / `LessonCalendar()`; `AdminHubPage()` → `/admin`; `ProfilePage()` «Администрирование».
+
+### UI (✅)
+
+- `/home`, `/lessons`, календарь, ДЗ, график работы — как у преподавателя (`actsAsTeacher`).
+- Профиль → «Администрирование» → `/admin` (`AdminHubPage`): расписание, пользователи, мероприятия, школа, документы.
+- Sidebar «Админ» → `/admin`. `AdminPageHeader` назад → `/admin`.
+- `/admin/schedule` календарь `schoolWide` — все занятия школы.
+
+### Permissions (✅)
+
+- Admin: teacher-набор (`lessons:view-own|view-assigned`, `availability:manage`, `assignments:create`, …) + `admin:*`.
+- Без `lessons:book`. Свой график: `teacher_availability` для роли admin.
+
+### Tests
+
+`home.test.tsx` admin → teacher UI; `routes.test.tsx` hub `/admin`; `permissions.test.ts` `actsAsTeacher`; `calendar.test.ts` schoolWide; `availability.test.ts` own schedule → **531 passed | 4 skipped** (44 files).
+
+**Graphify stats:** 2282 nodes, 2419 edges, 353 communities (graphify update 2026-09-03 post-§112).
+
+---
+
+## 111. Phone Read-Only + Privacy (2026-09-03)
+
+**Scope:** убрать смену телефона; свой номер виден в настройках; чужие номера скрыты (кроме admin `/admin/users`).
+
+**Graphify:** `AccountSettingsPage()` → read-only phone; `UsersApi.getAllUsers(requesterId)` → `sanitizeUserPhoneForViewer()`; `kvmartiraUsers.js` `assertUserUpdate` phone lock.
+
+### UI (✅)
+
+- `AccountSettingsPage`: полный номер (`storedPhoneToDisplay`), без формы редактирования.
+- `PromoteToTeacherModal`: убран показ телефона (поиск по цифрам остаётся).
+
+### API + domain (✅)
+
+- `UpdateProfileInput` без `phone`; mock/PB `updateProfile` не принимает телефон.
+- `sanitizeUserPhoneForViewer` / `sanitizeUsersPhoneForViewer` — self + admin видят phone.
+- `getAllUsers(requesterId)`, `getUser(id, requesterId)`; `getTeachers` без phone.
+- PB hook: `Нельзя изменить номер телефона` на update.
+
+### Tests
+
+`profile.test.ts` −3 phone update; `adminUsers.test.ts` +1 sanitize; `pocketbaseSchema.test.ts` +1 → **525 passed | 4 skipped** (43 files).
+
+**Graphify stats:** 2262 nodes, 2395 edges, 349 communities (graphify update 2026-09-03 post-§111).
+
+---
+
+## 110. Settings Account maskPhone Crash (2026-09-03)
+
+**Scope:** `/profile/settings/account` падал с `TypeError: Cannot read properties of undefined (reading 'length')` в `maskPhone`.
+
+**Graphify:** `AccountSettingsPage()` → `maskPhone()` → `mapUserRecord()` / `buildResolvedSession()`; `users.pb.js` onRecordEnrich.
+
+### Root cause (✅)
+
+- `user.phone` мог быть `undefined` (PB `hide('phone')` / запись без поля) → `maskPhone` читал `.length` без guard.
+
+### Fix (✅)
+
+- `maskPhone` — null/undefined/empty → `—`.
+- `mapUserRecord` — `phone` всегда string (`''` fallback).
+- `pocketbaseAuthApi` — `phoneFallback` из identity (login) / previous authStore (refresh).
+- `AccountSettingsPage` — `?? ''` для state.
+- `users.pb.js` — сравнение `auth.id` / `record.id` через `String()`.
+
+### Tests
+
+`phone.test.ts` +1; `pocketbaseAdapter.test.ts` +1 → **526 passed | 4 skipped** (43 files).
+
+**Graphify stats:** 2260 nodes, 2392 edges, 349 communities (graphify update 2026-09-03 post-§110).
+
+---
+
+## 109. Admin User Role Switch (2026-09-03)
+
+**Scope:** администратор на `/admin/users` меняет роль пользователя student ↔ teacher.
+
+**Graphify:** `AdminUsersPage()` → `UsersApi.updateUserRole()` → `canChangeUserRole()` → mock/`pocketbase/users.ts`; hook `assertUserUpdate()` в `kvartiraUsers.js`.
+
+### API + domain (✅)
+
+- `UsersApi.updateUserRole(requesterId, userId, role)` — только `student` | `teacher`.
+- `services/users/access.ts`: `admin:users`, не себя, не admin, не повышение до admin.
+- Mock + PocketBase; уведомление «Роль изменена».
+
+### PocketBase (✅)
+
+- Hook `onRecordUpdateRequest` / `assertUserUpdate`: не-admin не меняет `role`; admin — только student↔teacher.
+- Superuser без ограничений.
+
+### UI (✅)
+
+- `/admin/users`: кнопки «Сделать преподавателем» / «Сделать учеником», confirm modal, offline guard.
+- У администраторов кнопки нет.
+
+### Tests
+
+`adminUsers.test.ts` +7; `routes.test.tsx` +1; `pocketbaseSchema.test.ts` +1 → **524 passed | 4 skipped** (43 files).
+
+---
+
+## 108. Other Users Avatar Display (2026-09-02)
+
+**Scope:** аватары других пользователей не отображались — в PB `avatarUrl` хранится как `pbfile:` ref; UI не резолвил signed URL.
+
+**Graphify:** `resolveUsersAvatars()` → `pocketbase/users.ts` `getAllUsers()` / `groups.ts` `loadMembers()` / `lessons.ts` `getTeachers()` / `public.ts`; `Avatar()` + `isDisplayableAvatarSrc()` → assignment groups, chat, admin users, lessons.
+
+### Root cause (✅)
+
+- `resolveUserAvatars` вызывался только для текущего пользователя (auth, getUser, upload).
+- `getAllUsers()` и загрузка members/teachers возвращали сырые `pbfile:` refs.
+- Многие `<Avatar>` не передавали `src` даже при наличии `avatarUrl`.
+
+### Fix (✅)
+
+- `files.ts`: `resolveUsersAvatars(users[])` — batch resolve `pbfile:` → signed URL.
+- PB adapters: `getAllUsers`, `loadMembers`, `getTeachers`, `loadTeachers`, `getTeacher`.
+- UI: `src={user.avatarUrl}` в chat, admin users, lessons book/detail, groups (уже было).
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +1 (adapter resolve coverage) → **515 passed | 4 skipped** (42 files).
+
+**Graphify stats:** 2237 nodes, 2368 edges, 344 communities (graphify update 2026-09-02 post-§108).
+
+---
+
+## 107. Auth Refresh Persist (2026-09-02)
+
+**Scope:** F5 на защищённом маршруте сбрасывал сессию → редирект на `/login`.
+
+**Graphify:** `resolveBootstrapSession()` → `bootstrapFromStorage()` → `syncSession()` → `ProtectedRoute()` / `GuestRoute()` → `AuthHydrationGate()`.
+
+### Root cause (✅)
+
+- `syncSession` на mount (PB) мог сбросить сессию до/после rehydrate.
+- Только `kvartira-auth` — при пустом Zustand не восстанавливался `pocketbase_auth`.
+- Race: redirect до применения persisted session.
+
+### Fix v2 (✅)
+
+- `services/auth/bootstrapSession.ts`: fallback `pocketbase_auth` → Zustand session.
+- `bootstrapFromStorage()` после rehydrate в `AuthHydrationGate`.
+- `useAuthSessionSync`: без `syncSession` на mount (только focus + realtime).
+- Routes: `isValidPersistedSession(session)` вместо `useCurrentUser` guard.
+
+### Fix v3 — login regression (✅)
+
+- `bootstrapFromStorage` больше **не затирает** in-memory session (`set(null)`).
+- `partialize`: сохраняет token + user (strip avatars), без `sanitizePersistedSession → null`.
+- Route guards снова `useCurrentUser` + `isKnownUserRole`.
+
+### Tests
+
+`bootstrapSession.test.ts` +4; `authStoreSync.test.ts` +3 → **514 passed | 4 skipped** (42 files).
+
+**Graphify stats:** 2235 nodes, 2363 edges, 344 communities (graphify update 2026-09-02 post-§107 v2).
+
+---
+
+## 106. Home Event Image Card + Text Contrast (2026-09-02)
+
+**Scope:** блок «Ближайшее мероприятие» на `/home` — фон карточки из `event.imageUrl`, читаемый текст.
+
+**Graphify:** `HomeEventCard()` → `useImageTextContrast()` → `detectImageTextContrast()` → `HomePage()` admin + student/teacher branches.
+
+### UI (✅)
+
+- `HomeEventCard`: `object-cover` на всю карточку; градиент снизу; светлый/тёмный текст по luminance нижней половины изображения.
+- Без `imageUrl` — прежний `Card` с текстом на `surface`.
+
+### Domain (✅)
+
+- `services/images/contrast.ts` — canvas sample, CORS/timeout → fallback `on-dark` (белый текст + тёмный градиент).
+
+### Tests
+
+`imageContrast.test.ts` +4 → **506 passed | 4 skipped** (40 files).
+
+---
+
+## 105. Home Greeting Header + White Screen Fix (2026-09-02)
+
+**Scope:** аватар и роль в шапке `/home`; белый экран после правок.
+
+**Graphify:** `HomeGreetingHeader()` → `Avatar()` → `isDisplayableAvatarSrc()`; `utils/index.ts` circular import fix.
+
+### UI (✅)
+
+- `HomePage`: `HomeGreetingHeader` — `Avatar` слева, имя + `getRoleLabel` (`text-brand`, как в профиле).
+- У админа убран subtitle «Административный обзор».
+
+### White screen root cause (✅)
+
+- Случайный `import { getInitials } from '@/utils'` внутри `utils/index.ts` → circular import, падение при старте.
+- Огромный legacy `data:` URL в `localStorage` (`kvartira-auth`) — зависание/битая сессия.
+- Гонка Zustand rehydrate + React Router → пустой экран до redirect.
+- `GuestRoute` редиректил на `/home` при любой сессии, `ProtectedRoute` — обратно на `/login` при невалидной роли.
+
+### Domain (✅)
+
+- `services/profile/constants.ts` — `isDisplayableAvatarSrc`.
+- `services/auth/sessionStorage.ts` — `sanitizePersistedSession`, strip data URL / `pbfile:` при persist/rehydrate.
+- `providers.tsx` — `AuthHydrationGate` (ждёт rehydrate).
+- `GuestRoute` — redirect только при `isKnownUserRole`.
+- `Avatar.tsx` — безопасный fallback на инициалы.
+
+### Tests
+
+`profile.test.ts` +1; `authSessionStorage.test.ts` +4; `layouts.test.tsx` +1; `home.test.tsx` greeting → **501 passed | 4 skipped** (39 files).
+
+---
+
+## 104. Avatar — kvmartira_files storage (2026-09-02)
+
+**Scope:** фикс «Must be no more than 5000 character(s)» — PB `text` max:0 всё равно = 5000; data URL не влезает.
+
+**Graphify:** `pocketbaseUsersApi.uploadAvatar()` → `uploadStoredFile(purpose: avatar)` → `kvartira_files`; `resolveUserAvatars()` → signed URL.
+
+### Root cause (✅)
+
+- PocketBase: `field.max = 0` на text → **дефолт 5000**, не «без лимита».
+- Хранение base64 в `users.avatarUrl` / `avatarOriginalUrl` не масштабируется.
+
+### Fix (✅)
+
+- `1789708800_kvartira_avatar_files.js` — purpose `avatar` в `kvartira_files`; поля users → text max 255 (`pbfile:` refs).
+- `pocketbase/users.ts` — upload/remove через `kvmartira_files`, delete старых refs.
+- `files.ts` — `resolveUserAvatars`, `deleteStoredFiles`; purpose `avatar`.
+- `kvartiraFiles.js` — `avatar` в PURPOSES.
+- `auth.ts` — login/refreshSession резолвят signed URL.
+
+### Deploy / локально (pocketbase.exe)
+
+```bash
+cd pocketbase
+.\pocketbase.exe migrate --dir=./pb_data --migrationsDir=./pb_migrations --hooksDir=./pb_hooks
+.\pocketbase.exe serve --dir=./pb_data --hooksDir=./pb_hooks --migrationsDir=./pb_migrations
+```
+
+Миграции `1789536000` + `1789622400` + `1789708800` + **`1789795200`** (purpose select fix). **После migrate обязательно перезапустить `serve`** — PB кэширует схему коллекций.
+
+### Tests
+
+`pocketbaseSchema.test.ts` +1; `pocketbaseAdapter.test.ts` hook assertion → **492 passed | 4 skipped** (37 files).
+
+---
+
+## 103. Avatar Upload — PocketBase data URL fix (2026-09-02)
+
+**Scope:** загрузка фото аватара на `/profile` падала в `VITE_API_MODE=pocketbase`.
+
+**Graphify:** `AvatarUpload()` → `useAvatarMutations` → `pocketbaseUsersApi.uploadAvatar()` → `users.avatarUrl`; миграция `1789536000_*`.
+
+### Root cause (✅)
+
+- Схема PB: `avatarUrl` / `avatarOriginalUrl` — тип `url`; клиент шлёт `data:image/jpeg;base64,...` → PB validation error.
+- После смены на `text` — дефолтный лимит PB **5000 символов**; data URL миниатюры/оригинала больше.
+- Мобильные file pickers иногда отдают пустой `file.type` → клиентская валидация MIME отклоняла JPEG.
+
+### Fix (✅)
+
+- `1789536000_kvartira_avatar_text_fields.js` — поля `avatarUrl` / `avatarOriginalUrl` → `text` (`max: 0`).
+- `1789622400_kvartira_avatar_text_max.js` — снят дефолтный лимит PB text 5000 символов (data URL > 5KB).
+- `inferAvatarMimeType()` — fallback по расширению `.jpg`/`.png`/`.webp` в `AvatarUpload` + `validateAvatarUpload`.
+- `mapPocketBaseError` — маппинг url/length validation → понятные сообщения.
+
+### Deploy
+
+Выложить миграции **`1789536000_*`** + **`1789622400_*`**, **перезапустить PocketBase** (migrate).
+
+### Tests
+
+`profile.test.ts` +1; `pocketbaseSchema.test.ts` +2 → **491 passed | 4 skipped** (37 files).
+
+---
+
+## 102. PocketBase User Delete Cascade (2026-09-02)
+
+**Scope:** удаление пользователей в PocketBase Admin UI падало с «required relation reference».
+
+**Graphify:** `users.pb.js` → `kvartiraUsers.js` → `1789449600_*`; blocking relations: `lessons`, `messages`, `assignments`.
+
+### Root cause (✅)
+
+- Обязательные relation на `users` без `cascadeDelete`: `lessons`, `lesson_history`, `messages`, `assignments`, `assignment_groups`.
+- Миграция `1789363200` была помечена applied, но `field.type === 'relation'` guard не обновил поля → `cascadeDelete` остался `false`.
+- Хук v1 только чистил optional refs, не удалял blocking records.
+
+### Fix (✅)
+
+- `1789449600_kvartira_user_cascade_delete_fix.js` — без type guard; + `assignments.group` cascade.
+- `kvartiraUsers.js` — `purgeUserDependents()` удаляет messages/lessons/assignments/groups/availability до delete.
+- `kvartiraAssignments.js` — `assertAssignmentGroupDelete` пропускает purge cascade.
+
+### Deploy
+
+Выложить **`pb_hooks`** + миграцию **`1789449600_*`**, **перезапустить PocketBase** (hooks + migrate).
+
+### Tests
+
+`pocketbaseSchema.test.ts` +1 → **488 passed | 4 skipped** (37 files).
+
+---
+
+## 101. Seed — remove placeholder materials (2026-09-02)
+
+**Scope:** убрать из `mocks/seed.ts` фиктивные файлы и картинки, добавленные для проверки UI.
+
+**Graphify:** `initialLessons` / `initialAssignments` / `events` / `initialSupportTickets` без placeholder URL.
+
+### Seed (✅)
+
+- Занятия: нет PDF с `example.com`.
+- ДЗ: только текстовые блоки; убраны `breathing-exercises.pdf`, `demo-warmup.mp3`, `etude-demo.mp4`.
+- Мероприятия: нет Unsplash.
+- Обращения: нет `homework-error.mp3`.
+
+### Tests
+
+`events.test.ts` −1 (seed imageUrl) → **485 passed | 4 skipped** (37 files).
+
+---
+
+## 100. Production cutover — real users (2026-09-02)
+
+**Scope:** убрать демо-заглушки из UI; PocketBase ДЗ/группы и публичная витрина вместо hybrid mock.
+
+**Graphify:** `LoginPage()` без `demoLogin`; `pocketbaseAssignmentsApi` / `pocketbaseAssignmentGroupsApi` → `assignment_groups`; `pocketbasePublicApi` → landing; `users.pb.js` hide phone.
+
+### UI (✅)
+
+- Login: только телефон + пароль, без «Быстрый вход для демо».
+- Reset password: без показа демо-кода SMS.
+- Forgot password: PB → «обратитесь к администратору»; mock SMS без UI-подсказки.
+
+### PocketBase (✅)
+
+- Миграция `1789276800_kvartira_assignments_groups.js`: коллекция `assignment_groups` (`kind` general/custom, `members`), `assignments.group` + `contentBlocks`; удалены student/submit/review.
+- Адаптеры `pocketbase/{assignments,groups,public}.ts`; убран hybrid mock из `createPocketbaseApiClient()`.
+- Хуки: create teacher/group lock; общую группу нельзя править.
+- Public landing из PB; гости видят преподавателей (`role = teacher`), телефон скрыт (`onRecordEnrich`).
+- `isGeneral` на группе (PB id ≠ `grp-general`).
+
+### Deploy
+
+Выложить фронт + `pb_hooks` + миграция `1789276800_*`, перезапустить PocketBase, при необходимости `npm run pb:seed -- --force`.
+
+### Tests
+
+`pocketbaseAdapter.test.ts` +3; `pocketbaseAuth.test.ts` +1 → **486 passed | 4 skipped** (37 files).
 
 ---
 
@@ -1717,18 +2192,19 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 
 **Scope:** мобильный UX — отключить pinch-zoom двумя пальцами; скрыть полосу прокрутки справа; запретить выделение текста при долгом нажатии (app-like PWA shell).
 
-**Graphify:** `index.html` viewport meta → `globals.css` `html`/`body` (`touch-action`, `scrollbar-width`, `select-none`, `-webkit-touch-callout`); `.scrollbar-none` utility для горизонтальных списков (`ChatFilters`, `SupportTicketFilters`).
+**Graphify:** `index.html` viewport meta → `globals.css` `html`/`body`; `RouteErrorPage` → `router.tsx` `errorElement`; `.app-error-panel` + `[role='alert']` selectable text.
 
 ### Fix (✅)
 
 - `index.html`: `maximum-scale=1.0, user-scalable=no` в viewport meta.
-- `globals.css`: `touch-action: manipulation` на `html`; скрытие scrollbar на `html`/`body` (Firefox `scrollbar-width`, WebKit `::-webkit-scrollbar`).
-- `body`: `select-none` + `-webkit-touch-callout: none`; исключение `user-select: text` для `input`/`textarea`/`select`/`[contenteditable]`/`[role='alert']` (ошибки, в т.ч. `ErrorState`).
+- `globals.css`: `touch-action: manipulation` на `html`; скрытие scrollbar на `html`/`body`.
+- `body`: `select-none` + `-webkit-touch-callout: none`; исключение `user-select: text` для полей ввода, `[role='alert']`, `.app-error-panel` (включая вложенный текст/stack).
+- `RouteErrorPage` + корневой `errorElement` в `router.tsx` — замена дефолтного React Router «Unexpected application error».
 - `.scrollbar-none` utility — явное скрытие scrollbar на overflow-контейнерах.
 
 ### Tests
 
-Без новых тестов; **463 total** (35 files).
+`routeError.test.tsx` +1 → **464 total** (36 files).
 
 ---
 
@@ -2007,7 +2483,7 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 ### Storage (✅)
 
 - `kvartira_files`: owner, purpose (`chat`|`assignment`|`support`), contextId, file field (до 100 MB).
-- `pocketbase/files.ts`: `uploadStoredFile`, `resolveStoredFileUrl`, `linkStoredFilesToContext`, `pbfile:` refs.
+- `pocketbase/files.ts`: `uploadStoredFile`, `resolveStoredFileUrl`, `resolveUserAvatars`, `resolveUsersAvatars`, `linkStoredFilesToContext`, `pbfile:` refs.
 - Migration `1788758400_kvartira_files_storage.js` + RBAC (participants IDOR).
 - Hooks `files.pb.js` + `kvartiraFiles.js` — owner on create; metadata lock on update.
 - Adapters: upload → PB storage; read → signed URL via auth token.

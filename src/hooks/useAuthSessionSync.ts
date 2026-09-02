@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
  */
 export function useAuthSessionSync(userId: string | undefined): void {
   const syncSession = useAuthStore((s) => s.syncSession);
+  const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
     if (!userId || !isPocketBaseMode()) return;
@@ -22,6 +23,9 @@ export function useAuthSessionSync(userId: string | undefined): void {
         if (event.action === 'update') {
           void syncSession();
         }
+        if (event.action === 'delete') {
+          void logout();
+        }
       })
       .then((unsub) => {
         if (cancelled) {
@@ -31,8 +35,6 @@ export function useAuthSessionSync(userId: string | undefined): void {
         }
       })
       .catch(() => {});
-
-    void syncSession();
 
     const onFocus = () => {
       void syncSession();
@@ -44,5 +46,5 @@ export function useAuthSessionSync(userId: string | undefined): void {
       if (unsubscribe) void unsubscribe();
       window.removeEventListener('focus', onFocus);
     };
-  }, [userId, syncSession]);
+  }, [userId, syncSession, logout]);
 }

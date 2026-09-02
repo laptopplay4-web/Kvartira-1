@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { isProgressFeatureEnabled } from '@/config/features';
 import { AppLayout, AdminRoute, GuestRoute, ProtectedRoute } from './layouts';
+import { RouteErrorPage } from './RouteErrorPage';
 
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
@@ -29,10 +30,10 @@ const CreateAssignmentPage = lazy(() => import('@/pages/assignments/CreateAssign
 const AssignmentGroupsPage = lazy(() => import('@/pages/assignments/AssignmentGroupsPage'));
 const AssignmentGroupDetailPage = lazy(() => import('@/pages/assignments/AssignmentGroupDetailPage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
+const AdminHubPage = lazy(() => import('@/pages/admin/AdminHubPage'));
 const AdminSchedulePage = lazy(() => import('@/pages/admin/AdminSchedulePage'));
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
 const AdminLegalPage = lazy(() => import('@/pages/admin/AdminLegalPage'));
-const AdminEventsPage = lazy(() => import('@/pages/admin/AdminEventsPage'));
 const AdminSchoolSettingsPage = lazy(() => import('@/pages/admin/AdminSchoolSettingsPage'));
 const LandingPage = lazy(() => import('@/pages/public/LandingPage'));
 const DirectionDetailPage = lazy(() => import('@/pages/public/DirectionDetailPage'));
@@ -42,6 +43,9 @@ const LegalDocumentDetailPage = lazy(() => import('@/pages/legal/LegalDocumentDe
 const LegalConsentsPage = lazy(() => import('@/pages/profile/LegalConsentsPage'));
 
 export const appRoutes = [
+  {
+    errorElement: <RouteErrorPage />,
+    children: [
   { path: '/directions/:id', element: <DirectionDetailPage /> },
   { path: '/teachers/:id', element: <TeacherDetailPage /> },
   { path: '/legal', element: <LegalDocumentsPage /> },
@@ -103,7 +107,7 @@ export const appRoutes = [
           { path: '/notifications', element: <NotificationsPage /> },
           {
             element: <AdminRoute permission="admin:access" />,
-            children: [{ path: '/admin', element: <Navigate to="/home" replace /> }],
+            children: [{ path: '/admin', element: <AdminHubPage /> }],
           },
           {
             element: <AdminRoute permission="admin:schedule" />,
@@ -119,7 +123,7 @@ export const appRoutes = [
           },
           {
             element: <AdminRoute permission="admin:events" />,
-            children: [{ path: '/admin/events', element: <AdminEventsPage /> }],
+            children: [{ path: '/admin/events', element: <Navigate to="/events" replace /> }],
           },
           {
             element: <AdminRoute permission="admin:school-settings" />,
@@ -130,6 +134,8 @@ export const appRoutes = [
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
 ];
 
 export const router = createBrowserRouter(appRoutes);

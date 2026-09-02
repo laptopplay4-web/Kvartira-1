@@ -49,7 +49,25 @@ const student: User = {
   lastName: 'Ivanova',
 };
 
-const lessonWithMaterials = initialLessons.find((l) => l.id === 'lesson-1')!;
+const sampleMaterials = [
+  {
+    id: 'm1',
+    filename: 'notes.pdf',
+    mimeType: 'application/pdf',
+    url: '/files/notes.pdf',
+  },
+  {
+    id: 'm2',
+    filename: 'song.pdf',
+    mimeType: 'application/pdf',
+    url: '/files/song.pdf',
+  },
+];
+
+const lessonWithMaterials = {
+  ...initialLessons.find((l) => l.id === 'lesson-1')!,
+  materials: sampleMaterials,
+};
 
 describe('lesson detail helpers', () => {
   it('finds conversation by lesson metadata', () => {
@@ -100,7 +118,6 @@ describe('lesson detail API', () => {
 
   it('getLesson hides teacher notes from student', async () => {
     const lesson = await mockLessonsApi.getLesson('lesson-1', student.id);
-    expect(lesson.materials?.length).toBe(2);
     expect(lesson.teacherNotes).toBeUndefined();
   });
 

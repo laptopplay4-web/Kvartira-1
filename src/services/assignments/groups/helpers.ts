@@ -3,20 +3,26 @@ import type { AssignmentGroup, User } from '@/types';
 export const GENERAL_ASSIGNMENT_GROUP_ID = 'grp-general';
 export const GENERAL_ASSIGNMENT_GROUP_LABEL = 'Общее задание';
 
-export function isGeneralAssignmentGroup(groupId: string): boolean {
-  return groupId === GENERAL_ASSIGNMENT_GROUP_ID;
+export function isGeneralAssignmentGroup(group: AssignmentGroup | string): boolean {
+  if (typeof group === 'string') {
+    return group === GENERAL_ASSIGNMENT_GROUP_ID;
+  }
+  return group.isGeneral === true || group.id === GENERAL_ASSIGNMENT_GROUP_ID;
 }
 
 export function isCustomAssignmentGroup(group: AssignmentGroup): boolean {
-  return group.id !== GENERAL_ASSIGNMENT_GROUP_ID;
+  return !isGeneralAssignmentGroup(group);
 }
 
 export function getAssignmentGroupLabel(
   groupId: string,
   groups: AssignmentGroup[],
 ): string {
-  if (isGeneralAssignmentGroup(groupId)) return GENERAL_ASSIGNMENT_GROUP_LABEL;
-  return groups.find((g) => g.id === groupId)?.name ?? '';
+  const group = groups.find((g) => g.id === groupId);
+  if (group ? isGeneralAssignmentGroup(group) : isGeneralAssignmentGroup(groupId)) {
+    return GENERAL_ASSIGNMENT_GROUP_LABEL;
+  }
+  return group?.name ?? '';
 }
 
 export function sortRecipientGroups(groups: AssignmentGroup[]): AssignmentGroup[] {

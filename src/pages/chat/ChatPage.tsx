@@ -83,7 +83,7 @@ export default function ChatPage() {
 
   const { data: users } = useQuery({
     queryKey: ['users'],
-    queryFn: () => api.users.getAllUsers(),
+    queryFn: () => api.users.getAllUsers(user.id),
   });
 
   const { data: searchResults, isLoading: searchLoading } = useSearchMessages(user.id, search);

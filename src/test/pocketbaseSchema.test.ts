@@ -4,6 +4,24 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const MIGRATION = resolve(ROOT, 'pocketbase/pb_migrations/1788148800_kvartira_schema.js');
+const USER_CASCADE_MIGRATION = resolve(
+  ROOT,
+  'pocketbase/pb_migrations/1789363200_kvartira_user_cascade_delete.js',
+);
+const USER_CASCADE_FIX_MIGRATION = resolve(
+  ROOT,
+  'pocketbase/pb_migrations/1789449600_kvartira_user_cascade_delete_fix.js',
+);
+const AVATAR_TEXT_MIGRATION = resolve(
+  ROOT,
+  'pocketbase/pb_migrations/1789536000_kvartira_avatar_text_fields.js',
+);
+const AVATAR_TEXT_MAX_MIGRATION = resolve(
+  ROOT,
+  'pocketbase/pb_migrations/1789622400_kvartira_avatar_text_max.js',
+);
+const USERS_HOOK = resolve(ROOT, 'pocketbase/pb_hooks/users.pb.js');
+const USERS_LIB = resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraUsers.js');
 const SCHEMA_DOC = resolve(ROOT, 'pocketbase/SCHEMA.md');
 
 /** ROADMAP 1.2 required collection names */
@@ -59,5 +77,98 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     for (const name of REQUIRED_COLLECTIONS) {
       expect(doc).toContain(`\`${name}\``);
     }
+  });
+
+  it('user cascade migration enables cascadeDelete on blocking user relations', () => {
+    const source = readFileSync(USER_CASCADE_MIGRATION, 'utf8');
+    expect(source).toContain("enableCascadeDelete(lessons, ['student', 'teacher'])");
+    expect(source).toContain("enableCascadeDelete(lessonHistory, ['user'])");
+    expect(source).toContain("enableCascadeDelete(messages, ['sender'])");
+    expect(source).toContain("enableCascadeDelete(assignments, ['teacher', 'group'])");
+    expect(source).toContain("enableCascadeDelete(groups, ['teacher'])");
+  });
+
+  it('users delete hook clears optional references before record removal', () => {
+    const hook = readFileSync(USERS_HOOK, 'utf8');
+    const lib = readFileSync(USERS_LIB, 'utf8');
+    expect(hook).toContain('onRecordDeleteRequest');
+    expect(hook).toContain('cleanupUserReferences');
+    expect(lib).toContain('purgeUserDependents');
+    expect(lib).toContain('deleteAllByFilter');
+    expect(lib).toContain('lessons');
+    expect(lib).toContain('messages');
+    expect(lib).toContain('assignment_groups');
+    expect(lib).toContain('progress_goals');
+    expect(lib).toContain('participantIds');
+  });
+
+  it('users enrich hook compares auth.id (not getString id) for own phone', () => {
+    const hook = readFileSync(USERS_HOOK, 'utf8');
+    expect(hook).toContain('onRecordEnrich');
+    expect(hook).toContain('auth.id');
+    expect(hook).toContain("e.record.hide('phone'");
+    expect(hook).not.toContain("getString('id')");
+  });
+
+  it('users update hook locks role to admin student↔teacher switch', () => {
+    const hook = readFileSync(USERS_HOOK, 'utf8');
+    const lib = readFileSync(USERS_LIB, 'utf8');
+    expect(hook).toContain('onRecordUpdateRequest');
+    expect(hook).toContain('assertUserUpdate');
+    expect(lib).toContain('assertUserUpdate');
+    expect(lib).toContain('Нельзя изменить роль');
+    expect(lib).toContain('Нельзя изменить номер телефона');
+    expect(lib).toContain('Можно менять только роли ученика и преподавателя');
+  });
+
+  it('user cascade fix migration re-applies cascadeDelete without type guard', () => {
+    const source = readFileSync(USER_CASCADE_FIX_MIGRATION, 'utf8');
+    expect(source).not.toContain("field.type === 'relation'");
+    expect(source).toContain("enableCascadeDelete(assignments, ['teacher', 'group'])");
+  });
+
+  it('avatar fields migration changes url type to text for data URLs', () => {
+    const source = readFileSync(AVATAR_TEXT_MIGRATION, 'utf8');
+    expect(source).toContain("type: 'text'");
+    expect(source).toContain('max: 255');
+    expect(source).toContain('avatarUrl');
+    expect(source).toContain('avatarOriginalUrl');
+  });
+
+  it('avatar text max migration sets explicit max (PB max:0 = 5000 default)', () => {
+    const source = readFileSync(AVATAR_TEXT_MAX_MIGRATION, 'utf8');
+    expect(source).toContain('field.max = 255');
+    expect(source).toContain('avatarUrl');
+    expect(source).toContain('avatarOriginalUrl');
+  });
+
+  it('avatar files migration adds kvmartira_files purpose and short text refs', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1789708800_kvartira_avatar_files.js'),
+      'utf8',
+    );
+    expect(source).toContain("'avatar'");
+    expect(source).toContain('kvartira_files');
+    expect(source).toContain('AVATAR_REF_MAX');
+  });
+
+  it('avatar purpose select fix migration sets full purpose values list', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1789795200_kvartira_avatar_purpose_select.js'),
+      'utf8',
+    );
+    expect(source).toContain("'avatar'");
+    expect(source).toContain('PURPOSE_VALUES');
+  });
+
+  it('school social + directions video migration adds json fields and school purpose', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1789968000_kvartira_school_social_video.js'),
+      'utf8',
+    );
+    expect(source).toContain('socialLinks');
+    expect(source).toContain('directionsVideo');
+    expect(source).toContain("'school'");
+    expect(source).toContain('purpose = "school"');
   });
 });

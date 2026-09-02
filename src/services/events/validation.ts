@@ -1,5 +1,7 @@
 import type { CompetitionApplication, EventType, PublicSchoolInfo } from '@/types';
 import type { CreateEventInput, UpdateEventInput, UpdateSchoolSettingsInput } from '@/services/api/types';
+import { EMPTY_SCHOOL_SOCIAL_LINKS } from '@/services/school/constants';
+import { mergeSchoolSocialLinks, validateSchoolSocialLinks } from '@/services/school/helpers';
 
 export function normalizeEventInput(
   input: CreateEventInput | UpdateEventInput,
@@ -105,6 +107,13 @@ export function validateSchoolSettingsInput(
       return `${label} не длиннее ${MAX_CONTACT} символов`;
     }
   }
+
+  const socialLinks = mergeSchoolSocialLinks(
+    current.socialLinks ?? EMPTY_SCHOOL_SOCIAL_LINKS,
+    input.socialLinks,
+  );
+  const socialError = validateSchoolSocialLinks(socialLinks);
+  if (socialError) return socialError;
 
   return null;
 }

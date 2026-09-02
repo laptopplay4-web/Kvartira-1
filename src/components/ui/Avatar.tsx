@@ -1,4 +1,5 @@
 import { cn, getInitials } from '@/utils';
+import { isDisplayableAvatarSrc } from '@/services/profile/constants';
 
 interface AvatarProps {
   src?: string;
@@ -12,6 +13,7 @@ const sizes = { sm: 'h-8 w-8 text-xs', md: 'h-10 w-10 text-sm', lg: 'h-16 w-16 t
 
 export function Avatar({ src, firstName, lastName, size = 'md', className }: AvatarProps) {
   const initials = getInitials(firstName, lastName);
+  const photoSrc = isDisplayableAvatarSrc(src) ? src : undefined;
   return (
     <div
       className={cn(
@@ -21,8 +23,8 @@ export function Avatar({ src, firstName, lastName, size = 'md', className }: Ava
       )}
       aria-label={`${firstName} ${lastName}`}
     >
-      {src ? (
-        <img src={src} alt="" className="h-full w-full object-cover" />
+      {photoSrc ? (
+        <img src={photoSrc} alt="" className="h-full w-full object-cover" />
       ) : (
         <span aria-hidden>{initials}</span>
       )}

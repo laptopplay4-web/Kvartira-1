@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mockEventsApi, resetMockDatabase } from '@/services/api/mock';
-import { canViewSchoolEvent } from '@/services/events/access';
+import { canManageEvents, canViewSchoolEvent } from '@/services/events/access';
 import {
   normalizeCompetitionApplication,
   normalizeEventInput,
@@ -131,16 +131,7 @@ describe('mockEventsApi competition registration', () => {
   });
 });
 
-describe('seed events imageUrl', () => {
-  beforeEach(() => resetMockDatabase());
-
-  it('returns imageUrl on event detail', async () => {
-    const event = await mockEventsApi.getEvent('event-1', 'user-student');
-    expect(event.imageUrl).toMatch(/^https:\/\//);
-  });
-});
-
-describe('mockEventsApi admin CRUD', () => {
+describe('mockEventsApi events CRUD', () => {
   beforeEach(() => resetMockDatabase());
 
   it('lists all events for admin', async () => {
@@ -148,13 +139,39 @@ describe('mockEventsApi admin CRUD', () => {
     expect(events.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('denies CRUD for non-admin', async () => {
-    await expect(mockEventsApi.getAllEvents('user-teacher-1')).rejects.toMatchObject({
+  it('denies CRUD for student', async () => {
+    await expect(mockEventsApi.getAllEvents('user-student')).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
   });
 
-  it('creates, updates and deletes event', async () => {
+  it('allows teacher to create, update and delete event', async () => {
+    const created = await mockEventsApi.createEvent(
+      {
+        title: 'Учительский концерт',
+        description: 'Описание',
+        type: 'concert',
+        date: '2026-12-01',
+        startTime: '18:00',
+        location: 'Зал',
+      },
+      'user-teacher-1',
+    );
+    expect(created.id).toMatch(/^event-/);
+
+    const updated = await mockEventsApi.updateEvent(
+      created.id,
+      { title: 'Обновлённый концерт' },
+      'user-teacher-1',
+    );
+    expect(updated.title).toBe('Обновлённый концерт');
+
+    await mockEventsApi.deleteEvent(created.id, 'user-teacher-1');
+    const all = await mockEventsApi.getAllEvents('user-teacher-1');
+    expect(all.find((e) => e.id === created.id)).toBeUndefined();
+  });
+
+  it('creates, updates and deletes event as admin', async () => {
     const created = await mockEventsApi.createEvent(
       {
         title: 'Тестовый концерт',
@@ -163,10 +180,12 @@ describe('mockEventsApi admin CRUD', () => {
         date: '2026-12-01',
         startTime: '18:00',
         location: 'Зал',
+        imageUrl: 'https://cdn.example/concert.jpg',
       },
       'user-admin',
     );
     expect(created.id).toMatch(/^event-/);
+    expect(created.imageUrl).toBe('https://cdn.example/concert.jpg');
 
     const updated = await mockEventsApi.updateEvent(
       created.id,
@@ -178,6 +197,15 @@ describe('mockEventsApi admin CRUD', () => {
     await mockEventsApi.deleteEvent(created.id, 'user-admin');
     const all = await mockEventsApi.getAllEvents('user-admin');
     expect(all.find((e) => e.id === created.id)).toBeUndefined();
+  });
+});
+
+describe('canManageEvents', () => {
+  it('allows teacher and admin, denies student', () => {
+    expect(canManageEvents({ role: 'teacher' })).toBe(true);
+    expect(canManageEvents({ role: 'admin' })).toBe(true);
+    expect(canManageEvents({ role: 'student' })).toBe(false);
+    expect(canManageEvents(null)).toBe(false);
   });
 });
 

@@ -66,6 +66,12 @@ describe('PocketBase auth hooks (ROADMAP 1.3)', () => {
     expect(source).toContain('required = false');
   });
 
+  it('login page has no demo role shortcuts', () => {
+    const login = readFileSync(LOGIN_PAGE, 'utf8');
+    expect(login).not.toContain('demoLogin');
+    expect(login).not.toContain('Быстрый вход для демо');
+  });
+
   it('login, register and forgot-password use PhoneInput mask', () => {
     const login = readFileSync(LOGIN_PAGE, 'utf8');
     const register = readFileSync(REGISTER_PAGE, 'utf8');

@@ -4,8 +4,10 @@ import {
   extractPhoneDigits,
   formatPhoneDisplay,
   isCompletePhone,
+  phoneFromSyntheticEmail,
   storedPhoneToDisplay,
 } from '@/utils/phone';
+import { maskPhone } from '@/utils';
 
 describe('phone utils', () => {
   it('formats progressive display mask', () => {
@@ -34,5 +36,18 @@ describe('phone utils', () => {
     expect(isCompletePhone('+79991234567')).toBe(true);
     expect(isCompletePhone('+7')).toBe(false);
     expect(isCompletePhone('+7999123456')).toBe(false);
+  });
+
+  it('masks phone safely when missing or short', () => {
+    expect(maskPhone(undefined)).toBe('—');
+    expect(maskPhone(null)).toBe('—');
+    expect(maskPhone('')).toBe('—');
+    expect(maskPhone('+7900')).toBe('+7900');
+    expect(maskPhone('+79001234567')).toBe('+790 *** ** 67');
+  });
+
+  it('recovers phone from synthetic PB email', () => {
+    expect(phoneFromSyntheticEmail('79001234567@kvartira.local')).toBe('+79001234567');
+    expect(phoneFromSyntheticEmail('user@example.com')).toBe('');
   });
 });

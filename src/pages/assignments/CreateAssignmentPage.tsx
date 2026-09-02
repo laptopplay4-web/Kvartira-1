@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,6 +12,7 @@ import { validateAssignmentContentFile } from '@/services/assignments/validation
 import {
   GENERAL_ASSIGNMENT_GROUP_ID,
   GENERAL_ASSIGNMENT_GROUP_LABEL,
+  isGeneralAssignmentGroup,
   sortRecipientGroups,
 } from '@/services/assignments/groups/helpers';
 import { api } from '@/services/api';
@@ -51,6 +52,7 @@ export default function CreateAssignmentPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -65,7 +67,12 @@ export default function CreateAssignmentPage() {
     enabled: canCreateAssignment(user),
   });
 
+  const generalGroup = groups?.find((g) => isGeneralAssignmentGroup(g));
   const customGroups = groups ? sortRecipientGroups(groups) : [];
+
+  useEffect(() => {
+    if (generalGroup?.id) setValue('groupId', generalGroup.id);
+  }, [generalGroup?.id, setValue]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -220,7 +227,9 @@ export default function CreateAssignmentPage() {
                 className="w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-body-sm focus-ring"
                 {...register('groupId')}
               >
-                <option value={GENERAL_ASSIGNMENT_GROUP_ID}>{GENERAL_ASSIGNMENT_GROUP_LABEL}</option>
+                {generalGroup && (
+                  <option value={generalGroup.id}>{GENERAL_ASSIGNMENT_GROUP_LABEL}</option>
+                )}
                 {customGroups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name} ({g.memberIds.length} уч.)

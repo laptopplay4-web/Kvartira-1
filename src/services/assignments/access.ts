@@ -10,8 +10,10 @@ export function canViewAssignment(
   if (can(user, 'assignments:view-all')) return true;
   if (can(user, 'assignments:view-assigned') && assignment.teacherId === user.id) return true;
   if (can(user, 'assignments:view-own')) {
-    if (isGeneralAssignmentGroup(assignment.groupId)) return true;
     const group = groups.find((g) => g.id === assignment.groupId);
+    if (group ? isGeneralAssignmentGroup(group) : isGeneralAssignmentGroup(assignment.groupId)) {
+      return true;
+    }
     return group?.memberIds.includes(user.id) ?? false;
   }
   return false;

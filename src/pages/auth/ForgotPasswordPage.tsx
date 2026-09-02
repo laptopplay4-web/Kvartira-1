@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
     try {
       const result = await api.auth.requestPasswordReset(data.phone);
       navigate('/reset-password', {
-        state: { resetId: result.resetId, demoCode: result.demoCode },
+        state: { resetId: result.resetId },
       });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось отправить код');
@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
           <Logo size="lg" className="mb-4" />
           <h1 className="text-h1">Восстановление пароля</h1>
           <p className="mt-2 text-body-sm text-text-secondary">
-            Введите телефон — мы отправим код для сброса пароля
+            Введите телефон аккаунта. Если SMS-код недоступен, обратитесь к администратору школы.
           </p>
         </div>
 

@@ -91,7 +91,7 @@ export default function LessonDetailPage() {
 
     queryKey: ['students'],
 
-    queryFn: () => api.users.getAllUsers(),
+    queryFn: () => api.users.getAllUsers(user.id),
 
     enabled: user.role !== 'student',
 
@@ -315,7 +315,12 @@ export default function LessonDetailPage() {
 
           <div className="flex items-center gap-3">
 
-            <Avatar firstName={teacher.firstName} lastName={teacher.lastName} size="lg" />
+            <Avatar
+              src={teacher.avatarUrl}
+              firstName={teacher.firstName}
+              lastName={teacher.lastName}
+              size="lg"
+            />
 
             <div>
 
@@ -333,7 +338,11 @@ export default function LessonDetailPage() {
 
           <div className="flex items-center gap-3 border-t border-border-subtle pt-4">
 
-            <Avatar firstName={student.firstName} lastName={student.lastName} />
+            <Avatar
+              src={student.avatarUrl}
+              firstName={student.firstName}
+              lastName={student.lastName}
+            />
 
             <div>
 

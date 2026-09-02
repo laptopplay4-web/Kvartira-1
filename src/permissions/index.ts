@@ -116,9 +116,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'legal:accept',
   ],
   admin: [
+    'lessons:view-own',
+    'lessons:view-assigned',
     'lessons:view-all',
     'lessons:manage-own',
-    'lessons:book',
     'lessons:reschedule-own',
     'lessons:cancel-own',
     'availability:manage',
@@ -167,8 +168,17 @@ export function can(
   user: { role: UserRole } | null | undefined,
   permission: Permission,
 ): boolean {
-  if (!user) return false;
-  return ROLE_PERMISSIONS[user.role].includes(permission);
+  if (!user?.role) return false;
+  return ROLE_PERMISSIONS[user.role]?.includes(permission) ?? false;
+}
+
+export function isKnownUserRole(role: unknown): role is UserRole {
+  return role === 'student' || role === 'teacher' || role === 'admin';
+}
+
+/** Admin uses teacher screens; school-wide tools live under /admin. */
+export function actsAsTeacher(role: UserRole | undefined): boolean {
+  return role === 'teacher' || role === 'admin';
 }
 
 export function getRoleLabel(role: UserRole): string {
@@ -177,5 +187,5 @@ export function getRoleLabel(role: UserRole): string {
     teacher: 'Преподаватель',
     admin: 'Администратор',
   };
-  return labels[role];
+  return labels[role] ?? '';
 }

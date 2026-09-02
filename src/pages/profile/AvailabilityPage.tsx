@@ -63,7 +63,7 @@ export default function AvailabilityPage() {
   const [pendingPeriodStart, setPendingPeriodStart] = useState<string | null>(null);
   const [intervalModalOpen, setIntervalModalOpen] = useState(false);
 
-  const canManage = can(user, 'availability:manage') && user.role === 'teacher';
+  const canManage = can(user, 'availability:manage');
   const teacherId = user.id;
 
   const { data, isLoading, isError, refetch } = useQuery({

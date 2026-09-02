@@ -29,7 +29,7 @@ export default function ProfilePage() {
       ? [{ to: '/profile/legal', icon: FileText, label: 'Документы и согласия' }]
       : []),
     ...(can(user, 'admin:access')
-      ? [{ to: '/home', icon: Shield, label: 'Администрирование' }]
+      ? [{ to: '/admin', icon: Shield, label: 'Администрирование' }]
       : []),
   ];
 

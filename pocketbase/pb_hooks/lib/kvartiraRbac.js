@@ -32,8 +32,11 @@ const LESSON_ACCESS = `${ADMIN} || student = @request.auth.id || teacher = @requ
 /** lesson_history: lesson participants + admin */
 const LESSON_HISTORY_ACCESS = `${ADMIN} || (@collection.lessons.id ?= lesson && (@collection.lessons.student ?= @request.auth.id || @collection.lessons.teacher ?= @request.auth.id))`;
 
-/** assignments:view-all | view-own | view-assigned */
-const ASSIGNMENT_ACCESS = `${ADMIN} || student = @request.auth.id || teacher = @request.auth.id`;
+/** assignments:view-all | view-own | view-assigned (group members / general) */
+const ASSIGNMENT_ACCESS = `${ADMIN} || teacher = @request.auth.id || (@collection.assignment_groups.id ?= group && (@collection.assignment_groups.kind = "general" || @collection.assignment_groups.members.id ?= @request.auth.id))`;
+
+/** assignment_groups: teacher owns custom groups; general visible to all auth */
+const ASSIGNMENT_GROUP_ACCESS = `${ADMIN} || teacher = @request.auth.id || kind = "general" || members.id ?= @request.auth.id`;
 
 /** Conversation membership (chat:read) — admin without membership cannot list personal chats */
 const CONVERSATION_MEMBER = `${ADMIN} || (@collection.conversation_members.conversation ?= id && @collection.conversation_members.user ?= @request.auth.id)`;
@@ -47,8 +50,8 @@ const PROGRESS_STUDENT_ROW = `${ADMIN} || student = @request.auth.id || (${TEACH
 /** support:view-own-tickets | view-all-tickets */
 const TICKET_ACCESS = `${ADMIN} || user = @request.auth.id`;
 
-/** kvartira_files — owner, conversation/assignment/ticket participants */
-const FILE_ACCESS = `${ADMIN} || owner = @request.auth.id || (purpose = "chat" && contextId != "" && @collection.conversation_members.conversation ?= contextId && @collection.conversation_members.user ?= @request.auth.id) || (purpose = "assignment" && contextId != "" && @collection.assignments.id ?= contextId && (@collection.assignments.student ?= @request.auth.id || @collection.assignments.teacher ?= @request.auth.id)) || (purpose = "support" && contextId != "" && @collection.support_tickets.id ?= contextId && (@collection.support_tickets.user ?= @request.auth.id || @request.auth.role = "admin"))`;
+/** kvartira_files — owner, conversation/assignment/ticket participants; school public */
+const FILE_ACCESS = `${ADMIN} || owner = @request.auth.id || purpose = "school" || (purpose = "chat" && contextId != "" && @collection.conversation_members.conversation ?= contextId && @collection.conversation_members.user ?= @request.auth.id) || (purpose = "assignment" && contextId != "" && @collection.assignments.id ?= contextId && (@collection.assignments.teacher ?= @request.auth.id || (@collection.assignment_groups.id ?= @collection.assignments.group && (@collection.assignment_groups.kind = "general" || @collection.assignment_groups.members.id ?= @request.auth.id)))) || (purpose = "support" && contextId != "" && @collection.support_tickets.id ?= contextId && (@collection.support_tickets.user ?= @request.auth.id || @request.auth.role = "admin"))`;
 
 /** Own row or admin */
 const OWN_USER_OR_ADMIN = `${ADMIN} || user = @request.auth.id`;
@@ -59,8 +62,8 @@ const OWN_USER_OR_ADMIN = `${ADMIN} || user = @request.auth.id`;
  */
 const COLLECTION_RULES = {
   users: {
-    listRule: AUTH,
-    viewRule: AUTH,
+    listRule: `${AUTH} || role = "teacher"`,
+    viewRule: `${AUTH} || role = "teacher"`,
     createRule: PUBLIC,
     updateRule: `${ADMIN} || id = @request.auth.id`,
     deleteRule: null,
@@ -119,7 +122,7 @@ const COLLECTION_RULES = {
     viewRule: PUBLIC,
     createRule: `${ADMIN} || ${TEACHER}`,
     updateRule: `${ADMIN} || ${TEACHER}`,
-    deleteRule: ADMIN,
+    deleteRule: `${ADMIN} || ${TEACHER}`,
   },
   event_registrations: {
     listRule: `${ADMIN} || user = @request.auth.id`,
@@ -127,6 +130,13 @@ const COLLECTION_RULES = {
     createRule: `${ADMIN} || (${AUTH} && user = @request.auth.id)`,
     updateRule: `${ADMIN} || user = @request.auth.id`,
     deleteRule: `${ADMIN} || user = @request.auth.id`,
+  },
+  assignment_groups: {
+    listRule: ASSIGNMENT_GROUP_ACCESS,
+    viewRule: ASSIGNMENT_GROUP_ACCESS,
+    createRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
+    updateRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
+    deleteRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
   },
   assignments: {
     listRule: ASSIGNMENT_ACCESS,
@@ -296,6 +306,7 @@ module.exports = {
   own,
   LESSON_ACCESS,
   ASSIGNMENT_ACCESS,
+  ASSIGNMENT_GROUP_ACCESS,
   CONVERSATION_MEMBER,
   MESSAGE_ACCESS,
   PROGRESS_STUDENT_ROW,

@@ -1,3 +1,4 @@
+import { actsAsTeacher } from '@/permissions';
 import type { Lesson, TeacherAvailability, TimeRange, User } from '@/types';
 import { isSlotInPast } from '@/utils/dates';
 import { formatUserName } from '@/utils';
@@ -53,13 +54,26 @@ export function getDayScheduleForDate(
   return { ranges: daySchedule.ranges, breaks: daySchedule.breaks ?? [] };
 }
 
+export function calendarViewerRole(
+  role: User['role'],
+  schoolWide = false,
+): User['role'] {
+  if (schoolWide) return role;
+  return actsAsTeacher(role) ? 'teacher' : role;
+}
+
 export function buildLessonFiltersForRole(
   userId: string,
   role: User['role'],
-  extra?: { teacherId?: string; studentId?: string },
+  extra?: { teacherId?: string; studentId?: string; schoolWide?: boolean },
 ): { studentId?: string; teacherId?: string; requesterId: string } {
-  const base = { requesterId: userId, ...extra };
-  if (role === 'student') return { ...base, studentId: userId };
-  if (role === 'teacher') return { ...base, teacherId: extra?.teacherId ?? userId };
-  return base;
+  const viewRole = calendarViewerRole(role, extra?.schoolWide);
+  const base = { requesterId: userId };
+  if (viewRole === 'student') return { ...base, studentId: extra?.studentId ?? userId };
+  if (viewRole === 'teacher') return { ...base, teacherId: extra?.teacherId ?? userId };
+  return {
+    ...base,
+    ...(extra?.teacherId ? { teacherId: extra.teacherId } : {}),
+    ...(extra?.studentId ? { studentId: extra.studentId } : {}),
+  };
 }

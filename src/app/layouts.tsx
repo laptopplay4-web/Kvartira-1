@@ -2,8 +2,8 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { BottomNav, SidebarNav } from '@/components/ui/BottomNav';
 import { MobileHeader } from '@/components/ui/MobileHeader';
-import { useCurrentUser } from '@/stores/authStore';
-import { can, type Permission } from '@/permissions';
+import { useAuthStore, useCurrentUser } from '@/stores/authStore';
+import { can, isKnownUserRole, type Permission } from '@/permissions';
 import { api } from '@/services/api';
 import { WifiOff } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -83,16 +83,26 @@ export function AppLayout() {
   );
 }
 
+function AuthRouteLoading() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center text-text-muted">Загрузка…</div>
+  );
+}
+
 export function ProtectedRoute({ children }: { children?: React.ReactNode }) {
+  const hydrated = useAuthStore.persist.hasHydrated();
   const user = useCurrentUser();
   useAuthSessionSync(user?.id);
-  if (!user) return <Navigate to="/login" replace />;
+  if (!hydrated) return <AuthRouteLoading />;
+  if (!user || !isKnownUserRole(user.role)) return <Navigate to="/login" replace />;
   return children ? <>{children}</> : <Outlet />;
 }
 
 export function GuestRoute({ children }: { children?: React.ReactNode }) {
+  const hydrated = useAuthStore.persist.hasHydrated();
   const user = useCurrentUser();
-  if (user) return <Navigate to="/home" replace />;
+  if (!hydrated) return <AuthRouteLoading />;
+  if (user && isKnownUserRole(user.role)) return <Navigate to="/home" replace />;
   return children ? <>{children}</> : <Outlet />;
 }
 

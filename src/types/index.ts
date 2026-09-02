@@ -329,11 +329,13 @@ export interface AssignmentGroup {
   name: string;
   teacherId: string;
   memberIds: string[];
+  /** School-wide recipients (all students). Survives PB id remap. */
+  isGeneral?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Group detail with resolved members for UI (hybrid PB + mock). */
+/** Group detail with resolved members for UI. */
 export interface AssignmentGroupDetail extends AssignmentGroup {
   members: User[];
   canManage: boolean;
@@ -490,11 +492,30 @@ export interface PublicContactInfo {
   workingHours: string;
 }
 
+/** Ссылки школы (опциональные; пустая строка = не задано). */
+export interface SchoolSocialLinks {
+  vk: string;
+  telegram: string;
+  youtube: string;
+  website: string;
+  twoGis: string;
+  yandexMaps: string;
+}
+
+export interface SchoolDirectionsVideo {
+  url: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface PublicSchoolInfo {
   name: string;
   tagline: string;
   about: string;
   contacts: PublicContactInfo;
+  socialLinks: SchoolSocialLinks;
+  directionsVideo?: SchoolDirectionsVideo;
 }
 
 export interface PublicTeacher {

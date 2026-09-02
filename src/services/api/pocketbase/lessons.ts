@@ -19,6 +19,7 @@ import {
 } from '@/services/api/pocketbase/mappers';
 
 import { getPocketBaseAvailability } from '@/services/api/pocketbase/availability';
+import { resolveUsersAvatars } from '@/services/api/pocketbase/files';
 
 import { canViewLesson, canRescheduleLesson, canCancelLesson, canEditTeacherNotes } from '@/services/lessons/access';
 
@@ -264,7 +265,8 @@ export const pocketbaseLessonsApi: LessonsApi = {
 
 
 
-      return filtered.map(mapUserRecord);
+      const users = await resolveUsersAvatars(filtered.map(mapUserRecord));
+      return users.map((user) => ({ ...user, phone: '' }));
 
     });
 

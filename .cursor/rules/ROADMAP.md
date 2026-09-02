@@ -28,17 +28,17 @@ Production-ready, когда выполнены **все** условия:
 
 ---
 
-## 2. Текущий статус (2026-08-31)
+## 2. Текущий статус (2026-09-02)
 
 | Область | Статус |
 |---------|--------|
-| MVP (auth, lessons, chat, events, profile, admin, PWA) | ✅ mock |
-| Этап 2 (assignments, progress, support, public, security, legal CMS) | ✅ mock |
-| Production backend | ⏳ фаза 2 (2.9 ✅) |
+| MVP (auth, lessons, chat, events, profile, admin, PWA) | ✅ mock + pocketbase |
+| Этап 2 (assignments, progress, support, public, security, legal CMS) | ✅ mock + pocketbase |
+| Production backend | ⏳ фазы 3.4–6 |
 | Frontend polish (фаза 0) | ✅ |
 | **Текущая фаза** | **3** |
 | **Следующий шаг** | **3.4** — Email channel (optional) |
-| Тесты | 455 (34 files) |
+| Тесты | 543 (44 files; 4 skipped) |
 | Graphify | см. `stack.mdc` §42 |
 
 Полный чеклист реализации — `stack.mdc` §16.
@@ -253,6 +253,8 @@ Deploy checklist (фаза 6.3):
 
 | Дата | Изменение |
 |------|-----------|
+| 2026-09-02 | Seed: убраны placeholder-файлы ДЗ/занятий/мероприятий; next: 3.4 |
+| 2026-09-02 | Production cutover: no demo login UI; PB assignments/groups + public adapter; next: 3.4 |
 | 2026-08-31 | v1.0 — initial roadmap; backend: PocketBase; фаза 0, next: 0.4 |
 | 2026-08-31 | 0.4 ✅ — Lesson detail materials + chat link + teacher notes; next: 0.5 |
 | 2026-08-31 | 0.5 ✅ — Home assignments block (student); next: 0.6 |

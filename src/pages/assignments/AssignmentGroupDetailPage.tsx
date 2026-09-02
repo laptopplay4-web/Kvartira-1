@@ -32,7 +32,7 @@ export default function AssignmentGroupDetailPage() {
 
   const { data: users } = useQuery({
     queryKey: ['users'],
-    queryFn: () => api.users.getAllUsers(),
+    queryFn: () => api.users.getAllUsers(user.id),
   });
 
   const { data: directions } = useQuery({

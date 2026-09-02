@@ -34,7 +34,7 @@ import { calculateAvailableSlots, slotsConflict } from '@/services/slots/calcula
 import { canViewLesson, canRescheduleLesson, canCancelLesson, canEditTeacherNotes } from '@/services/lessons/access';
 import { sanitizeLessonForViewer } from '@/services/lessons/helpers';
 import { validateTeacherAvailability } from '@/services/availability/validateAvailability';
-import { can } from '@/permissions';
+import { actsAsTeacher, can, getRoleLabel } from '@/permissions';
 import { ApiError } from '@/services/api/types';
 import type {
   AuthApi,
@@ -51,7 +51,6 @@ import type {
 import { createMockChatApi } from './chat';
 import { createMockAssignmentsApi } from './assignments';
 import { createMockAssignmentGroupsApi } from './groups';
-import { createHybridUserResolver } from './userResolver';
 import { createMockProgressApi } from './progress';
 import { createMockSupportApi } from './support';
 import { createMockPublicApi } from './public';
@@ -60,7 +59,7 @@ import { createMockLegalApi } from './legal';
 import { createMockSchoolSettingsApi } from './schoolSettings';
 import { createMockNotificationsApi, tryPushNotification } from './notifications';
 import { evaluateAndUnlockAchievements } from '@/services/progress/achievements';
-import { canManageEventsAdmin } from '@/services/events/access';
+import { canManageEvents } from '@/services/events/access';
 import {
   normalizeCompetitionApplication,
   normalizeEventInput,
@@ -79,6 +78,9 @@ import {
 } from '@/services/auth/validation';
 import { validateUpdateProfileInput } from '@/services/profile/validation';
 import { validateAvatarUpload } from '@/services/profile/avatar';
+import { getUserRoleChangeError } from '@/services/users/access';
+import { sanitizeUserPhoneForViewer, sanitizeUsersPhoneForViewer, preserveOwnPhone } from '@/services/users/helpers';
+import { readPersistedLoginPhone, resolveOwnPhoneNumber } from '@/services/auth/ownPhone';
 
 interface PasswordResetRequest {
   id: string;
@@ -161,7 +163,7 @@ function assertAvailabilityAccess(teacherId: string, requesterId: string): void 
     throw new ApiError('Нет доступа к графику работы', 'FORBIDDEN', 403);
   }
   const teacher = getUserById(teacherId);
-  if (teacher.role !== 'teacher') {
+  if (!actsAsTeacher(teacher.role)) {
     throw new ApiError('Пользователь не является преподавателем', 'INVALID_USER', 400);
   }
 }
@@ -342,11 +344,13 @@ export const mockLessonsApi: LessonsApi = {
 
   async getTeachers(directionId) {
     await delay();
-    return db.users.filter((u) => {
-      if (u.role !== 'teacher') return false;
-      if (!directionId) return true;
-      return teacherDirections[u.id]?.includes(directionId);
-    });
+    return db.users
+      .filter((u) => {
+        if (u.role !== 'teacher') return false;
+        if (!directionId) return true;
+        return teacherDirections[u.id]?.includes(directionId);
+      })
+      .map((u) => ({ ...u, phone: '' }));
   },
 
   async getLessons(filters) {
@@ -632,14 +636,6 @@ export const mockLessonsApi: LessonsApi = {
 export const mockChatApi: ChatApi = createMockChatApi(db, delay);
 export const mockAssignmentsApi = createMockAssignmentsApi(db, delay);
 export const mockAssignmentGroupsApi = createMockAssignmentGroupsApi(db, delay);
-
-export function createPocketbaseHybridAssignmentApis() {
-  const resolveUser = createHybridUserResolver(db.users);
-  return {
-    assignments: createMockAssignmentsApi(db, delay, resolveUser),
-    assignmentGroups: createMockAssignmentGroupsApi(db, delay, resolveUser),
-  };
-}
 export const mockProgressApi = createMockProgressApi(db, delay);
 export const mockSupportApi = createMockSupportApi(db, delay);
 export const mockPublicApi = createMockPublicApi(db, delay);
@@ -649,7 +645,7 @@ export const mockSchoolSettingsApi = createMockSchoolSettingsApi(db, delay, getU
 
 function assertEventsAdminAccess(requesterId: string) {
   const user = getUserById(requesterId);
-  if (!user || !canManageEventsAdmin(user)) {
+  if (!user || !canManageEvents(user)) {
     throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
   }
 }
@@ -821,16 +817,24 @@ function syncUserInSessions(user: User): void {
 }
 
 export const mockUsersApi: UsersApi = {
-  async getUser(id) {
+  async getUser(id, requesterId) {
     await delay();
     const user = db.users.find((u) => u.id === id);
     if (!user) throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
-    return user;
+    const viewer = getUserById(requesterId);
+    const sanitized = sanitizeUserPhoneForViewer(user, viewer);
+    const fallback = resolveOwnPhoneNumber(
+      requesterId,
+      user.phone,
+      readPersistedLoginPhone(requesterId),
+    );
+    return preserveOwnPhone(sanitized, requesterId, fallback);
   },
 
-  async getAllUsers() {
+  async getAllUsers(requesterId) {
     await delay();
-    return db.users;
+    const viewer = getUserById(requesterId);
+    return sanitizeUsersPhoneForViewer(db.users, viewer);
   },
 
   async updateProfile(requesterId, data) {
@@ -842,17 +846,33 @@ export const mockUsersApi: UsersApi = {
       throw new ApiError(validationError, 'VALIDATION_ERROR', 400);
     }
 
-    if (data.phone !== undefined && data.phone !== user.phone) {
-      if (db.users.some((u) => u.id !== user.id && u.phone === data.phone)) {
-        throw new ApiError('Пользователь с таким телефоном уже существует', 'DUPLICATE', 409);
-      }
-      user.phone = data.phone;
-    }
-
     if (data.firstName !== undefined) user.firstName = data.firstName.trim();
     if (data.lastName !== undefined) user.lastName = data.lastName.trim();
 
     syncUserInSessions(user);
+    return user;
+  },
+
+  async updateUserRole(requesterId, userId, role) {
+    await delay();
+    const requester = getUserById(requesterId);
+    const user = getUserById(userId);
+    const error = getUserRoleChangeError(requester, user, role);
+    if (error) {
+      const forbidden = error === 'Нет доступа';
+      throw new ApiError(error, forbidden ? 'FORBIDDEN' : 'VALIDATION_ERROR', forbidden ? 403 : 400);
+    }
+
+    user.role = role;
+    syncUserInSessions(user);
+    tryPushNotification(
+      db,
+      user.id,
+      'system',
+      'Роль изменена',
+      `Ваша роль в школе: ${getRoleLabel(role)}`,
+      '/profile',
+    );
     return user;
   },
 

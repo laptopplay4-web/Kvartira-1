@@ -7,6 +7,8 @@ import {
   MAX_AVATAR_FILE_SIZE,
 } from './constants';
 
+export { isDisplayableAvatarSrc } from './constants';
+
 export interface AvatarUploadInput {
   filename: string;
   mimeType: string;
@@ -73,6 +75,22 @@ export function zoomCropAtPoint(
   };
 }
 
+const AVATAR_EXT_TO_MIME: Record<string, (typeof ALLOWED_AVATAR_MIMES)[number]> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
+/** iOS/Android file pickers often return an empty mimeType — infer from extension. */
+export function inferAvatarMimeType(filename: string, mimeType: string): string {
+  if (mimeType && (ALLOWED_AVATAR_MIMES as readonly string[]).includes(mimeType)) {
+    return mimeType;
+  }
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return AVATAR_EXT_TO_MIME[ext] ?? mimeType;
+}
+
 export function validateAvatarUpload(
   input: Pick<AvatarUploadInput, 'filename' | 'mimeType' | 'size'>,
 ): { valid: true } | { valid: false; message: string } {
@@ -80,7 +98,8 @@ export function validateAvatarUpload(
     return { valid: false, message: 'Не удалось загрузить файл' };
   }
 
-  if (!(ALLOWED_AVATAR_MIMES as readonly string[]).includes(input.mimeType)) {
+  const mimeType = inferAvatarMimeType(input.filename, input.mimeType);
+  if (!(ALLOWED_AVATAR_MIMES as readonly string[]).includes(mimeType)) {
     return { valid: false, message: 'Допустимы JPEG, PNG или WebP' };
   }
 

@@ -7,7 +7,7 @@ interface AdminPageHeaderProps {
 export function AdminPageHeader({ title }: AdminPageHeaderProps) {
   return (
     <header className="mb-6">
-      <BackLink label="Главная" fallbackTo="/home" />
+      <BackLink label="Администрирование" fallbackTo="/admin" />
       <h1 className="text-h1">{title}</h1>
     </header>
   );

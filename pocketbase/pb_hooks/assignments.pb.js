@@ -1,8 +1,7 @@
-/// <reference path="../pb_data/types.d.ts" />
+/// @reference path="../pb_data/types.d.ts"
 /**
- * ROADMAP 2.5 — assignment hooks:
- * - force teacher = auth on create (non-admin)
- * - student submit / teacher review field lock on update
+ * Assignment + assignment_groups hooks:
+ * teacher lock on create; groups immutable kind; no submit/review.
  */
 
 onRecordCreateRequest((e) => {
@@ -16,3 +15,21 @@ onRecordUpdateRequest((e) => {
   assignments.assertAssignmentUpdate($app, e);
   e.next();
 }, 'assignments');
+
+onRecordCreateRequest((e) => {
+  const assignments = require(`${__hooks}/lib/kvartiraAssignments.js`);
+  assignments.assertAssignmentGroupCreate($app, e);
+  e.next();
+}, 'assignment_groups');
+
+onRecordUpdateRequest((e) => {
+  const assignments = require(`${__hooks}/lib/kvartiraAssignments.js`);
+  assignments.assertAssignmentGroupUpdate($app, e);
+  e.next();
+}, 'assignment_groups');
+
+onRecordDeleteRequest((e) => {
+  const assignments = require(`${__hooks}/lib/kvartiraAssignments.js`);
+  assignments.assertAssignmentGroupDelete($app, e);
+  e.next();
+}, 'assignment_groups');

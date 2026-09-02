@@ -27,6 +27,12 @@ const PB_MESSAGE_MAP: Record<string, { message: string; code: string }> = {
 const PB_FIELD_MESSAGE_MAP: Record<string, string> = {
   'Must be at least 8 character(s).': 'Минимум 8 символов',
   'Must be at least 8 characters.': 'Минимум 8 символов',
+  'Must be a valid url.': 'Некорректный формат изображения',
+  'Must be a valid URL.': 'Некорректный формат изображения',
+  'Must be at most 5000 character(s).': 'Изображение слишком большое',
+  'The length must be no more than 5000.': 'Изображение слишком большое',
+  'invalid purpose': 'Недопустимый тип файла',
+  'invalid value avatar.': 'Сервер не настроен для аватаров — примените миграции PocketBase и перезапустите serve',
 };
 
 function extractPbFieldError(data: unknown): string | null {

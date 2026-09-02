@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/Input';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/services/api/types';
-import { GraduationCap, Music, Shield } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { PHONE_INCOMPLETE_MESSAGE, PHONE_STORAGE_REGEX } from '@/utils/phone';
 
@@ -25,7 +24,7 @@ export default function LoginPage() {
   const passwordResetSuccess = Boolean(
     (location.state as { passwordResetSuccess?: boolean } | null)?.passwordResetSuccess,
   );
-  const { login, demoLogin, isLoading } = useAuthStore();
+  const { login, isLoading } = useAuthStore();
   const [error, setError] = useState('');
   const {
     register,
@@ -41,16 +40,6 @@ export default function LoginPage() {
     setError('');
     try {
       await login(data.phone, data.password);
-      navigate('/home');
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Ошибка входа');
-    }
-  };
-
-  const handleDemo = async (role: 'student' | 'teacher' | 'admin') => {
-    setError('');
-    try {
-      await demoLogin(role);
       navigate('/home');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Ошибка входа');
@@ -109,45 +98,6 @@ export default function LoginPage() {
             Войти
           </Button>
         </form>
-
-        <div className="mt-8">
-          <p className="mb-3 text-center text-caption">Быстрый вход для демо</p>
-          <div className="grid grid-cols-3 gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => handleDemo('student')}
-              disabled={isLoading}
-              className="flex-col h-auto py-3 gap-1"
-            >
-              <GraduationCap className="h-4 w-4" aria-hidden />
-              <span className="text-xs">Ученик</span>
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => handleDemo('teacher')}
-              disabled={isLoading}
-              className="flex-col h-auto py-3 gap-1"
-            >
-              <Music className="h-4 w-4" aria-hidden />
-              <span className="text-xs">Препод.</span>
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => handleDemo('admin')}
-              disabled={isLoading}
-              className="flex-col h-auto py-3 gap-1"
-            >
-              <Shield className="h-4 w-4" aria-hidden />
-              <span className="text-xs">Админ</span>
-            </Button>
-          </div>
-        </div>
 
         <p className="mt-8 text-center text-body-sm text-text-muted">
           Нет аккаунта?{' '}

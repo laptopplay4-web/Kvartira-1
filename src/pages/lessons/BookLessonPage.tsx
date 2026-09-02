@@ -321,7 +321,12 @@ export default function BookLessonPage() {
 
                   <div className="flex items-center gap-4">
 
-                    <Avatar firstName={t.firstName} lastName={t.lastName} size="lg" />
+                    <Avatar
+                      src={t.avatarUrl}
+                      firstName={t.firstName}
+                      lastName={t.lastName}
+                      size="lg"
+                    />
 
                     <div>
 
@@ -491,7 +496,12 @@ export default function BookLessonPage() {
 
             <div className="flex items-center gap-3">
 
-              <Avatar firstName={selectedTeacher.firstName} lastName={selectedTeacher.lastName} size="lg" />
+              <Avatar
+                src={selectedTeacher.avatarUrl}
+                firstName={selectedTeacher.firstName}
+                lastName={selectedTeacher.lastName}
+                size="lg"
+              />
 
               <div>
 

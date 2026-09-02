@@ -3,7 +3,7 @@
  * ROADMAP 3.1 — kvartira_files create/update guards.
  */
 
-const PURPOSES = ['chat', 'assignment', 'support'];
+const PURPOSES = ['chat', 'assignment', 'support', 'avatar', 'school'];
 
 /**
  * @param {import('pocketbase').App} app

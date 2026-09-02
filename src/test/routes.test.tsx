@@ -13,7 +13,8 @@ import { SidebarNav } from '@/components/ui/BottomNav';
 import ProfilePage from '@/pages/profile/ProfilePage';
 import AdminSchedulePage from '@/pages/admin/AdminSchedulePage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
-import type { User } from '@/types';
+import type { AuthSession, User } from '@/types';
+import { formatUserName } from '@/utils';
 
 const mockGetLessons = vi.fn();
 const mockGetDirections = vi.fn();
@@ -22,6 +23,7 @@ const mockGetEvents = vi.fn();
 const mockGetConversations = vi.fn();
 const mockGetNotifications = vi.fn();
 const mockGetAllUsers = vi.fn();
+const mockUpdateUserRole = vi.fn();
 
 vi.mock('@/services/api', () => ({
   api: {
@@ -41,6 +43,7 @@ vi.mock('@/services/api', () => ({
     },
     users: {
       getAllUsers: (...args: unknown[]) => mockGetAllUsers(...args),
+      updateUserRole: (...args: unknown[]) => mockUpdateUserRole(...args),
     },
   },
 }));
@@ -54,11 +57,36 @@ vi.mock('@/hooks/useAuthSessionSync', () => ({
 }));
 
 let mockUser: User | null;
+let mockSession: AuthSession | null = null;
+
+function setMockUser(user: User | null) {
+  mockUser = user;
+  mockSession = user ? { token: 'token-test', user } : null;
+}
 
 vi.mock('@/stores/authStore', () => ({
   useCurrentUser: () => mockUser,
-  useAuthStore: (selector: (s: { logout: () => void; updateSessionUser: () => void; syncSession: () => Promise<void> }) => unknown) =>
-    selector({ logout: vi.fn(), updateSessionUser: vi.fn(), syncSession: vi.fn() }),
+  useAuthStore: Object.assign(
+    (selector: (s: {
+      session: AuthSession | null;
+      logout: () => void;
+      updateSessionUser: () => void;
+      syncSession: () => Promise<void>;
+      bootstrapFromStorage: () => void;
+    }) => unknown) =>
+      selector({
+        session: mockSession,
+        logout: vi.fn(),
+        updateSessionUser: vi.fn(),
+        syncSession: vi.fn(),
+        bootstrapFromStorage: vi.fn(),
+      }),
+    {
+      persist: {
+        hasHydrated: () => true,
+      },
+    },
+  ),
 }));
 
 const adminUser: User = {
@@ -111,19 +139,35 @@ describe('admin shell routes', () => {
     mockGetConversations.mockResolvedValue([]);
     mockGetNotifications.mockResolvedValue([]);
     mockGetAllUsers.mockResolvedValue([adminUser, studentUser]);
+    mockUpdateUserRole.mockResolvedValue(studentUser);
   });
 
-  it('redirects admin /admin to /home', async () => {
-    mockUser = adminUser;
+  it('renders admin hub at /admin', async () => {
+    setMockUser(adminUser);
     renderRoute('/admin');
 
     await waitFor(() => {
-      expect(screen.getByText('Административный обзор')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Администрирование' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /Расписание/ })).toHaveAttribute('href', '/admin/schedule');
+    expect(screen.getByRole('link', { name: /Пользователи/ })).toHaveAttribute('href', '/admin/users');
+    expect(screen.queryByRole('link', { name: /Мероприятия/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Школа/ })).toHaveAttribute('href', '/admin/school');
+    expect(screen.getByRole('link', { name: /Документы/ })).toHaveAttribute('href', '/admin/legal');
+  });
+
+  it('redirects /admin/events to /events for admin', async () => {
+    setMockUser(adminUser);
+    mockGetEvents.mockResolvedValue([]);
+    renderRoute('/admin/events');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Мероприятия' })).toBeInTheDocument();
     });
   });
 
   it('renders /admin/schedule inside AppLayout', async () => {
-    mockUser = adminUser;
+    setMockUser(adminUser);
     renderRoute('/admin/schedule');
 
     await waitFor(() => {
@@ -134,7 +178,7 @@ describe('admin shell routes', () => {
   });
 
   it('renders /admin/users inside AppLayout', async () => {
-    mockUser = adminUser;
+    setMockUser(adminUser);
     renderRoute('/admin/users');
 
     await waitFor(() => {
@@ -145,17 +189,17 @@ describe('admin shell routes', () => {
   });
 
   it('blocks student from /admin', async () => {
-    mockUser = studentUser;
+    setMockUser(studentUser);
     renderRoute('/admin');
 
     await waitFor(() => {
-      expect(screen.queryByText('Административный обзор')).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: formatUserName(adminUser) })).not.toBeInTheDocument();
     });
     expect(screen.queryByText('Администрирование')).not.toBeInTheDocument();
   });
 
   it('blocks student from /admin/schedule', async () => {
-    mockUser = studentUser;
+    setMockUser(studentUser);
     renderRoute('/admin/schedule');
 
     await waitFor(() => {
@@ -164,7 +208,7 @@ describe('admin shell routes', () => {
   });
 
   it('blocks teacher from /admin/schedule', async () => {
-    mockUser = teacherUser;
+    setMockUser(teacherUser);
     renderRoute('/admin/schedule');
 
     await waitFor(() => {
@@ -173,7 +217,7 @@ describe('admin shell routes', () => {
   });
 
   it('blocks student from /admin/users', async () => {
-    mockUser = studentUser;
+    setMockUser(studentUser);
     renderRoute('/admin/users');
 
     await waitFor(() => {
@@ -184,24 +228,26 @@ describe('admin shell routes', () => {
 
 describe('admin navigation links', () => {
   beforeEach(() => {
-    mockUser = adminUser;
+    setMockUser(adminUser);
     vi.stubGlobal(
       'matchMedia',
       vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }),
     );
   });
 
-  it('Sidebar Admin link points to /home', () => {
+  it('Sidebar Admin link points to /admin', () => {
     render(
-      <MemoryRouter>
-        <SidebarNav chatBadge={0} />
-      </MemoryRouter>,
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <SidebarNav chatBadge={0} />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
-    expect(screen.getByRole('link', { name: /Админ/ })).toHaveAttribute('href', '/home');
+    expect(screen.getByRole('link', { name: /Админ/ })).toHaveAttribute('href', '/admin');
   });
 
-  it('Profile admin menu points to /home', () => {
+  it('Profile admin menu points to /admin', () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
@@ -212,11 +258,11 @@ describe('admin navigation links', () => {
 
     expect(screen.getByRole('link', { name: /Администрирование/ })).toHaveAttribute(
       'href',
-      '/home',
+      '/admin',
     );
   });
 
-  it('Schedule back button falls back to /home', async () => {
+  it('Schedule back button falls back to /admin', async () => {
     mockGetLessons.mockResolvedValue([]);
     mockGetAllUsers.mockResolvedValue([]);
     mockGetDirections.mockResolvedValue([]);
@@ -229,11 +275,12 @@ describe('admin navigation links', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole('button', { name: /Главная/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Администрирование/ })).toBeInTheDocument();
     expect(await screen.findByText('Нет занятий')).toBeInTheDocument();
   });
 
-  it('Users back button falls back to /home', async () => {
+  it('Users back button falls back to /admin', async () => {
+    setMockUser(adminUser);
     mockGetAllUsers.mockResolvedValue([]);
 
     render(
@@ -244,11 +291,12 @@ describe('admin navigation links', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole('button', { name: /Главная/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Администрирование/ })).toBeInTheDocument();
     expect(await screen.findByText('Нет пользователей')).toBeInTheDocument();
   });
 
   it('AdminUsersPage reuses shared users cache without refetch', async () => {
+    setMockUser(adminUser);
     vi.clearAllMocks();
     const users = [adminUser, studentUser];
     mockGetAllUsers.mockResolvedValue(users);
@@ -276,5 +324,24 @@ describe('admin navigation links', () => {
     });
 
     expect(mockGetAllUsers).not.toHaveBeenCalled();
+  });
+
+  it('AdminUsersPage offers teacher section add and demote controls', async () => {
+    setMockUser(adminUser);
+    mockGetAllUsers.mockResolvedValue([adminUser, teacherUser, studentUser]);
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <AdminUsersPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Добавить преподавателя' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: `Сделать учеником: ${formatUserName(teacherUser)}` }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Сделать преподавателем/ })).not.toBeInTheDocument();
   });
 });

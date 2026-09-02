@@ -9,7 +9,7 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 
 | PB collection | TS type / domain | Ключевые поля |
 |---------------|------------------|---------------|
-| `users` *(auth)* | `User` | phone, role, firstName, lastName, avatarUrl, bio, directionIds (json, teachers) |
+| `users` *(auth)* | `User` | phone, role, firstName, lastName, avatarUrl (text, `pbfile:` ref), avatarOriginalUrl (text), bio, directionIds (json, teachers) |
 | `directions` | `Direction` | name, description, icon |
 | `teacher_availability` | `TeacherAvailability` | teacher, schedule (json), exceptions, planningPeriod (json) |
 | `lessons` | `Lesson` | student, teacher, direction, date, startTime, status |
@@ -19,7 +19,8 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 | `messages` | `Message` | conversation, sender, text, attachments (json) |
 | `events` | `SchoolEvent` | type, date, registeredUserIds |
 | `event_registrations` | `EventRegistration` | event, user, application |
-| `assignments` | `Assignment` | teacher, student, materials, submission, feedback |
+| `assignments` | `Assignment` | teacher, group, contentBlocks (json) |
+| `assignment_groups` | `AssignmentGroup` | teacher, kind (`general`\|`custom`), members |
 | `skills` | `Skill` | name, direction, maxLevel |
 | `student_skill_progress` | `StudentSkillProgress` | student, skill, level |
 | `progress_goals` | `ProgressGoal` | student, title, status |
@@ -36,9 +37,9 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 | `notifications` | `AppNotification` | user, type, title, link |
 | `notification_preferences` | `NotificationPreferences` | user, pushEnabled |
 | `push_subscriptions` | Web Push endpoint | user, endpoint, p256dh, auth, userAgent |
-| `school_settings` | `PublicSchoolInfo` | name, contacts (json) |
+| `school_settings` | `PublicSchoolInfo` | name, tagline, about, contacts (json: phone/email/address/workingHours + socialLinks + directionsVideo) |
 | `public_news` | `PublicNewsItem` | title, excerpt, publishedAt |
-| `kvartira_files` | file storage | owner, purpose, contextId, file, mimeType, size |
+| `kvartira_files` | file storage | owner, purpose (`chat`/`assignment`/`support`/`avatar`), contextId, file, mimeType, size |
 | `audit_logs` | `AuditLog` | actor, action, entityType, entityId |
 
 ## Индексы (бизнес-инварианты)
@@ -88,6 +89,8 @@ Hook `onRecordAuthWithPasswordRequest` подставляет запись по 
 
 **Регистрация:** `POST /api/collections/users/records` с `phone`, `password`, `passwordConfirm`, `firstName`, `lastName` — hook выставляет `role=student` и email `{digits}@kvartira.local`.
 
+**Смена роли (admin):** `UsersApi.updateUserRole` — только `student` ↔ `teacher`. Hook `assertUserUpdate` блокирует self-service и смену роли администратора.
+
 **История входов:** `onRecordAuthRequest` → коллекция `login_history`; ошибка записи истории/сессии **не блокирует** вход; неверный пароль → `success: false` + уведомление. Миграция `1789190400_kvartira_login_history_bool.js` — `login_history.success` optional (JSVM `false` = blank).
 
 ## RBAC (ROADMAP 1.4 ✅)
@@ -115,6 +118,17 @@ API rules на всех 29 коллекциях — маппинг к `src/permi
 
 Идемпотентность: пропуск, если `users.phone = +79001234567` уже существует.
 
+## User delete (admin)
+
+Удаление пользователя в PocketBase Admin UI требует `cascadeDelete` на обязательных relation-полях и очистки опциональных ссылок.
+
+| Компонент | Назначение |
+|-----------|------------|
+| `pb_migrations/1789363200_kvartira_user_cascade_delete.js` | первичный `cascadeDelete` (fresh install) |
+| `pb_migrations/1789449600_kvartira_user_cascade_delete_fix.js` | повторное применение + `assignments.group` |
+| `pb_hooks/users.pb.js` | `onRecordDeleteRequest` → purge dependents |
+| `pb_hooks/lib/kvartiraUsers.js` | delete lessons/messages/assignments + optional refs |
+
 ## Events adapter (ROADMAP 2.3 ✅)
 
 `src/services/api/pocketbase/events.ts` — контракт `EventsApi`.
@@ -125,7 +139,7 @@ API rules на всех 29 коллекциях — маппинг к `src/permi
 | `mappers.ts` `mapEventRecord` / `mapEventRegistrationRecord` | PB → `SchoolEvent` / `EventRegistration` |
 | `pb_hooks/events.pb.js` | лимит мест + sync `registeredUserIds` |
 | `pb_hooks/lib/kvartiraEvents.js` | capacity check, sync helper |
-| Client IDOR | `canViewSchoolEvent` (invited), `canManageEventsAdmin` |
+| Client IDOR | `canViewSchoolEvent` (invited), `canManageEvents` |
 
 **Запись:** `event_registrations` (unique `idx_event_registration`); hook обновляет `events.registeredUserIds` — иначе ученик не видит чужие записи из-за own-row RBAC. Конкурсная заявка — json `application`. Достижения при записи — до Progress adapter.
 
@@ -150,13 +164,15 @@ API rules на всех 29 коллекциях — маппинг к `src/permi
 
 | Компонент | Назначение |
 |-----------|------------|
-| `pocketbase/assignments.ts` | list/detail, create, submit, review, upload (dataUrl) |
-| `mappers.ts` `mapAssignmentRecord` | PB → `Assignment` (`teacher`/`student`/`lesson` → *Id) |
-| `pb_hooks/assignments.pb.js` | create teacher lock + submit/review field lock |
-| `pb_hooks/lib/kvartiraAssignments.js` | `assertAssignmentCreate`, `assertAssignmentUpdate` |
-| Client IDOR | `canViewAssignment`, `canCreateAssignment`, `canSubmitAssignment`, `canReviewAssignment` |
+| `pocketbase/assignments.ts` | list/detail, create, upload (content blocks) |
+| `pocketbase/groups.ts` | groups CRUD + members |
+| `mappers.ts` `mapAssignmentRecord` | PB → `Assignment` (`teacher`/`group` → *Id, contentBlocks) |
+| `pb_hooks/assignments.pb.js` | create teacher lock; groups kind lock |
+| `pb_hooks/lib/kvartiraAssignments.js` | `assertAssignmentCreate`, `assertAssignmentGroupCreate` |
+| `pb_migrations/1789276800_kvartira_assignments_groups.js` | `assignment_groups` + drop submit/review fields |
+| Client IDOR | `canViewAssignment`, `canCreateAssignment`, `canViewAssignmentGroup` |
 
-**Создание:** преподаватель → `status: assigned`. **Сдача:** ученик пишет только `submission` + `submitted`. **Проверка:** преподаватель пишет только `feedback` + `reviewed`. **Вложения:** `kvartira_files` + signed URLs (фаза 3.1 ✅). Уведомление ученику — до Notifications adapter. Unlock достижений — Progress adapter (2.6).
+**Создание:** преподаватель назначает группу + блоки материалов. **Общая группа** (`kind: general`) видна всем ученикам. **Вложения:** `kvartira_files` + signed URLs. Уведомление участникам группы при создании.
 
 ## Progress adapter (ROADMAP 2.6 ✅)
 

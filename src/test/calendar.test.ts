@@ -9,6 +9,7 @@ import {
   groupLessonsByDate,
   isLessonPast,
   buildLessonFiltersForRole,
+  calendarViewerRole,
 } from '@/services/calendar/helpers';
 import { mockLessonsApi, resetMockDatabase } from '@/services/api/mock';
 import type { Lesson } from '@/types';
@@ -88,6 +89,23 @@ describe('calendar helpers', () => {
       requesterId: 't1',
       teacherId: 't1',
     });
+    expect(buildLessonFiltersForRole('a1', 'admin')).toEqual({
+      requesterId: 'a1',
+      teacherId: 'a1',
+    });
+    expect(buildLessonFiltersForRole('a1', 'admin', { schoolWide: true })).toEqual({
+      requesterId: 'a1',
+    });
+    expect(
+      buildLessonFiltersForRole('a1', 'admin', { schoolWide: true, teacherId: 't1' }),
+    ).toEqual({
+      requesterId: 'a1',
+      teacherId: 't1',
+    });
+    expect(calendarViewerRole('admin')).toBe('teacher');
+    expect(calendarViewerRole('admin', true)).toBe('admin');
+    expect(calendarViewerRole('teacher')).toBe('teacher');
+    expect(calendarViewerRole('student')).toBe('student');
   });
 });
 

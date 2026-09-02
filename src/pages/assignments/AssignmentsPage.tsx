@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Plus, Users } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
-import { can } from '@/permissions';
+import { actsAsTeacher, can } from '@/permissions';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -40,7 +40,7 @@ export default function AssignmentsPage() {
 
   const subtitle = () => {
     if (user.role === 'student') return 'Материалы от преподавателей по вашим группам';
-    if (user.role === 'teacher') return 'Материалы для ваших групп';
+    if (actsAsTeacher(user.role)) return 'Материалы для ваших групп';
     return 'Все материалы школы';
   };
 

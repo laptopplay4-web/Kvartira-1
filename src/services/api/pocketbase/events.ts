@@ -12,7 +12,7 @@ import {
   mapEventRegistrationRecord,
   mapUserRecord,
 } from '@/services/api/pocketbase/mappers';
-import { canManageEventsAdmin, canViewSchoolEvent } from '@/services/events/access';
+import { canManageEvents, canViewSchoolEvent } from '@/services/events/access';
 import {
   normalizeCompetitionApplication,
   normalizeEventInput,
@@ -29,7 +29,7 @@ async function getRequesterUser(requesterId: string): Promise<User> {
 
 async function assertEventsAdminAccess(requesterId: string): Promise<User> {
   const user = await getRequesterUser(requesterId);
-  if (!canManageEventsAdmin(user)) {
+  if (!canManageEvents(user)) {
     throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
   }
   return user;

@@ -1,7 +1,6 @@
 /// @ts-check
 /**
- * ROADMAP 2.5 — assignment create/update IDOR.
- * Mirrors mock AssignmentsApi: teacher creates, student submits, teacher reviews.
+ * Assignment + assignment_groups IDOR (groups + content blocks).
  */
 
 /**
@@ -30,8 +29,6 @@ function relId(value) {
 }
 
 /**
- * Teacher (non-admin) is always the creator; student must be a student role.
- *
  * @param {core.App} app
  * @param {core.RecordRequestEvent} e
  */
@@ -43,20 +40,13 @@ function assertAssignmentCreate(app, e) {
 
   if (isUsersAuth(auth) && auth.getString('role') !== 'admin') {
     e.record.set('teacher', auth.id);
-    e.record.set('status', 'assigned');
-    e.record.set('submission', null);
-    e.record.set('feedback', null);
   }
 
-  const studentId = relId(e.record.get('student'));
-  if (!studentId) {
-    throw new ApiError(400, 'Укажите ученика');
+  const groupId = relId(e.record.get('group'));
+  if (!groupId) {
+    throw new ApiError(400, 'Укажите группу получателей');
   }
-
-  const student = app.findRecordById('users', studentId);
-  if (student.getString('role') !== 'student') {
-    throw new ApiError(400, 'Задание можно назначить только ученику');
-  }
+  app.findRecordById('assignment_groups', groupId);
 
   const title = e.record.getString('title').trim();
   const description = e.record.getString('description').trim();
@@ -68,8 +58,7 @@ function assertAssignmentCreate(app, e) {
 }
 
 /**
- * Student may only set submission + status=submitted (from assigned).
- * Teacher may only set feedback + status=reviewed (from submitted).
+ * Assignments are immutable after create for app users (no submit/review).
  *
  * @param {core.App} _app
  * @param {core.RecordRequestEvent} e
@@ -80,58 +69,109 @@ function assertAssignmentUpdate(_app, e) {
     throw new ApiError(403, 'Нет доступа');
   }
   if (!isUsersAuth(auth) || auth.getString('role') === 'admin') return;
+  throw new ApiError(403, 'Нет доступа');
+}
+
+/**
+ * @param {core.App} app
+ * @param {core.RecordRequestEvent} e
+ */
+function assertAssignmentGroupCreate(app, e) {
+  const auth = e.auth;
+  if (!auth) {
+    throw new ApiError(403, 'Нет доступа');
+  }
+
+  if (isUsersAuth(auth) && auth.getString('role') !== 'admin') {
+    e.record.set('teacher', auth.id);
+    e.record.set('kind', 'custom');
+  }
+
+  const name = e.record.getString('name').trim();
+  if (!name || name.length < 2) {
+    throw new ApiError(400, 'Введите название группы');
+  }
+  e.record.set('name', name);
+
+  const memberIds = e.record.get('members') || [];
+  assertMembersAreStudents(app, memberIds);
+}
+
+/**
+ * @param {core.App} app
+ * @param {core.RecordRequestEvent} e
+ */
+function assertAssignmentGroupUpdate(app, e) {
+  const auth = e.auth;
+  if (!auth) {
+    throw new ApiError(403, 'Нет доступа');
+  }
+  if (!isUsersAuth(auth) || auth.getString('role') === 'admin') {
+    assertMembersAreStudents(app, e.record.get('members') || []);
+    return;
+  }
 
   const record = e.record;
   const original = typeof record.original === 'function' ? record.original() : record;
-  const authId = auth.id;
-  const role = auth.getString('role');
-  const teacherId = relId(original.get('teacher'));
-  const studentId = relId(original.get('student'));
-  const oldStatus = original.getString('status');
-
-  const newSubmission = record.get('submission');
-  const newFeedback = record.get('feedback');
-
-  const locked = [
-    'teacher',
-    'student',
-    'title',
-    'description',
-    'lesson',
-    'dueDate',
-    'responseType',
-    'materials',
-    'submission',
-    'feedback',
-    'status',
-  ];
-  for (const field of locked) {
-    record.set(field, original.get(field));
+  const kind = original.getString('kind');
+  if (kind === 'general') {
+    throw new ApiError(403, 'Общую группу нельзя изменить');
+  }
+  if (relId(original.get('teacher')) !== auth.id) {
+    throw new ApiError(403, 'Нет доступа');
   }
 
-  if (role === 'student' && authId === studentId) {
-    if (oldStatus !== 'assigned') {
-      throw new ApiError(403, 'Нельзя отправить ответ на это задание');
+  record.set('teacher', original.get('teacher'));
+  record.set('kind', kind);
+
+  const name = record.getString('name').trim();
+  if (!name || name.length < 2) {
+    throw new ApiError(400, 'Введите название группы');
+  }
+  record.set('name', name);
+  assertMembersAreStudents(app, record.get('members') || []);
+}
+
+/**
+ * @param {core.App} _app
+ * @param {core.RecordRequestEvent} e
+ */
+function assertAssignmentGroupDelete(_app, e) {
+  const users = require(`${__hooks}/lib/kvartiraUsers.js`);
+  if (users.isUserPurgeInProgress()) return;
+
+  const auth = e.auth;
+  if (!auth) return;
+  if (!isUsersAuth(auth) || auth.getString('role') === 'admin') return;
+
+  const kind = e.record.getString('kind');
+  if (kind === 'general') {
+    throw new ApiError(403, 'Общую группу нельзя удалить');
+  }
+  if (relId(e.record.get('teacher')) !== auth.id) {
+    throw new ApiError(403, 'Нет доступа');
+  }
+}
+
+/**
+ * @param {core.App} app
+ * @param {unknown} members
+ */
+function assertMembersAreStudents(app, members) {
+  const ids = Array.isArray(members) ? members.map(relId).filter(Boolean) : [];
+  for (const id of ids) {
+    const user = app.findRecordById('users', id);
+    if (user.getString('role') !== 'student') {
+      throw new ApiError(400, 'В группу можно добавить только ученика');
     }
-    record.set('submission', newSubmission);
-    record.set('status', 'submitted');
-    return;
   }
-
-  if (role === 'teacher' && authId === teacherId) {
-    if (oldStatus !== 'submitted') {
-      throw new ApiError(403, 'Нельзя проверить это задание');
-    }
-    record.set('feedback', newFeedback);
-    record.set('status', 'reviewed');
-    return;
-  }
-
-  throw new ApiError(403, 'Нет доступа');
 }
 
 module.exports = {
   assertAssignmentCreate,
   assertAssignmentUpdate,
+  assertAssignmentGroupCreate,
+  assertAssignmentGroupUpdate,
+  assertAssignmentGroupDelete,
   relId,
 };

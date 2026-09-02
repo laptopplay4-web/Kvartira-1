@@ -40,7 +40,7 @@ const RBAC_MIGRATION_COLLECTIONS = [
   'audit_logs',
 ] as const;
 
-const RBAC_LIB_COLLECTIONS = [...RBAC_MIGRATION_COLLECTIONS, 'kvartira_files'] as const;
+const RBAC_LIB_COLLECTIONS = [...RBAC_MIGRATION_COLLECTIONS, 'kvartira_files', 'assignment_groups'] as const;
 
 describe('PocketBase RBAC rules (ROADMAP 1.4)', () => {
   it('rbac migration defines rules for all collections', () => {

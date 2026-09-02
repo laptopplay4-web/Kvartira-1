@@ -29,7 +29,6 @@ type FormData = z.infer<typeof schema>;
 
 interface ResetLocationState {
   resetId?: string;
-  demoCode?: string;
 }
 
 export default function ResetPasswordPage() {
@@ -99,12 +98,6 @@ export default function ResetPasswordPage() {
             Введите код из SMS и задайте новый пароль
           </p>
         </div>
-
-        {state.demoCode && (
-          <p className="mt-6 rounded-lg border border-border-subtle bg-surface-elevated px-4 py-3 text-center text-body-sm text-text-secondary">
-            Демо-код: <span className="font-mono text-text-primary">{state.demoCode}</span>
-          </p>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
           <Input

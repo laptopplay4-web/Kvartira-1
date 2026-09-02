@@ -261,7 +261,8 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
     const rec = await client.createRecord('assignment_groups', {
       name: group.name,
       teacher: ids.get(group.teacherId),
-      memberIds: group.memberIds.map((id) => ids.get(id)).filter(Boolean),
+      kind: group.id === 'grp-general' || group.isGeneral ? 'general' : 'custom',
+      members: group.memberIds.map((id) => ids.get(id)).filter(Boolean),
     });
     await patchRecordTimestamps(client, 'assignment_groups', rec.id, group.createdAt, group.updatedAt);
     ids.set(group.id, rec.id);
@@ -275,7 +276,7 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
       description: asgn.description,
       teacher: ids.get(asgn.teacherId),
       group: ids.get(asgn.groupId),
-      dueDate: asgn.dueDate ?? '',
+      ...(asgn.dueDate ? { dueDate: asgn.dueDate } : {}),
       contentBlocks: asgn.contentBlocks ?? [],
     });
     await patchRecordTimestamps(client, 'assignments', rec.id, asgn.createdAt, asgn.updatedAt);
@@ -470,7 +471,11 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
     name: publicSchoolInfo.name,
     tagline: publicSchoolInfo.tagline ?? '',
     about: publicSchoolInfo.about ?? '',
-    contacts: publicSchoolInfo.contacts,
+    contacts: {
+      ...publicSchoolInfo.contacts,
+      socialLinks: publicSchoolInfo.socialLinks ?? {},
+      directionsVideo: publicSchoolInfo.directionsVideo ?? null,
+    },
   });
   counts.school_settings = 1;
 

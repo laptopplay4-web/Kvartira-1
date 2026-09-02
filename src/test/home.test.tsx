@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PROGRESS_FEATURE_ENABLED } from '@/config/features';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { getNextUpcomingEvent } from '@/services/events/helpers';
@@ -378,6 +378,22 @@ describe('HomePage P1', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
+  it('shows user avatar next to name in greeting header', async () => {
+    mockUser = { ...studentUser, avatarUrl: 'https://example.com/avatar.jpg' };
+    mockGetLessons.mockResolvedValue([]);
+
+    renderHome();
+
+    const heading = await screen.findByRole('heading', { name: formatUserName(studentUser) });
+    const header = heading.closest('header');
+    expect(header).toBeTruthy();
+    expect(within(header!).getByLabelText(formatUserName(studentUser)).querySelector('img')).toHaveAttribute(
+      'src',
+      'https://example.com/avatar.jpg',
+    );
+    expect(within(header!).getByText('Ученик')).toBeInTheDocument();
+  });
+
   it('shows empty state when no upcoming lessons', async () => {
     mockUser = studentUser;
     mockGetLessons.mockResolvedValue([]);
@@ -433,106 +449,63 @@ const adminUser: User = {
   phone: '+79009999999',
 };
 
-describe('HomePage Admin P1', () => {
-  const today = new Date().toISOString().slice(0, 10);
-
+describe('HomePage admin as teacher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetDirections.mockResolvedValue([{ id: 'dir-1', name: 'Фортепиано' }]);
     mockGetTeachers.mockResolvedValue([teacherUser]);
     mockGetEvents.mockResolvedValue([]);
     mockGetConversations.mockResolvedValue([]);
+    mockAssignmentsDefaults();
   });
 
-  it('shows administrative overview header and KPI stats', async () => {
+  it('shows teacher-like home without KPI or admin quick actions', async () => {
     mockUser = adminUser;
-    mockGetLessons.mockResolvedValue([
-      { ...lesson, date: today, studentId: studentUser.id, teacherId: teacherUser.id },
-      { ...lesson, id: 'lesson-2', date: '2099-01-01', studentId: studentUser.id, teacherId: teacherUser.id },
-    ]);
-    mockGetAllUsers.mockResolvedValue([adminUser, teacherUser, studentUser]);
+    mockGetLessons.mockResolvedValue([]);
+    mockGetAllUsers.mockResolvedValue([]);
 
     renderHome();
 
-    expect(await screen.findByText('Административный обзор')).toBeInTheDocument();
-    expect(screen.getByText('Сегодня')).toBeInTheDocument();
-
-    await waitFor(() => {
-      const todayCard = screen.getByText('Занятий сегодня').parentElement!;
-      expect(within(todayCard).getByText('1')).toBeInTheDocument();
-      const upcomingCard = screen.getByText('Предстоящих').parentElement!;
-      expect(within(upcomingCard).getByText('2')).toBeInTheDocument();
-      const teachersCard = screen.getByText('Преподавателей').parentElement!;
-      expect(within(teachersCard).getByText('1')).toBeInTheDocument();
-      const studentsCard = screen.getByText('Учеников').parentElement!;
-      expect(within(studentsCard).getByText('1')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: formatUserName(adminUser) })).toBeInTheDocument();
+    expect(screen.getByText('Администратор')).toBeInTheDocument();
+    expect(screen.getByText('Ближайшее занятие')).toBeInTheDocument();
+    expect(screen.getByText('Предстоящие занятия')).toBeInTheDocument();
+    expect(screen.queryByText('Занятий сегодня')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ближайшее занятие школы')).not.toBeInTheDocument();
+    expect(screen.queryByText('Быстрые действия')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Расписание/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Записаться на занятие')).not.toBeInTheDocument();
+    const allLinks = screen.getAllByRole('link', { name: /^Все$/ });
+    expect(allLinks.some((link) => link.getAttribute('href') === '/events')).toBe(true);
+    expect(allLinks.some((link) => link.getAttribute('href') === '/lessons')).toBe(true);
+    expect(mockGetLessons).toHaveBeenCalledWith({
+      requesterId: adminUser.id,
+      teacherId: adminUser.id,
     });
   });
 
-  it('does not show book CTA or upcoming lessons list for admin', async () => {
-    mockUser = adminUser;
-    mockGetLessons.mockResolvedValue([lesson]);
-    mockGetAllUsers.mockResolvedValue([teacherUser, studentUser]);
-
-    renderHome();
-
-    await screen.findByText('Административный обзор');
-    expect(screen.queryByText('Записаться на занятие')).not.toBeInTheDocument();
-    expect(screen.queryByText('Предстоящие занятия')).not.toBeInTheDocument();
-    expect(screen.queryByText('Чат')).not.toBeInTheDocument();
-  });
-
-  it('shows teacher and student in next school lesson', async () => {
+  it('shows student in next lesson like a teacher', async () => {
     mockUser = adminUser;
     mockGetLessons.mockResolvedValue([
-      { ...lesson, studentId: studentUser.id, teacherId: teacherUser.id },
+      { ...lesson, studentId: studentUser.id, teacherId: adminUser.id },
     ]);
-    mockGetAllUsers.mockResolvedValue([teacherUser, studentUser]);
+    mockGetAllUsers.mockResolvedValue([studentUser]);
 
     renderHome();
 
-    const combined = `${formatUserName(teacherUser)} · ${formatUserName(studentUser)}`;
-    expect(await screen.findByRole('heading', { name: combined })).toBeInTheDocument();
-    expect(screen.getByText('Ближайшее занятие школы')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: formatUserName(studentUser) })).toBeInTheDocument();
+    expect(screen.queryByText(`${formatUserName(teacherUser)} · ${formatUserName(studentUser)}`)).not.toBeInTheDocument();
     expect(screen.queryByText(studentUser.phone)).not.toBeInTheDocument();
-    expect(screen.queryByText(teacherUser.phone)).not.toBeInTheDocument();
   });
 
-  it('shows admin quick actions for schedule, users, legal, events and school', async () => {
-    mockUser = adminUser;
-    mockGetLessons.mockResolvedValue([]);
-    mockGetAllUsers.mockResolvedValue([]);
-
-    renderHome();
-
-    await screen.findByText('Быстрые действия');
-    expect(screen.getByRole('link', { name: /Расписание/i })).toHaveAttribute('href', '/admin/schedule');
-    expect(screen.getByRole('link', { name: /Пользователи/i })).toHaveAttribute('href', '/admin/users');
-    expect(screen.getByRole('link', { name: /Документы/i })).toHaveAttribute('href', '/admin/legal');
-    expect(screen.getByRole('link', { name: /Мероприятия/i })).toHaveAttribute('href', '/admin/events');
-    expect(screen.getByRole('link', { name: /Школа/i })).toHaveAttribute('href', '/admin/school');
-  });
-
-  it('does not duplicate events nav as admin quick action tile', async () => {
-    mockUser = adminUser;
-    mockGetLessons.mockResolvedValue([]);
-    mockGetAllUsers.mockResolvedValue([]);
-
-    renderHome();
-
-    await screen.findByText('Быстрые действия');
-    expect(screen.queryByRole('link', { name: /^События$/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /^Все$/ })).toHaveAttribute('href', '/events');
-  });
-
-  it('shows LessonCardSkeleton while admin lesson block is loading', () => {
+  it('shows LessonCardSkeleton while nearest lesson is loading', () => {
     mockUser = adminUser;
     mockGetLessons.mockReturnValue(new Promise(() => {}));
     mockGetAllUsers.mockReturnValue(new Promise(() => {}));
 
     const { container } = renderHome();
 
-    expect(screen.getByText('Ближайшее занятие школы')).toBeInTheDocument();
+    expect(screen.getByText('Ближайшее занятие')).toBeInTheDocument();
     expect(container.querySelector('.animate-pulse')).toBeTruthy();
   });
 });
@@ -595,7 +568,7 @@ describe.skipIf(!PROGRESS_FEATURE_ENABLED)('HomePage progress block', () => {
 
     renderHome();
 
-    await screen.findByText('Административный обзор');
+    await screen.findByRole('heading', { name: formatUserName(adminUser) });
     expect(screen.queryByText('Прогресс')).not.toBeInTheDocument();
     expect(mockGetProgressSummary).not.toHaveBeenCalled();
   });

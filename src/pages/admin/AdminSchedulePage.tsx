@@ -45,7 +45,7 @@ export default function AdminSchedulePage() {
 
   const { data: users } = useQuery({
     queryKey: ['users'],
-    queryFn: () => api.users.getAllUsers(),
+    queryFn: () => api.users.getAllUsers(user.id),
   });
 
   const { data: directions } = useQuery({
@@ -117,6 +117,7 @@ export default function AdminSchedulePage() {
         defaultView={dateFilter ? 'day' : 'week'}
         initialAnchor={dateFilter ? parseISO(dateFilter) : undefined}
         showBookAction={false}
+        schoolWide
         className="mb-8"
         key={dateFilter || 'default'}
       />

@@ -4,6 +4,7 @@ import { cn } from '@/utils';
 import { can } from '@/permissions';
 import { useCurrentUser } from '@/stores/authStore';
 import { Logo } from '@/components/ui/Logo';
+import { SchoolAboutButton } from '@/components/school/SchoolAboutButton';
 
 interface NavItem {
   to: string;
@@ -77,9 +78,12 @@ export function SidebarNav({ chatBadge = 0 }: BottomNavProps) {
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border-subtle bg-surface p-4 md:flex">
       <div className="mb-8 px-2">
-        <NavLink to="/home" className="focus-ring inline-block rounded-lg" aria-label="На главную">
-          <Logo size="md" />
-        </NavLink>
+        <div className="flex items-center gap-1">
+          <NavLink to="/home" className="focus-ring inline-block rounded-lg" aria-label="На главную">
+            <Logo size="md" />
+          </NavLink>
+          <SchoolAboutButton />
+        </div>
         <p className="mt-2 text-caption">Школа музыки</p>
       </div>
       <nav className="flex flex-1 flex-col gap-1" aria-label="Основная навигация">
@@ -108,7 +112,7 @@ export function SidebarNav({ chatBadge = 0 }: BottomNavProps) {
         ))}
         {user && can(user, 'admin:access') && (
           <Link
-            to="/home"
+            to="/admin"
             aria-current={isAdminRoute ? 'page' : undefined}
             className={cn(
               'mt-4 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-ring',

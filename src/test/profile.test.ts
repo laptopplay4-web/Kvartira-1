@@ -6,6 +6,7 @@ import {
   getCoverScale,
   getCropZoomBounds,
   getInitialCropState,
+  inferAvatarMimeType,
   validateAvatarUpload,
   zoomCropAtPoint,
 } from '@/services/profile/avatar';
@@ -31,14 +32,8 @@ describe('profile validation', () => {
     expect(validateUpdateProfileInput({ lastName: 'B' })).toContain('Фамилия');
   });
 
-  it('validates phone format', () => {
-    expect(validateUpdateProfileInput({ phone: '123' })).toContain('Введите номер полностью');
-    expect(validateUpdateProfileInput({ phone: '+78001234567' })).toContain('Введите номер полностью');
-  });
-
   it('accepts valid fields', () => {
     expect(validateUpdateProfileInput({ firstName: 'Иван', lastName: 'Petrov' })).toBeNull();
-    expect(validateUpdateProfileInput({ phone: '+79991234567' })).toBeNull();
   });
 });
 
@@ -54,25 +49,6 @@ describe('profile update API', () => {
     });
     expect(updated.firstName).toBe('Новое');
     expect(updated.lastName).toBe('Имя');
-  });
-
-  it('updates phone', async () => {
-    const updated = await mockUsersApi.updateProfile(student.id, {
-      phone: '+79991112233',
-    });
-    expect(updated.phone).toBe('+79991112233');
-  });
-
-  it('rejects duplicate phone', async () => {
-    await expect(
-      mockUsersApi.updateProfile(student.id, { phone: teacher.phone }),
-    ).rejects.toBeInstanceOf(ApiError);
-  });
-
-  it('rejects invalid phone', async () => {
-    await expect(
-      mockUsersApi.updateProfile(student.id, { phone: 'bad' }),
-    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 
   it('rejects unknown user', async () => {
@@ -114,6 +90,20 @@ describe('avatar validation', () => {
       size: 1024,
     });
     expect(result).toEqual({ valid: true });
+  });
+
+  it('infers mime type from extension when file.type is empty', () => {
+    expect(inferAvatarMimeType('photo.jpg', '')).toBe('image/jpeg');
+    expect(
+      validateAvatarUpload({ filename: 'photo.jpg', mimeType: '', size: 1024 }),
+    ).toEqual({ valid: true });
+  });
+
+  it('rejects oversized data URLs for img display', async () => {
+    const { isDisplayableAvatarSrc } = await import('@/services/profile/constants');
+    expect(isDisplayableAvatarSrc('https://example.com/a.jpg')).toBe(true);
+    expect(isDisplayableAvatarSrc('pbfile:abc')).toBe(false);
+    expect(isDisplayableAvatarSrc(`data:image/jpeg;base64,${'a'.repeat(200_000)}`)).toBe(false);
   });
 
   it('prefers original url for full photo view', () => {

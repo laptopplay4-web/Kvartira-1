@@ -1,6 +1,7 @@
 import { Link, NavLink } from 'react-router-dom';
 import { Bell, BookOpen } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
+import { SchoolAboutButton } from '@/components/school/SchoolAboutButton';
 import { cn } from '@/utils';
 
 const headerNavLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -33,9 +34,12 @@ export function MobileHeader({
         className,
       )}
     >
-      <Link to="/home" className="focus-ring rounded-lg md:hidden" aria-label="На главную">
-        <Logo size="sm" />
-      </Link>
+      <div className="flex items-center gap-1 md:hidden">
+        <Link to="/home" className="focus-ring rounded-lg" aria-label="На главную">
+          <Logo size="sm" />
+        </Link>
+        <SchoolAboutButton />
+      </div>
       <div className="flex items-center gap-1">
         {showAssignments && (
           <NavLink

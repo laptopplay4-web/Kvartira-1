@@ -6,11 +6,12 @@ import type {
   SupportTicket,
   SupportTicketAttachment,
 } from '@/types';
+import type { User } from '@/types';
 import { getPocketBase } from '@/services/api/pocketbase/client';
 
 export const PB_FILE_URL_PREFIX = 'pbfile:';
 
-export type StoredFilePurpose = 'chat' | 'assignment' | 'support';
+export type StoredFilePurpose = 'chat' | 'assignment' | 'support' | 'avatar' | 'school';
 
 export interface UploadStoredFileInput {
   userId: string;
@@ -86,6 +87,37 @@ export async function resolveStoredFileUrl(url: string | undefined): Promise<str
   } catch {
     return url;
   }
+}
+
+export async function resolveUserAvatars(user: User): Promise<User> {
+  const [avatarUrl, avatarOriginalUrl] = await Promise.all([
+    resolveStoredFileUrl(user.avatarUrl),
+    resolveStoredFileUrl(user.avatarOriginalUrl),
+  ]);
+
+  if (avatarUrl === user.avatarUrl && avatarOriginalUrl === user.avatarOriginalUrl) {
+    return user;
+  }
+
+  const resolved: User = { ...user };
+  if (avatarUrl) resolved.avatarUrl = avatarUrl;
+  else delete resolved.avatarUrl;
+  if (avatarOriginalUrl) resolved.avatarOriginalUrl = avatarOriginalUrl;
+  else delete resolved.avatarOriginalUrl;
+  return resolved;
+}
+
+export async function resolveUsersAvatars(users: User[]): Promise<User[]> {
+  return Promise.all(users.map(resolveUserAvatars));
+}
+
+export async function deleteStoredFiles(...urls: Array<string | undefined>): Promise<void> {
+  const ids = collectStoredFileIds(...urls);
+  if (ids.length === 0) return;
+  const pb = getPocketBase();
+  await Promise.all(
+    ids.map((id) => pb.collection('kvartira_files').delete(id).catch(() => undefined)),
+  );
 }
 
 export async function uploadStoredFile(input: UploadStoredFileInput): Promise<UploadedStoredFile> {

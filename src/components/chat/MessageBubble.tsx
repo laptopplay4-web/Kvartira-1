@@ -83,7 +83,13 @@ export function MessageBubble({
       id={`message-${message.id}`}
     >
       {!isOwn && showAvatar && sender ? (
-        <Avatar firstName={sender.firstName} lastName={sender.lastName} size="sm" className="mt-1 shrink-0" />
+        <Avatar
+          src={sender.avatarUrl}
+          firstName={sender.firstName}
+          lastName={sender.lastName}
+          size="sm"
+          className="mt-1 shrink-0"
+        />
       ) : !isOwn ? (
         <div className="w-8 shrink-0" aria-hidden />
       ) : null}

@@ -339,6 +339,19 @@ describe('mock availability API permissions', () => {
     expect(updated.slotIntervalMinutes).toBe(60);
   });
 
+  it('admin can update own availability', async () => {
+    const updated = await mockAvailabilityApi.updateTeacherAvailability(
+      'user-admin',
+      {
+        slotIntervalMinutes: 30,
+        schedule: [{ dayOfWeek: 1, ranges: [{ start: '10:00', end: '18:00' }] }],
+      },
+      'user-admin',
+    );
+    expect(updated.slotIntervalMinutes).toBe(30);
+    expect(updated.teacherId).toBe('user-admin');
+  });
+
   it('updated availability affects slot calculation', async () => {
     await mockAvailabilityApi.updateTeacherAvailability(
       'user-teacher-1',

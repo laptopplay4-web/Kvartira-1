@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, MapPin, Music2, Users } from 'lucide-react';
+import { Clock, MapPin, Music2, Pencil, Trash2, Users } from 'lucide-react';
 import { BackLink } from '@/components/ui/BackLink';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
+import { canManageEvents } from '@/services/events/access';
 import { EVENT_TYPE_LABELS } from '@/services/events/constants';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -14,6 +15,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CompetitionApplicationModal } from '@/components/events/CompetitionApplicationModal';
+import { EventFormModal } from '@/components/events/EventFormModal';
 import { formatFullDate } from '@/utils/dates';
 import type { CompetitionApplication, EventType } from '@/types';
 
@@ -27,10 +29,14 @@ const EVENT_CTA: Record<EventType, string> = {
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useCurrentUser()!;
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
+  const canManage = canManageEvents(user);
   const [applicationOpen, setApplicationOpen] = useState(false);
   const [applicationError, setApplicationError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: event, isLoading, error, refetch } = useQuery({
     queryKey: ['event', id],
@@ -71,10 +77,23 @@ export default function EventDetailPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => api.events.deleteEvent(id!, user.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+      navigate('/events', { replace: true });
+    },
+  });
+
   if (isLoading) return <div className="page-container"><Skeleton className="h-64" /></div>;
   if (error || !event) return <div className="page-container"><ErrorState onRetry={() => refetch()} /></div>;
 
   const isFull = event.maxParticipants != null && event.registeredUserIds.length >= event.maxParticipants;
+
+  function invalidateEvent() {
+    void queryClient.invalidateQueries({ queryKey: ['event', id] });
+    void queryClient.invalidateQueries({ queryKey: ['events'] });
+  }
 
   const handleRegisterClick = () => {
     if (isCompetition) {
@@ -91,7 +110,33 @@ export default function EventDetailPage() {
 
   return (
     <div className="page-container max-w-lg">
-      <BackLink label="К мероприятиям" fallbackTo="/events" />
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <BackLink label="К мероприятиям" fallbackTo="/events" className="mb-0" />
+        {canManage && (
+          <div className="flex shrink-0 gap-1">
+            <Button
+              variant="secondary"
+              size="icon"
+              className="min-h-11 min-w-11"
+              aria-label="Редактировать"
+              disabled={!isOnline}
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="h-5 w-5" aria-hidden />
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="min-h-11 min-w-11 text-danger hover:text-danger"
+              aria-label="Удалить"
+              disabled={!isOnline || deleteMutation.isPending}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="h-5 w-5" aria-hidden />
+            </Button>
+          </div>
+        )}
+      </div>
 
       {event.imageUrl && (
         <img
@@ -193,6 +238,55 @@ export default function EventDetailPage() {
           error={applicationError}
           disabled={!isOnline}
         />
+      )}
+
+      {canManage && (
+        <EventFormModal
+          open={editing}
+          onClose={() => setEditing(false)}
+          adminId={user.id}
+          event={event}
+          onSaved={invalidateEvent}
+        />
+      )}
+
+      {canManage && deleteOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-event-title"
+        >
+          <Card className="w-full max-w-sm p-5">
+            <h2 id="delete-event-title" className="text-h3">
+              Удалить мероприятие?
+            </h2>
+            <p className="mt-2 text-body-sm text-text-secondary">
+              «{event.title}» будет удалено без возможности восстановления.
+            </p>
+            {deleteMutation.error && (
+              <p className="mt-2 text-body-sm text-danger" role="alert">
+                {deleteMutation.error instanceof ApiError
+                  ? deleteMutation.error.message
+                  : 'Не удалось удалить'}
+              </p>
+            )}
+            <div className="mt-4 flex gap-2">
+              <Button variant="ghost" className="min-h-11 flex-1" onClick={() => setDeleteOpen(false)}>
+                Отмена
+              </Button>
+              <Button
+                variant="destructive"
+                className="min-h-11 flex-1"
+                loading={deleteMutation.isPending}
+                disabled={!isOnline}
+                onClick={() => deleteMutation.mutate()}
+              >
+                Удалить
+              </Button>
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );

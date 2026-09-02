@@ -56,3 +56,12 @@ export function storedPhoneToDisplay(stored: string): string {
 export function isCompletePhone(stored: string): boolean {
   return PHONE_STORAGE_REGEX.test(stored);
 }
+
+/** Recover +79… from PB synthetic email `{digits}@kvartira.local`. */
+export function phoneFromSyntheticEmail(email: string | null | undefined): string {
+  if (!email) return '';
+  const match = email.trim().match(/^(\d{11})@kvartira\.local$/i);
+  if (!match) return '';
+  const phone = `+${match[1]}`;
+  return PHONE_STORAGE_REGEX.test(phone) ? phone : '';
+}

@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
-import { Clock, Mail, MapPin, Phone } from 'lucide-react';
 import type { PublicLandingData } from '@/types';
 import { Logo } from '@/components/ui/Logo';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
+import { SchoolAboutContent } from '@/components/school/SchoolAboutContent';
 import { formatFullDate } from '@/utils/dates';
 import { PUBLIC_EVENT_TYPE_LABELS } from '@/services/public/constants';
+import { Clock, MapPin } from 'lucide-react';
 
 interface PublicLandingContentProps {
   data: PublicLandingData;
@@ -185,31 +186,10 @@ export function PublicLandingContent({ data }: PublicLandingContentProps) {
           </section>
         )}
 
-        <section id="contacts" className="border-t border-border-subtle px-6 py-16 lg:px-10">
-          <SectionHeading title="Контакты" subtitle="Приходите в гости или напишите нам" />
+        <section id="about" className="border-t border-border-subtle px-6 py-16 lg:px-10">
+          <SectionHeading title="О школе" subtitle="Контакты, ссылки и как нас найти" />
           <Card className="mx-auto max-w-2xl" padding="lg">
-            <ul className="space-y-4 text-body">
-              <li className="flex items-start gap-3">
-                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-brand" aria-hidden />
-                <span>{school.contacts.address}</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <Phone className="h-5 w-5 shrink-0 text-brand" aria-hidden />
-                <a href={`tel:${school.contacts.phone.replace(/\D/g, '')}`} className="hover:text-brand">
-                  {school.contacts.phone}
-                </a>
-              </li>
-              <li className="flex items-center gap-3">
-                <Mail className="h-5 w-5 shrink-0 text-brand" aria-hidden />
-                <a href={`mailto:${school.contacts.email}`} className="hover:text-brand">
-                  {school.contacts.email}
-                </a>
-              </li>
-              <li className="flex items-center gap-3 text-text-secondary">
-                <Clock className="h-5 w-5 shrink-0 text-brand" aria-hidden />
-                {school.contacts.workingHours}
-              </li>
-            </ul>
+            <SchoolAboutContent school={school} hideHeader />
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/register" className="flex-1">
                 <Button className="w-full">Записаться</Button>

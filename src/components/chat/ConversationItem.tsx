@@ -47,7 +47,12 @@ export function ConversationItem({
           <Users className="h-5 w-5" aria-hidden />
         </div>
       ) : other ? (
-        <Avatar firstName={other.firstName} lastName={other.lastName} size="md" />
+        <Avatar
+          src={other.avatarUrl}
+          firstName={other.firstName}
+          lastName={other.lastName}
+          size="md"
+        />
       ) : (
         <div className="h-11 w-11 shrink-0 rounded-full bg-surface-elevated" />
       )}

@@ -87,7 +87,7 @@ describe('support helpers', () => {
   });
 
   it('searches tickets by subject and attachment filename', () => {
-    const results = searchTickets(initialSupportTickets, 'homework-error');
+    const results = searchTickets(initialSupportTickets, 'mp3');
     expect(results).toHaveLength(1);
     expect(results[0].id).toBe('ticket-2');
   });

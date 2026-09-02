@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { User } from '@/types';
 import { api } from '@/services/api';
 import { useCalendarLessons, type CalendarFilters } from '@/hooks/useCalendarLessons';
+import { calendarViewerRole } from '@/services/calendar/helpers';
 import {
   getCalendarDateRange,
   shiftCalendarAnchor,
@@ -25,6 +26,7 @@ interface LessonCalendarProps {
   defaultView?: CalendarViewMode;
   initialAnchor?: Date;
   showBookAction?: boolean;
+  schoolWide?: boolean;
   className?: string;
 }
 
@@ -56,10 +58,15 @@ export function LessonCalendar({
   defaultView = 'day',
   initialAnchor,
   showBookAction = true,
+  schoolWide = false,
   className,
 }: LessonCalendarProps) {
   const [view, setView] = useState<CalendarViewMode>(defaultView);
   const [anchor, setAnchor] = useState(() => initialAnchor ?? new Date());
+  const calendarViewer: User = {
+    ...viewer,
+    role: calendarViewerRole(viewer.role, schoolWide),
+  };
 
   const { from, to } = getCalendarDateRange(view, anchor);
   const selectedDate = format(anchor, 'yyyy-MM-dd');
@@ -70,6 +77,7 @@ export function LessonCalendar({
     view,
     anchorDate: anchor,
     filters,
+    schoolWide,
   });
 
   const { data: directionsList } = useQuery({
@@ -84,8 +92,8 @@ export function LessonCalendar({
 
   const { data: usersList } = useQuery({
     queryKey: ['users'],
-    queryFn: () => api.users.getAllUsers(),
-    enabled: viewer.role !== 'student',
+    queryFn: () => api.users.getAllUsers(viewer.id),
+    enabled: calendarViewer.role !== 'student',
   });
 
   const directions = useMemo(
@@ -142,7 +150,7 @@ export function LessonCalendar({
               directions={directions}
               teachers={teachers}
               students={students}
-              viewer={viewer}
+              viewer={calendarViewer}
               showBookAction={showBookAction}
             />
           )}
@@ -154,7 +162,7 @@ export function LessonCalendar({
               directions={directions}
               teachers={teachers}
               students={students}
-              viewer={viewer}
+              viewer={calendarViewer}
               onDayClick={handleDayClick}
             />
           )}

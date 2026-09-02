@@ -30,7 +30,7 @@ ROADMAP **1.4** · миграция `pb_migrations/1788326400_kvartira_rbac_rule
 
 | Collection | list/view | create | update | delete |
 |------------|-----------|--------|--------|--------|
-| `users` | auth (`lessons/chat UI`) | public (register hook) | self · admin | superuser |
+| `users` | auth (`lessons/chat UI`) | public (register hook) | self · admin; **роль** только admin, student↔teacher | superuser |
 | `directions` | public | admin | admin | admin |
 | `teacher_availability` | auth (booking) · owner · admin | teacher own · admin | teacher own · admin | teacher own · admin |
 | `lessons` | participant · admin | student own · admin | participant · admin | participant · admin |
@@ -38,9 +38,10 @@ ROADMAP **1.4** · миграция `pb_migrations/1788326400_kvartira_rbac_rule
 | `conversations` | member · admin | auth | member · admin | owner · admin |
 | `conversation_members` | member · self · admin | auth | self · admin | self · owner/admin of conv · admin |
 | `messages` | conv member · admin | member | sender · admin | sender · admin |
-| `events` | public (adapter hides `invited`) | teacher · admin | teacher · admin | admin |
+| `events` | public (adapter hides `invited`) | teacher · admin | teacher · admin | teacher · admin |
 | `event_registrations` | own · admin | own · admin | own · admin | own · admin |
-| `assignments` | participant · admin | teacher · admin | participant · admin | teacher · admin |
+| `assignments` | group members · general · teacher · admin | teacher · admin | teacher · admin | teacher · admin |
+| `assignment_groups` | members · general · teacher · admin | teacher · admin | owner teacher · admin | owner teacher · admin |
 | `skills` | auth | teacher · admin | teacher · admin | admin |
 | `student_skill_progress` | student · teacher · admin | teacher · admin | teacher · admin | admin |
 | `progress_goals` | student · teacher · admin | teacher · admin | teacher · admin | teacher · admin |

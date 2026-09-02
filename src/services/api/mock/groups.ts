@@ -11,7 +11,7 @@ import type {
   CreateAssignmentGroupInput,
   UpdateAssignmentGroupInput,
 } from '@/services/api/types';
-import { createLocalUserResolver, resolveSeedMemberForClient, toMockUserId, type MockUserResolver } from '@/services/api/mock/userResolver';
+import { createLocalUserResolver, toMockUserId, type MockUserResolver } from '@/services/api/mock/userResolver';
 
 export interface MockAssignmentGroupsDb {
   assignmentGroups: AssignmentGroup[];
@@ -65,11 +65,9 @@ export function createMockAssignmentGroupsApi(
       const group = getGroupById(id);
       const user = await assertViewAccess(group, requesterId);
 
-      const members = (
-        await Promise.all(
-          group.memberIds.map((memberId) => resolveSeedMemberForClient(memberId, db.users)),
-        )
-      ).filter((u): u is User => !!u);
+      const members = group.memberIds
+        .map((memberId) => db.users.find((u) => u.id === memberId))
+        .filter((u): u is User => !!u);
 
       const detail: AssignmentGroupDetail = {
         ...group,

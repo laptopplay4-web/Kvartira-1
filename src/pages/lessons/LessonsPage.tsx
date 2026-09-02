@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, List, CalendarDays, History } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
-import { can } from '@/permissions';
+import { actsAsTeacher, can } from '@/permissions';
 import type { LessonStatus } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { LessonCard } from '@/components/ui/LessonCard';
@@ -29,6 +29,7 @@ const HISTORY_FILTERS: { id: HistoryFilter; label: string; statuses: LessonStatu
 
 export default function LessonsPage() {
   const user = useCurrentUser()!;
+  const teacherView = actsAsTeacher(user.role);
   const [pageView, setPageView] = useState<PageView>('calendar');
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
 
@@ -36,8 +37,7 @@ export default function LessonsPage() {
     queryKey: ['lessons', 'list', user.id, user.role],
     queryFn: async () => {
       const base = { requesterId: user.id };
-      if (user.role === 'teacher') return api.lessons.getLessons({ ...base, teacherId: user.id });
-      if (user.role === 'admin') return api.lessons.getLessons(base);
+      if (teacherView) return api.lessons.getLessons({ ...base, teacherId: user.id });
       return api.lessons.getLessons({ ...base, studentId: user.id });
     },
   });
@@ -54,7 +54,7 @@ export default function LessonsPage() {
 
   const { data: students } = useQuery({
     queryKey: ['users'],
-    queryFn: () => api.users.getAllUsers(),
+    queryFn: () => api.users.getAllUsers(user.id),
     enabled: user.role !== 'student',
   });
 
@@ -123,10 +123,10 @@ export default function LessonsPage() {
         <LessonCalendar viewer={user} className="mb-8" />
       ) : (
         <>
-          {(user.role === 'teacher' ? todayLessons : upcoming)?.length ? (
+          {(teacherView ? todayLessons : upcoming)?.length ? (
             <section className="mb-8">
               <h2 className="mb-3 text-label">
-                {user.role === 'teacher' ? 'Сегодня' : 'Предстоящие'}
+                {teacherView ? 'Сегодня' : 'Предстоящие'}
               </h2>
               {isLoading ? (
                 <div className="space-y-3">
@@ -135,14 +135,14 @@ export default function LessonsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {(user.role === 'teacher' ? todayLessons : upcoming)?.map((lesson) => (
+                  {(teacherView ? todayLessons : upcoming)?.map((lesson) => (
                     <LessonCard
                       key={lesson.id}
                       lesson={lesson}
                       directionName={getDirectionName(lesson.directionId)}
                       teacher={getTeacher(lesson.teacherId)}
                       student={getStudent(lesson.studentId)}
-                      showTeacher={user.role === 'student'}
+                      showTeacher={!teacherView}
                     />
                   ))}
                 </div>
@@ -174,7 +174,7 @@ export default function LessonsPage() {
                     directionName={getDirectionName(lesson.directionId)}
                     teacher={getTeacher(lesson.teacherId)}
                     student={getStudent(lesson.studentId)}
-                    showTeacher={user.role === 'student'}
+                    showTeacher={!teacherView}
                   />
                 ))}
               </div>
@@ -214,7 +214,7 @@ export default function LessonsPage() {
                 directionName={getDirectionName(lesson.directionId)}
                 teacher={getTeacher(lesson.teacherId)}
                 student={getStudent(lesson.studentId)}
-                showTeacher={user.role === 'student'}
+                showTeacher={!teacherView}
               />
             ))}
           </div>

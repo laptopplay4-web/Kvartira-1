@@ -26,6 +26,14 @@ describe('auth session sync (PocketBase role refresh)', () => {
     expect(source).toContain('refreshSession');
     expect(source).toContain('roleChanged');
     expect(source).toContain('queryClient.clear');
+    expect(source).toContain('resolveBootstrapSession');
+    expect(source).not.toContain('if (!session) {\n          if (isPocketBaseMode()) clearPocketBaseAuth();');
+  });
+
+  it('ProtectedRoute waits for auth hydration', () => {
+    const source = readFileSync(resolve(ROOT, 'src/app/layouts.tsx'), 'utf8');
+    expect(source).toContain('useAuthStore.persist.hasHydrated()');
+    expect(source).toContain('AuthRouteLoading');
   });
 
   it('ProtectedRoute wires useAuthSessionSync', () => {
@@ -41,6 +49,9 @@ describe('auth session sync (PocketBase role refresh)', () => {
     expect(source).toContain("collection('users')");
     expect(source).toContain(".subscribe(userId");
     expect(source).toContain("event.action === 'update'");
+    expect(source).toContain("event.action === 'delete'");
+    expect(source).toContain('logout');
     expect(source).toContain("addEventListener('focus'");
+    expect(source).not.toMatch(/void syncSession\(\);\s*\n\s*const onFocus/);
   });
 });

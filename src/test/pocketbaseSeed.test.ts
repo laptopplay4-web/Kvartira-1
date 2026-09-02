@@ -23,6 +23,7 @@ const SEEDED_COLLECTIONS = [
   'events',
   'event_registrations',
   'assignments',
+  'assignment_groups',
   'skills',
   'student_skill_progress',
   'progress_goals',

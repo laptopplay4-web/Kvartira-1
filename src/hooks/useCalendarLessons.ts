@@ -16,6 +16,7 @@ export interface UseCalendarLessonsParams {
   view: CalendarViewMode;
   anchorDate: Date;
   filters?: CalendarFilters;
+  schoolWide?: boolean;
   enabled?: boolean;
 }
 
@@ -25,6 +26,7 @@ export function calendarLessonsQueryKey(
   view: CalendarViewMode,
   anchorDate: Date,
   filters?: CalendarFilters,
+  schoolWide = false,
 ) {
   const { from, to } = getCalendarDateRange(view, anchorDate);
   return [
@@ -38,6 +40,7 @@ export function calendarLessonsQueryKey(
     filters?.teacherId ?? '',
     filters?.directionId ?? '',
     filters?.status ?? '',
+    schoolWide ? 'school' : 'own',
   ] as const;
 }
 
@@ -47,15 +50,17 @@ export function useCalendarLessons({
   view,
   anchorDate,
   filters,
+  schoolWide = false,
   enabled = true,
 }: UseCalendarLessonsParams) {
   const { from, to } = getCalendarDateRange(view, anchorDate);
 
   return useQuery({
-    queryKey: calendarLessonsQueryKey(userId, role, view, anchorDate, filters),
+    queryKey: calendarLessonsQueryKey(userId, role, view, anchorDate, filters, schoolWide),
     queryFn: (): Promise<Lesson[]> => {
       const roleFilters = buildLessonFiltersForRole(userId, role, {
         teacherId: filters?.teacherId,
+        schoolWide,
       });
 
       return api.lessons.getLessons({

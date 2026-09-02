@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';import {
+import { useQuery } from '@tanstack/react-query';
+import {
   ArrowLeft,
   BookOpen,
   Calendar,
@@ -13,7 +14,7 @@ import { useQuery } from '@tanstack/react-query';import {
 } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
-import { can } from '@/permissions';
+import { can, actsAsTeacher } from '@/permissions';
 import { AchievementBadge } from '@/components/progress/AchievementBadge';
 import { SkillProgressBar } from '@/components/progress/SkillProgressBar';
 import {
@@ -285,7 +286,7 @@ function StudentPicker() {
 
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: () => api.users.getAllUsers(),
+    queryFn: () => api.users.getAllUsers(user.id),
     enabled: !!studentIds && studentIds.length > 0,
   });
 
@@ -361,7 +362,7 @@ export default function ProgressPage() {
 
   const { data: users } = useQuery({
     queryKey: ['users'],
-    queryFn: () => api.users.getAllUsers(),
+    queryFn: () => api.users.getAllUsers(user.id),
     enabled: !isStudent && !!viewingStudentId,
   });
 
@@ -381,7 +382,7 @@ export default function ProgressPage() {
   const subtitle = () => {
     if (isStudent) return 'Ваш прогресс обучения';
     if (viewingStudentId && viewedStudent) return `Прогресс: ${formatUserName(viewedStudent)}`;
-    if (user.role === 'teacher') return 'Прогресс ваших учеников';
+    if (actsAsTeacher(user.role)) return 'Прогресс ваших учеников';
     return 'Прогресс учеников школы';
   };
 

@@ -74,7 +74,12 @@ export function ChatHeader({
               <Users className="h-4 w-4" aria-hidden />
             </div>
           ) : other ? (
-            <Avatar firstName={other.firstName} lastName={other.lastName} size="sm" />
+            <Avatar
+              src={other.avatarUrl}
+              firstName={other.firstName}
+              lastName={other.lastName}
+              size="sm"
+            />
           ) : null}
 
           <div className="min-w-0 flex-1">

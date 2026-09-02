@@ -28,6 +28,7 @@ import type {
   PlanningPeriod,
   ProgressGoal,
   ProgressGoalStatus,
+  PublicNewsItem,
   ProgressHistoryEntry,
   ProgressHistoryType,
   PublicSchoolInfo,
@@ -65,6 +66,12 @@ import {
   normalizePbDateTime,
   relId,
 } from '@/services/api/pocketbase/helpers';
+import { phoneFromSyntheticEmail } from '@/utils/phone';
+import {
+  extractSchoolExtrasFromContacts,
+  normalizeSchoolSocialLinks,
+  parseSchoolDirectionsVideo,
+} from '@/services/school/helpers';
 
 export interface PbUserRecord extends RecordModel {
   phone: string;
@@ -78,10 +85,12 @@ export interface PbUserRecord extends RecordModel {
 }
 
 export function mapUserRecord(record: PbUserRecord | RecordModel): User {
-  const r = record as PbUserRecord;
+  const r = record as PbUserRecord & { email?: string };
+  const phone =
+    (typeof r.phone === 'string' && r.phone) || phoneFromSyntheticEmail(r.email) || '';
   const user: User = {
     id: record.id,
-    phone: r.phone,
+    phone,
     role: r.role,
     firstName: r.firstName,
     lastName: r.lastName,
@@ -494,16 +503,24 @@ export function mapAssignmentRecord(record: PbAssignmentRecord | RecordModel): A
 export interface PbAssignmentGroupRecord extends RecordModel {
   name: string;
   teacher: string | RecordModel;
+  kind?: 'general' | 'custom';
+  members?: Array<string | RecordModel>;
   memberIds?: string[];
 }
 
 export function mapAssignmentGroupRecord(record: PbAssignmentGroupRecord | RecordModel): AssignmentGroup {
   const r = record as PbAssignmentGroupRecord;
+  const members = Array.isArray(r.members)
+    ? r.members.map(relId).filter(Boolean)
+    : Array.isArray(r.memberIds)
+      ? r.memberIds
+      : [];
   return {
     id: record.id,
     name: r.name,
     teacherId: relId(r.teacher),
-    memberIds: Array.isArray(r.memberIds) ? r.memberIds : [],
+    memberIds: members,
+    isGeneral: r.kind === 'general',
     createdAt: getPbRecordCreatedAt(record),
     updatedAt: getPbRecordUpdatedAt(record),
   };
@@ -867,13 +884,12 @@ interface PbSchoolSettingsRecord {
   tagline?: string;
   about?: string;
   contacts: unknown;
+  socialLinks?: unknown;
+  directionsVideo?: unknown;
 }
 
 function parseSchoolContacts(value: unknown): PublicSchoolInfo['contacts'] {
-  if (!value || typeof value !== 'object') {
-    return { phone: '', email: '', address: '', workingHours: '' };
-  }
-  const contacts = value as Record<string, unknown>;
+  const contacts = coerceJsonObjectFromContacts(value);
   return {
     phone: typeof contacts.phone === 'string' ? contacts.phone : '',
     email: typeof contacts.email === 'string' ? contacts.email : '',
@@ -882,14 +898,59 @@ function parseSchoolContacts(value: unknown): PublicSchoolInfo['contacts'] {
   };
 }
 
+function coerceJsonObjectFromContacts(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return {};
+    }
+    return {};
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
 export function mapSchoolSettingsRecord(
   record: PbSchoolSettingsRecord | RecordModel,
 ): PublicSchoolInfo {
   const r = record as PbSchoolSettingsRecord;
-  return {
+  const extrasFromContacts = extractSchoolExtrasFromContacts(r.contacts);
+  const topLevelSocial = normalizeSchoolSocialLinks(r.socialLinks);
+  const hasTopLevelSocial = Object.values(topLevelSocial).some((v) => !!v);
+  const topLevelVideo = parseSchoolDirectionsVideo(r.directionsVideo);
+
+  const result: PublicSchoolInfo = {
     name: typeof r.name === 'string' ? r.name : '',
     tagline: typeof r.tagline === 'string' ? r.tagline : '',
     about: typeof r.about === 'string' ? r.about : '',
     contacts: parseSchoolContacts(r.contacts),
+    socialLinks: hasTopLevelSocial ? topLevelSocial : extrasFromContacts.socialLinks,
+  };
+
+  const video = topLevelVideo ?? extrasFromContacts.directionsVideo;
+  if (video) result.directionsVideo = video;
+  return result;
+}
+
+export interface PbPublicNewsRecord extends RecordModel {
+  title: string;
+  excerpt: string;
+  publishedAt: string;
+}
+
+export function mapPublicNewsRecord(record: PbPublicNewsRecord | RecordModel): PublicNewsItem {
+  const r = record as PbPublicNewsRecord;
+  return {
+    id: record.id,
+    title: r.title,
+    excerpt: r.excerpt,
+    publishedAt: normalizePbDate(r.publishedAt),
   };
 }

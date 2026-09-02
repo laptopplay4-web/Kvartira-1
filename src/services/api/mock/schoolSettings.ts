@@ -1,7 +1,16 @@
-import type { SchoolSettingsApi, UpdateSchoolSettingsInput } from '@/services/api/types';
+import type {
+  SchoolSettingsApi,
+  UpdateSchoolSettingsInput,
+  UploadSchoolDirectionsVideoInput,
+} from '@/services/api/types';
 import { ApiError } from '@/services/api/types';
 import { canManageSchoolSettings } from '@/services/events/access';
 import { validateSchoolSettingsInput } from '@/services/events/validation';
+import { EMPTY_SCHOOL_SOCIAL_LINKS } from '@/services/school/constants';
+import {
+  mergeSchoolSocialLinks,
+  validateSchoolDirectionsVideoFile,
+} from '@/services/school/helpers';
 import type { PublicSchoolInfo } from '@/types';
 
 export interface MockSchoolSettingsDb {
@@ -20,10 +29,48 @@ export function createMockSchoolSettingsApi(
     }
   }
 
+  function assertAuthenticated(requesterId: string) {
+    const user = getUserById(requesterId);
+    if (!user) {
+      throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+    }
+  }
+
+  function mergeSettings(
+    current: PublicSchoolInfo,
+    input: UpdateSchoolSettingsInput,
+  ): PublicSchoolInfo {
+    const next: PublicSchoolInfo = {
+      name: (input.name ?? current.name).trim(),
+      tagline: (input.tagline ?? current.tagline).trim(),
+      about: (input.about ?? current.about).trim(),
+      contacts: {
+        phone: (input.contacts?.phone ?? current.contacts.phone).trim(),
+        email: (input.contacts?.email ?? current.contacts.email).trim(),
+        address: (input.contacts?.address ?? current.contacts.address).trim(),
+        workingHours: (input.contacts?.workingHours ?? current.contacts.workingHours).trim(),
+      },
+      socialLinks: mergeSchoolSocialLinks(
+        current.socialLinks ?? EMPTY_SCHOOL_SOCIAL_LINKS,
+        input.socialLinks,
+      ),
+    };
+
+    if (input.directionsVideo === null) {
+      delete next.directionsVideo;
+    } else if (input.directionsVideo) {
+      next.directionsVideo = { ...input.directionsVideo };
+    } else if (current.directionsVideo) {
+      next.directionsVideo = { ...current.directionsVideo };
+    }
+
+    return next;
+  }
+
   return {
     async getSchoolSettings(requesterId) {
       await delay();
-      assertManageAccess(requesterId);
+      assertAuthenticated(requesterId);
       return structuredClone(db.schoolInfo);
     },
 
@@ -36,18 +83,39 @@ export function createMockSchoolSettingsApi(
         throw new ApiError(validationError, 'VALIDATION', 400);
       }
 
-      db.schoolInfo = {
-        name: (input.name ?? db.schoolInfo.name).trim(),
-        tagline: (input.tagline ?? db.schoolInfo.tagline).trim(),
-        about: (input.about ?? db.schoolInfo.about).trim(),
-        contacts: {
-          phone: (input.contacts?.phone ?? db.schoolInfo.contacts.phone).trim(),
-          email: (input.contacts?.email ?? db.schoolInfo.contacts.email).trim(),
-          address: (input.contacts?.address ?? db.schoolInfo.contacts.address).trim(),
-          workingHours: (input.contacts?.workingHours ?? db.schoolInfo.contacts.workingHours).trim(),
-        },
-      };
+      db.schoolInfo = mergeSettings(db.schoolInfo, input);
+      return structuredClone(db.schoolInfo);
+    },
 
+    async uploadDirectionsVideo(input: UploadSchoolDirectionsVideoInput, requesterId) {
+      await delay(100);
+      assertManageAccess(requesterId);
+
+      const fileError = validateSchoolDirectionsVideoFile(input);
+      if (fileError) throw new ApiError(fileError, 'VALIDATION', 400);
+
+      const video = {
+        url: input.dataUrl,
+        filename: input.filename.trim(),
+        mimeType: input.mimeType,
+        size: input.size,
+      };
+      db.schoolInfo = {
+        ...db.schoolInfo,
+        socialLinks: db.schoolInfo.socialLinks ?? { ...EMPTY_SCHOOL_SOCIAL_LINKS },
+        directionsVideo: video,
+      };
+      return structuredClone(video);
+    },
+
+    async removeDirectionsVideo(requesterId) {
+      await delay();
+      assertManageAccess(requesterId);
+      const { directionsVideo: _, ...rest } = db.schoolInfo;
+      db.schoolInfo = {
+        ...rest,
+        socialLinks: rest.socialLinks ?? { ...EMPTY_SCHOOL_SOCIAL_LINKS },
+      };
       return structuredClone(db.schoolInfo);
     },
   };

@@ -92,7 +92,9 @@
   textarea,
   select,
   [contenteditable='true'],
-  [role='alert'] {
+  [role='alert'],
+  .app-error-panel,
+  .app-error-panel * {
     -webkit-user-select: text;
     user-select: text;
     -webkit-touch-callout: default;

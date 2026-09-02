@@ -14,6 +14,8 @@ import {
   mapConversationMemberRecord,
   mapMessageRecord,
   mapAssignmentRecord,
+  mapAssignmentGroupRecord,
+  mapPublicNewsRecord,
   mapSkillRecord,
   mapSkillProgressRecord,
   mapProgressGoalRecord,
@@ -40,12 +42,15 @@ import { pocketbaseLessonsApi } from '@/services/api/pocketbase/lessons';
 import { pocketbaseAvailabilityApi } from '@/services/api/pocketbase/availability';
 import { pocketbaseEventsApi } from '@/services/api/pocketbase/events';
 import { pocketbaseChatApi } from '@/services/api/pocketbase/chat';
+import { pocketbaseAssignmentsApi } from '@/services/api/pocketbase/assignments';
+import { pocketbaseAssignmentGroupsApi } from '@/services/api/pocketbase/groups';
 import { pocketbaseProgressApi } from '@/services/api/pocketbase/progress';
 import { pocketbaseSupportApi } from '@/services/api/pocketbase/support';
 import { pocketbaseLegalApi } from '@/services/api/pocketbase/legal';
 import { pocketbaseSecurityApi } from '@/services/api/pocketbase/security';
 import { pocketbaseNotificationsApi } from '@/services/api/pocketbase/notifications';
 import { pocketbaseSchoolSettingsApi } from '@/services/api/pocketbase/schoolSettings';
+import { pocketbasePublicApi } from '@/services/api/pocketbase/public';
 import { fromPbSkillLevel, toPbSkillLevel } from '@/services/progress/skillLevel';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -68,6 +73,8 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       'src/services/api/pocketbase/events.ts',
       'src/services/api/pocketbase/chat.ts',
       'src/services/api/pocketbase/assignments.ts',
+      'src/services/api/pocketbase/groups.ts',
+      'src/services/api/pocketbase/public.ts',
       'src/services/api/pocketbase/progress.ts',
       'src/services/api/pocketbase/support.ts',
       'src/services/api/pocketbase/legal.ts',
@@ -126,6 +133,37 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       avatarUrl: 'https://example.com/a.png',
       bio: 'bio',
     });
+  });
+
+  it('mapUserRecord defaults missing phone to empty string', () => {
+    const user = mapUserRecord({
+      id: 'rec-no-phone',
+      collectionId: 'users',
+      collectionName: 'users',
+      created: '',
+      updated: '',
+      role: 'student',
+      firstName: 'Анна',
+      lastName: 'Иванова',
+    } as Parameters<typeof mapUserRecord>[0]);
+
+    expect(user.phone).toBe('');
+  });
+
+  it('mapUserRecord recovers phone from synthetic email when phone hidden', () => {
+    const user = mapUserRecord({
+      id: 'rec-email-phone',
+      collectionId: 'users',
+      collectionName: 'users',
+      created: '',
+      updated: '',
+      role: 'student',
+      firstName: 'Анна',
+      lastName: 'Иванова',
+      email: '79001234567@kvartira.local',
+    } as Parameters<typeof mapUserRecord>[0]);
+
+    expect(user.phone).toBe('+79001234567');
   });
 
   it('userToPbRecord round-trips through mapUserRecord', () => {
@@ -304,14 +342,16 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     const client = createApiClient();
     expect(client.auth.login).toBeTypeOf('function');
     expect(client.users.getAllUsers).toBeTypeOf('function');
+    expect(client.users.updateUserRole).toBeTypeOf('function');
     expect(client.lessons.getDirections).toBe(pocketbaseLessonsApi.getDirections);
     expect(client.availability.getTeacherAvailability).toBe(
       pocketbaseAvailabilityApi.getTeacherAvailability,
     );
     expect(client.events.getEvents).toBe(pocketbaseEventsApi.getEvents);
     expect(client.chat.getConversations).toBe(pocketbaseChatApi.getConversations);
-    expect(client.assignments.getAssignments).toBeTypeOf('function');
-    expect(client.assignmentGroups.getGroups).toBeTypeOf('function');
+    expect(client.assignments.getAssignments).toBe(pocketbaseAssignmentsApi.getAssignments);
+    expect(client.assignmentGroups.getGroups).toBe(pocketbaseAssignmentGroupsApi.getGroups);
+    expect(client.public.getLandingData).toBe(pocketbasePublicApi.getLandingData);
     expect(client.progress.getSummary).toBe(pocketbaseProgressApi.getSummary);
     expect(client.support.getTickets).toBe(pocketbaseSupportApi.getTickets);
     expect(client.legal.getDocuments).toBe(pocketbaseLegalApi.getDocuments);
@@ -574,7 +614,49 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(assignment.createdAt).toBe('2026-08-01T10:00:00.000Z');
   });
 
-  it('assignment hooks lock create teacher and submit/review fields', () => {
+  it('mapAssignmentGroupRecord maps kind and members', () => {
+    const group = mapAssignmentGroupRecord({
+      id: 'grp-1',
+      collectionId: 'assignment_groups',
+      collectionName: 'assignment_groups',
+      created: '2026-08-01 10:00:00.000Z',
+      updated: '2026-08-01 10:00:00.000Z',
+      name: 'Общее задание',
+      teacher: 'user-teacher-1',
+      kind: 'general',
+      members: ['user-student', { id: 'user-student-2' }],
+    });
+    expect(group.isGeneral).toBe(true);
+    expect(group.memberIds).toEqual(['user-student', 'user-student-2']);
+    expect(group.teacherId).toBe('user-teacher-1');
+  });
+
+  it('mapPublicNewsRecord maps publishedAt date', () => {
+    const news = mapPublicNewsRecord({
+      id: 'news-1',
+      collectionId: 'public_news',
+      collectionName: 'public_news',
+      created: '',
+      updated: '',
+      title: 'Новость',
+      excerpt: 'Кратко',
+      publishedAt: '2026-09-01 00:00:00.000Z',
+    });
+    expect(news).toMatchObject({ id: 'news-1', title: 'Новость', publishedAt: '2026-09-01' });
+  });
+
+  it('assignments groups migration adds collection and drops student field', () => {
+    const migration = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1789276800_kvartira_assignments_groups.js'),
+      'utf8',
+    );
+    expect(migration).toContain('assignment_groups');
+    expect(migration).toContain("kind");
+    expect(migration).toContain('contentBlocks');
+    expect(migration).toContain("role = \"teacher\"");
+  });
+
+  it('assignment hooks lock create teacher and group fields', () => {
     const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/assignments.pb.js'), 'utf8');
     const lib = readFileSync(
       resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraAssignments.js'),
@@ -584,10 +666,11 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).toContain('onRecordCreateRequest');
     expect(hook).toContain('onRecordUpdateRequest');
     expect(hook).toContain('assignments');
+    expect(hook).toContain('assignment_groups');
     expect(lib).toContain('assertAssignmentCreate');
     expect(lib).toContain('assertAssignmentUpdate');
-    expect(lib).toContain("status', 'submitted'");
-    expect(lib).toContain("status', 'reviewed'");
+    expect(lib).toContain('assertAssignmentGroupCreate');
+    expect(lib).toContain('Укажите группу получателей');
   });
 
   it('toPbSkillLevel and fromPbSkillLevel convert 0–100 ↔ 0–10', () => {
@@ -790,6 +873,20 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
         email: 'hello@kvartira-music.ru',
         address: 'г. Москва',
         workingHours: 'Пн–Сб: 10:00–20:00',
+        socialLinks: {
+          vk: 'https://vk.com/kvartira',
+          telegram: '',
+          youtube: '',
+          website: 'https://kvartira-music.ru',
+          twoGis: '',
+          yandexMaps: '',
+        },
+        directionsVideo: {
+          url: 'pbfile:vid1',
+          filename: 'route.mp4',
+          mimeType: 'video/mp4',
+          size: 1024,
+        },
       },
     });
 
@@ -803,7 +900,38 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
         address: 'г. Москва',
         workingHours: 'Пн–Сб: 10:00–20:00',
       },
+      socialLinks: {
+        vk: 'https://vk.com/kvartira',
+        website: 'https://kvartira-music.ru',
+      },
+      directionsVideo: {
+        url: 'pbfile:vid1',
+        filename: 'route.mp4',
+      },
     });
+  });
+
+  it('mapSchoolSettingsRecord reads nested extras from contacts json string', () => {
+    const settings = mapSchoolSettingsRecord({
+      id: 'school-2',
+      collectionId: 'school_settings',
+      collectionName: 'school_settings',
+      created: '',
+      updated: '',
+      name: 'Квартира',
+      tagline: 'Слоган',
+      about: 'About',
+      contacts: JSON.stringify({
+        phone: '+7900',
+        email: 'a@b.c',
+        address: 'Адрес',
+        workingHours: '10-20',
+        socialLinks: { vk: 'vk.com/school', website: '' },
+      }),
+    });
+
+    expect(settings.contacts.phone).toBe('+7900');
+    expect(settings.socialLinks.vk).toBe('https://vk.com/school');
   });
 
   it('support hooks lock ticket create user and admin-only reply', () => {
@@ -1032,6 +1160,7 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).toContain('onRecordCreateRequest');
     expect(lib).toContain('assertFileCreate');
     expect(lib).toContain('assertFileUpdate');
+    expect(lib).toContain("'avatar'");
     expect(lib).toContain('owner must match authenticated user');
   });
 
@@ -1054,6 +1183,22 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(file.name).toBe('test.png');
     expect(file.type).toBe('image/png');
     expect(file.size).toBe(1);
+  });
+
+  it('users and groups adapters resolve avatars for other users', () => {
+    const usersApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/users.ts'), 'utf8');
+    const groupsApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/groups.ts'), 'utf8');
+    const lessonsApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/lessons.ts'), 'utf8');
+    const publicApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/public.ts'), 'utf8');
+    const filesApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/files.ts'), 'utf8');
+
+    expect(filesApi).toContain('resolveUsersAvatars');
+    expect(usersApi).toContain('resolveUsersAvatars');
+    expect(usersApi).toContain('updateUserRole');
+    expect(usersApi).toContain('getUserRoleChangeError');
+    expect(groupsApi).toContain('resolveUsersAvatars');
+    expect(lessonsApi).toContain('resolveUsersAvatars');
+    expect(publicApi).toContain('resolveUsersAvatars');
   });
 
   it('chat realtime subscribes to PocketBase collections when mode is pocketbase', () => {

@@ -1,8 +1,14 @@
 import { can } from '@/permissions';
 import type { SchoolEvent, User } from '@/types';
 
+/** Teacher and admin can create/edit/delete school events (UI: `/events`). */
+export function canManageEvents(user: Pick<User, 'role'> | null | undefined): boolean {
+  return can(user, 'events:manage');
+}
+
+/** @deprecated use canManageEvents — same rule (teacher + admin). */
 export function canManageEventsAdmin(user: Pick<User, 'role'> | null | undefined): boolean {
-  return !!user && user.role === 'admin' && can(user, 'events:manage');
+  return canManageEvents(user);
 }
 
 /** Invited events are visible only to users on the invite list (matches mock getEvents/getEvent). */

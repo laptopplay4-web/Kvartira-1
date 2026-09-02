@@ -27,6 +27,7 @@ import type {
   TeacherAvailability,
   PlanningPeriod,
   User,
+  UserRole,
   AchievementWithStatus,
   ProgressGoal,
   ProgressGoalStatus,
@@ -248,6 +249,16 @@ export interface UpdateSchoolSettingsInput {
   tagline?: string;
   about?: string;
   contacts?: Partial<PublicSchoolInfo['contacts']>;
+  socialLinks?: Partial<PublicSchoolInfo['socialLinks']>;
+  /** Передать `null`, чтобы удалить видео «Как добраться». */
+  directionsVideo?: PublicSchoolInfo['directionsVideo'] | null;
+}
+
+export interface UploadSchoolDirectionsVideoInput {
+  filename: string;
+  mimeType: string;
+  size: number;
+  dataUrl: string;
 }
 
 export interface SchoolSettingsApi {
@@ -256,12 +267,16 @@ export interface SchoolSettingsApi {
     input: UpdateSchoolSettingsInput,
     requesterId: string,
   ): Promise<PublicSchoolInfo>;
+  uploadDirectionsVideo(
+    input: UploadSchoolDirectionsVideoInput,
+    requesterId: string,
+  ): Promise<NonNullable<PublicSchoolInfo['directionsVideo']>>;
+  removeDirectionsVideo(requesterId: string): Promise<PublicSchoolInfo>;
 }
 
 export interface UpdateProfileInput {
   firstName?: string;
   lastName?: string;
-  phone?: string;
 }
 
 export interface UploadAvatarInput {
@@ -277,9 +292,10 @@ export interface UploadAvatarInput {
 }
 
 export interface UsersApi {
-  getUser(id: string): Promise<User>;
-  getAllUsers(): Promise<User[]>;
+  getUser(id: string, requesterId: string): Promise<User>;
+  getAllUsers(requesterId: string): Promise<User[]>;
   updateProfile(requesterId: string, data: UpdateProfileInput): Promise<User>;
+  updateUserRole(requesterId: string, userId: string, role: Extract<UserRole, 'student' | 'teacher'>): Promise<User>;
   uploadAvatar(requesterId: string, input: UploadAvatarInput): Promise<User>;
   removeAvatar(requesterId: string): Promise<User>;
 }

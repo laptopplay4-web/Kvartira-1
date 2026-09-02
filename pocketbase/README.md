@@ -38,6 +38,15 @@ npm run pb:up
 | `npm run pb:logs` | Логи |
 | `npm run pb:seed` | Загрузить демо-данные из `src/mocks/seed.ts` (фаза 1.5) |
 
+После обновления миграций (локально без Docker):
+
+```bash
+cd pocketbase
+.\pocketbase.exe migrate --dir=./pb_data --migrationsDir=./pb_migrations --hooksDir=./pb_hooks
+```
+
+Затем перезапустить `serve` (миграции при `serve` тоже применяются, но явный `migrate` надёжнее).
+
 ## Структура
 
 ```

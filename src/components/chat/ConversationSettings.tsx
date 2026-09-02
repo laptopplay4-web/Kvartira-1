@@ -133,7 +133,12 @@ export function ConversationSettings({
             {memberUsers.map(({ member, user }) => (
               <li key={member.userId} className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Avatar firstName={user!.firstName} lastName={user!.lastName} size="sm" />
+                  <Avatar
+                    src={user!.avatarUrl}
+                    firstName={user!.firstName}
+                    lastName={user!.lastName}
+                    size="sm"
+                  />
                   <div>
                     <p className="text-sm">{formatUserName(user!)}</p>
                     <p className="text-caption text-text-muted">{member.role}</p>

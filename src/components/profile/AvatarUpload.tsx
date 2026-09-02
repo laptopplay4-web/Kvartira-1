@@ -15,6 +15,7 @@ import {
   hasAvatarPhoto,
   loadImageFromSrc,
   readFileAsDataUrl,
+  inferAvatarMimeType,
   validateAvatarUpload,
 } from '@/services/profile/avatar';
 import type { User } from '@/types';
@@ -133,7 +134,7 @@ export function AvatarUpload({
 
     const validation = validateAvatarUpload({
       filename: file.name,
-      mimeType: file.type,
+      mimeType: inferAvatarMimeType(file.name, file.type),
       size: file.size,
     });
     if (!validation.valid) {

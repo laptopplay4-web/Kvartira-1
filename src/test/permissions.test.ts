@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { can } from '@/permissions';
+import { can, actsAsTeacher } from '@/permissions';
 import type { User } from '@/types';
 
 const student: User = { id: '1', phone: '+7', role: 'student', firstName: 'A', lastName: 'B' };
@@ -24,13 +24,20 @@ describe('permissions', () => {
     expect(can(teacher, 'progress:view-assigned')).toBe(true);
     expect(can(teacher, 'progress:manage-goals')).toBe(true);
     expect(can(teacher, 'progress:manage-skills')).toBe(true);
+    expect(can(teacher, 'events:manage')).toBe(true);
     expect(can(teacher, 'lessons:book')).toBe(false);
   });
 
-  it('admin has admin access', () => {
+  it('admin has admin access and teacher functions', () => {
     expect(can(admin, 'admin:access')).toBe(true);
     expect(can(admin, 'admin:schedule')).toBe(true);
     expect(can(admin, 'admin:users')).toBe(true);
+    expect(can(admin, 'lessons:view-own')).toBe(true);
+    expect(can(admin, 'lessons:view-assigned')).toBe(true);
+    expect(can(admin, 'lessons:manage-own')).toBe(true);
+    expect(can(admin, 'availability:manage')).toBe(true);
+    expect(can(admin, 'assignments:create')).toBe(true);
+    expect(can(admin, 'lessons:book')).toBe(false);
     expect(can(admin, 'progress:view-all')).toBe(true);
     expect(can(admin, 'progress:manage-goals')).toBe(true);
     expect(can(admin, 'support:reply-ticket')).toBe(true);
@@ -38,6 +45,9 @@ describe('permissions', () => {
     expect(can(admin, 'legal:manage')).toBe(true);
     expect(can(admin, 'admin:events')).toBe(true);
     expect(can(admin, 'admin:school-settings')).toBe(true);
+    expect(actsAsTeacher(admin.role)).toBe(true);
+    expect(actsAsTeacher(teacher.role)).toBe(true);
+    expect(actsAsTeacher(student.role)).toBe(false);
   });
 
   it('teacher lacks admin permissions', () => {
@@ -50,5 +60,10 @@ describe('permissions', () => {
 
   it('null user has no permissions', () => {
     expect(can(null, 'lessons:book')).toBe(false);
+  });
+
+  it('user with missing or unknown role has no permissions', () => {
+    expect(can({ role: undefined as unknown as User['role'] }, 'lessons:book')).toBe(false);
+    expect(can({ role: 'guest' as User['role'] }, 'lessons:book')).toBe(false);
   });
 });

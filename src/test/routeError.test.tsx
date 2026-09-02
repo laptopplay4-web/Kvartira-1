@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { RouteErrorPage } from '@/app/RouteErrorPage';
 
-function BrokenPage() {
+function BrokenPage(): ReactNode {
   throw new Error('Test boom');
 }
 

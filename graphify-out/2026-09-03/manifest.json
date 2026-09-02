@@ -1020,8 +1020,8 @@
     "semantic_hash": ""
   },
   "src/pages/admin/AdminSchoolSettingsPage.tsx": {
-    "mtime": 1788384681.3587878,
-    "ast_hash": "0cf86f9cc00db0a1a3a741fcbd2aaad3",
+    "mtime": 1788385397.8935082,
+    "ast_hash": "fb5a270689ac669a2677422dca5f6b99",
     "semantic_hash": ""
   },
   "src/services/api/mock/schoolSettings.ts": {
@@ -1035,8 +1035,8 @@
     "semantic_hash": ""
   },
   "src/test/schoolSettings.test.ts": {
-    "mtime": 1788384715.1957586,
-    "ast_hash": "aca46b95559d204bf68ce408de570041",
+    "mtime": 1788385448.3422308,
+    "ast_hash": "59e485d92379029b32ab46179e52ce92",
     "semantic_hash": ""
   },
   "src/components/ui/Toggle.tsx": {
@@ -1180,8 +1180,8 @@
     "semantic_hash": ""
   },
   "pocketbase/SCHEMA.md": {
-    "mtime": 1788384736.2271762,
-    "ast_hash": "f2a2cbf1338098cf0daab57924c9819c",
+    "mtime": 1788385421.947969,
+    "ast_hash": "83dfd40844627d86f9dd7a556352e169",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/auth.pb.js": {
@@ -1260,8 +1260,8 @@
     "semantic_hash": ""
   },
   "pocketbase/seed/run.ts": {
-    "mtime": 1788384633.9090595,
-    "ast_hash": "edca84708ac7d738f7e23086063ad8c8",
+    "mtime": 1788385421.2460387,
+    "ast_hash": "2fc9ec5966c2730462bfee3f837fbd05",
     "semantic_hash": ""
   },
   "src/test/pocketbaseSeed.test.ts": {
@@ -1295,8 +1295,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/mappers.ts": {
-    "mtime": 1788384613.1085927,
-    "ast_hash": "4fa5ececf39c710f3648b22a18d88bb4",
+    "mtime": 1788385392.700497,
+    "ast_hash": "ce6e91a5ea64bdf4e88a1ed1cf4dc03d",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/users.ts": {
@@ -1305,8 +1305,8 @@
     "semantic_hash": ""
   },
   "src/test/pocketbaseAdapter.test.ts": {
-    "mtime": 1788384714.8309429,
-    "ast_hash": "3a4fa3811fafa22350f70e6c939b8e2d",
+    "mtime": 1788385414.512283,
+    "ast_hash": "bb852df66f11ace296edc7f5d0600b7c",
     "semantic_hash": ""
   },
   "pocketbase/pb_migrations/1788499200_kvartira_lessons_adapter.js": {
@@ -1685,8 +1685,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/schoolSettings.ts": {
-    "mtime": 1788384614.0072513,
-    "ast_hash": "a59b6f7cf8607497ede2d8c3fb466be4",
+    "mtime": 1788385391.2473423,
+    "ast_hash": "1df0bfc0bd5e8c0436ffc2147b4ca078",
     "semantic_hash": ""
   },
   "pocketbase/pb_migrations/1789190400_kvartira_login_history_bool.js": {
@@ -1865,8 +1865,8 @@
     "semantic_hash": ""
   },
   "src/services/school/helpers.ts": {
-    "mtime": 1788384547.266738,
-    "ast_hash": "9e3da87a5ca31c00b5851f3d6b730e21",
+    "mtime": 1788385356.3997743,
+    "ast_hash": "253fe848b0dfe3c25335564f9cc101d9",
     "semantic_hash": ""
   },
   "src/components/school/SchoolAboutContent.tsx": {

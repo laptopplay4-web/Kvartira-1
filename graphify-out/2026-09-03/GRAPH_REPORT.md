@@ -1,11 +1,11 @@
 # Graph Report - Kvartira 1  (2026-09-03)
 
 ## Corpus Check
-- 371 files · ~151,009 words
+- 371 files · ~151,417 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2311 nodes · 2446 edges · 358 communities (230 shown, 128 thin omitted)
+- 2317 nodes · 2461 edges · 358 communities (231 shown, 127 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 89 edges (avg confidence: 0.58)
 - Token cost: 0 input · 0 output
 
@@ -286,7 +286,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (358 total, 128 thin omitted)
+## Communities (358 total, 127 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -638,7 +638,7 @@ Nodes (5): extractPbFieldError(), mapPocketBaseError(), PB_FIELD_MESSAGE_MAP, PB
 
 ### Community 242 - "mappers.ts"
 Cohesion: 0.04
-Nodes (31): mapSchoolSettingsRecord(), parseSchoolContacts(), PbAchievementDefinitionRecord, PbAssignmentGroupRecord, PbAssignmentRecord, PbAvailabilityRecord, PbConversationMemberRecord, PbConversationRecord (+23 more)
+Nodes (32): coerceJsonObjectFromContacts(), mapSchoolSettingsRecord(), parseSchoolContacts(), PbAchievementDefinitionRecord, PbAssignmentGroupRecord, PbAssignmentRecord, PbAvailabilityRecord, PbConversationMemberRecord (+24 more)
 
 ### Community 249 - "pocketbase/helpers.ts"
 Cohesion: 0.17
@@ -733,7 +733,7 @@ Cohesion: 0.19
 Nodes (8): AssignmentGroupsPage(), GENERAL_ASSIGNMENT_GROUP_ID, GENERAL_ASSIGNMENT_GROUP_LABEL, getAssignmentGroupLabel(), GroupMemberDirectionFilter, isCustomAssignmentGroup(), isGeneralAssignmentGroup(), sortRecipientGroups()
 
 ### Community 317 - "pocketbase/schoolSettings.ts"
-Cohesion: 0.32
+Cohesion: 0.28
 Nodes (5): assertSchoolSettingsManage(), findSchoolSettingsRecord(), getRequesterUser(), loadOrCreateSchoolSettingsRecord(), pocketbaseSchoolSettingsApi
 
 ### Community 318 - "asIdList"
@@ -768,17 +768,21 @@ Nodes (5): isValidStoredPhone(), readPbAuthPhone(), readPbAuthPhoneFromStore(), 
 Cohesion: 0.29
 Nodes (6): ALLOWED_DIRECTIONS_VIDEO_MIMES, EMPTY_SCHOOL_SOCIAL_LINKS, MAX_DIRECTIONS_VIDEO_SIZE, MAX_SCHOOL_LINK_LENGTH, SCHOOL_SOCIAL_LINK_KEYS, SCHOOL_SOCIAL_LINK_LABELS
 
+### Community 355 - "school/helpers.ts"
+Cohesion: 0.35
+Nodes (8): buildSchoolContactsPayload(), coerceJsonObject(), extractSchoolExtrasFromContacts(), mergeSchoolSocialLinks(), normalizeSchoolLinkUrl(), normalizeSchoolSocialLinks(), parseSchoolDirectionsVideo(), validateSchoolSocialLinks()
+
 ## Knowledge Gaps
 - **831 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+826 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **128 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **127 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `SupportApi` connect `SupportApi` to `types.ts`?**
-  _High betweenness centrality (0.003) - this node is a cross-community bridge._
 - **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
+  _High betweenness centrality (0.003) - this node is a cross-community bridge._
+- **Why does `SupportApi` connect `SupportApi` to `types.ts`?**
   _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **Why does `mapAssignmentGroupRecord()` connect `pocketbase/helpers.ts` to `mappers.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._

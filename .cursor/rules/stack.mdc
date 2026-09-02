@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.107 School social links + directions video · 2026-09-03
+Версия: 1.108 Production build test TS fix · 2026-09-03
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -449,7 +449,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `authSessionStorage.test.ts` | sanitize persisted session/user, invalid role rejection (4 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 543 tests (44 files; 4 skipped when Progress UI hidden).
+**Итого:** 545 passed | 4 skipped (44 files; Progress UI hidden skips 4 home tests).
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -559,6 +559,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Events CRUD on /events (teacher+admin) | ✅ 2026-09-03, см. §113 |
 | School About button (header/sidebar) | ✅ 2026-09-03, см. §114 |
 | School social links + directions video | ✅ 2026-09-03, см. §115 |
+| Production build test TS fix | ✅ 2026-09-03, см. §116 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1392,7 +1393,26 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2308 nodes, 2444 edges, 357 communities (graphify update 2026-09-03 post-§115).
+**Graphify stats:** 2317 nodes, 2461 edges, 358 communities (graphify update 2026-09-03 post-§116).
+
+---
+
+## 116. Production Build Test TS Fix (2026-09-03)
+
+**Scope:** `npm run build` падал на сервере — `tsc -b` включал `src/test/*` с двумя TS-ошибками.
+
+**Graphify:** `profile.test.ts` / `routeError.test.tsx` → `tsconfig.app.json` `include: ["src"]` → `npm run build`.
+
+### Fix (✅)
+
+- `profile.test.ts` — удалена неиспользуемая `teacher` (`noUnusedLocals`).
+- `routeError.test.tsx` — `BrokenPage(): ReactNode` для валидного JSX-компонента.
+
+### Verify (✅)
+
+- `npm run build` ✅; `npm test` → **545 passed | 4 skipped** (44 files).
+
+**Graphify stats:** 2317 nodes, 2461 edges, 358 communities (graphify update 2026-09-03 post-§116).
 
 ---
 

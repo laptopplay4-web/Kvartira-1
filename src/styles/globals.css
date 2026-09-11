@@ -284,7 +284,7 @@
   }
 
   .glass-menu-item {
-    @apply rounded-xl transition-colors hover:bg-white/10 focus-ring;
+    @apply rounded-xl transition-colors hover:bg-white/10 outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
   }
 
   .z-dropdown {

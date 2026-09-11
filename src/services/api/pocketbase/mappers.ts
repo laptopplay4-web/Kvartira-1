@@ -86,11 +86,41 @@ export interface MapUserRecordOptions {
   ownRecord?: boolean;
 }
 
+export function parseDirectionIds(value: unknown): string[] | undefined {
+  if (value == null) return undefined;
+
+  if (Array.isArray(value)) {
+    const ids = value
+      .map((item) => {
+        if (typeof item === 'string' && item.trim()) return item.trim();
+        if (item && typeof item === 'object' && 'id' in item) {
+          const id = (item as { id: unknown }).id;
+          return typeof id === 'string' && id.trim() ? id.trim() : '';
+        }
+        return '';
+      })
+      .filter(Boolean);
+    return ids.length > 0 ? [...new Set(ids)] : undefined;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    try {
+      return parseDirectionIds(JSON.parse(trimmed) as unknown);
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
 export function mapUserRecord(
   record: PbUserRecord | RecordModel,
   options: MapUserRecordOptions = {},
 ): User {
-  const r = record as PbUserRecord & { email?: string };
+  const r = record as PbUserRecord & { email?: string; directionIds?: unknown };
   const phone =
     (typeof r.phone === 'string' && r.phone) ||
     (options.ownRecord ? phoneFromSyntheticEmail(r.email) : '') ||
@@ -106,19 +136,19 @@ export function mapUserRecord(
   if (r.avatarUrl) user.avatarUrl = r.avatarUrl;
   if (r.avatarOriginalUrl) user.avatarOriginalUrl = r.avatarOriginalUrl;
   if (r.bio) user.bio = r.bio;
-  const directionIds = (r as { directionIds?: string[] }).directionIds;
+  const directionIds = parseDirectionIds(r.directionIds);
   if (directionIds?.length) user.directionIds = directionIds;
 
   return user;
 }
 
-export function userToPbRecord(user: User): PbUserRecord {
+export function userToPbRecord(user: User, base?: Partial<RecordModel>): PbUserRecord {
   return {
     id: user.id,
-    collectionId: 'users',
-    collectionName: 'users',
-    created: '',
-    updated: '',
+    collectionId: base?.collectionId ?? 'users',
+    collectionName: base?.collectionName ?? 'users',
+    created: typeof base?.created === 'string' ? base.created : '',
+    updated: typeof base?.updated === 'string' ? base.updated : '',
     phone: user.phone,
     role: user.role,
     firstName: user.firstName,

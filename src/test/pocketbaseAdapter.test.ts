@@ -126,6 +126,22 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     });
   });
 
+  it('mapUserRecord parses directionIds JSON string from PB', () => {
+    const user = mapUserRecord({
+      id: 'rec2',
+      collectionId: 'users',
+      collectionName: 'users',
+      created: '',
+      updated: '',
+      phone: '+79001234567',
+      role: 'teacher',
+      firstName: 'Елена',
+      lastName: 'Волкова',
+      directionIds: '["abc","def"]',
+    } as Parameters<typeof mapUserRecord>[0]);
+    expect(user.directionIds).toEqual(['abc', 'def']);
+  });
+
   it('mapUserRecord defaults missing phone to empty string', () => {
     const user = mapUserRecord({
       id: 'rec-no-phone',

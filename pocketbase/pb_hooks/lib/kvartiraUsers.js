@@ -186,20 +186,43 @@ function isStaffRole(role) {
  * Lock role: only admin may switch student ↔ teacher.
  * Superuser (non-users auth) is unrestricted.
  *
+ * Partial PATCH must not treat omitted fields as blank — otherwise phone/email
+ * look "changed" and the update is rejected (client then sees a failed save and
+ * the teacher-directions modal never closes).
+ *
  * @param {core.RecordRequestEvent} e
  */
 function assertUserUpdate(e) {
   const auth = e.auth;
   if (!isUsersAuth(auth)) return;
 
-  const original = typeof e.record.original === 'function' ? e.record.original() : e.record;
-  const oldPhone = original.getString('phone');
-  const newPhone = e.record.getString('phone');
-  if (oldPhone !== newPhone) {
-    throw new ApiError(400, 'Нельзя изменить номер телефона');
+  const info = typeof e.requestInfo === 'function' ? e.requestInfo() : null;
+  const body = (info && info.body) || {};
+  const original = typeof e.record.original === 'function' ? e.record.original() : null;
+
+  if (original) {
+    if (!Object.prototype.hasOwnProperty.call(body, 'phone')) {
+      e.record.set('phone', original.getString('phone'));
+    }
+    if (!Object.prototype.hasOwnProperty.call(body, 'email')) {
+      e.record.set('email', original.getString('email'));
+    }
+    if (!Object.prototype.hasOwnProperty.call(body, 'role')) {
+      e.record.set('role', original.getString('role'));
+    }
   }
 
-  const oldRole = original.getString('role');
+  if (Object.prototype.hasOwnProperty.call(body, 'phone')) {
+    const oldPhone = original ? original.getString('phone') : '';
+    const newPhone = e.record.getString('phone');
+    if (oldPhone !== newPhone) {
+      throw new ApiError(400, 'Нельзя изменить номер телефона');
+    }
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(body, 'role')) return;
+
+  const oldRole = original ? original.getString('role') : e.record.getString('role');
   const newRole = e.record.getString('role');
   if (oldRole === newRole) return;
 
@@ -207,7 +230,7 @@ function assertUserUpdate(e) {
     throw new ApiError(403, 'Нельзя изменить роль');
   }
 
-  if (auth.id === e.record.id) {
+  if (String(auth.id) === String(e.record.id)) {
     throw new ApiError(400, 'Нельзя изменить собственную роль');
   }
 

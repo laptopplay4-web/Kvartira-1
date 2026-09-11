@@ -1839,7 +1839,7 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 
 `directions.test.ts` +9; permissions + routes + schema + adapter → **561 passed | 4 skipped** (45 files).
 
-**Deploy:** миграция `1790054400_*` + фронт; перезапуск PocketBase.
+**Deploy:** миграции `1790054400_*`, `1790755200_kvartira_users_direction_ids_json.js` + `pb_hooks` (`kvartiraUsers.js` partial-update phone lock) + фронт; перезапуск PocketBase.
 
 **Graphify stats:** 2368 nodes, 2516 edges, 366 communities (graphify update 2026-09-07 post-§119 profile tab).
 

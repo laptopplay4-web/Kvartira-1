@@ -40,7 +40,7 @@ async function saveSessionUser(record: Parameters<typeof mapUserRecord>[0], requ
   let user = await resolveUserAvatars(mapUserRecord(record, { ownRecord: true }));
   user = preserveOwnPhone(user, requesterId, prevPhone);
   if (pb.authStore.record?.id === requesterId) {
-    pb.authStore.save(pb.authStore.token, userToPbRecord(user));
+    pb.authStore.save(pb.authStore.token, userToPbRecord(user, pb.authStore.record));
   }
   return user;
 }
@@ -87,39 +87,77 @@ export const pocketbaseUsersApi: UsersApi = {
 
     return withPbError(async () => {
       const pb = getPocketBase();
+      const authId = pb.authStore.record?.id;
+      const targetId =
+        authId && (authId === requesterId || !requesterId) ? String(authId) : requesterId;
+
       const body: Record<string, unknown> = {};
       if (data.firstName !== undefined) body.firstName = data.firstName.trim();
       if (data.lastName !== undefined) body.lastName = data.lastName.trim();
+
+      let normalizedDirectionIds: string[] | undefined;
       if (data.directionIds !== undefined) {
-        const current = mapUserRecord(await pb.collection('users').getOne(requesterId));
-        const directions = await pb.collection('directions').getFullList({ fields: 'id' });
+        let role: User['role'] = 'student';
+        try {
+          const current = mapUserRecord(await pb.collection('users').getOne(targetId), {
+            ownRecord: true,
+          });
+          role = current.role;
+        } catch {
+          const authRole = pb.authStore.record?.role;
+          if (authRole === 'student' || authRole === 'teacher' || authRole === 'admin') {
+            role = authRole;
+          }
+        }
+
+        const directions = await pb.collection('directions').getFullList({ sort: 'name' });
         const idsError = validateDirectionIdsSelection(
           data.directionIds,
           directions.map((d) => ({ id: d.id })),
-          { required: current.role !== 'admin' },
+          { required: role !== 'admin' },
         );
         if (idsError) {
           throw new ApiError(idsError, 'VALIDATION_ERROR', 400);
         }
-        body.directionIds = normalizeDirectionIds(data.directionIds);
+        normalizedDirectionIds = normalizeDirectionIds(data.directionIds);
+        body.directionIds = normalizedDirectionIds;
       }
 
-      const record = await pb.collection('users').update(requesterId, body);
+      let record;
+      try {
+        record = await pb.collection('users').update(targetId, body);
+      } catch (error) {
+        if (error instanceof ClientResponseError && error.status === 404) {
+          throw new ApiError(
+            'Не удалось сохранить профиль. Выйдите и войдите снова, затем повторите.',
+            'NOT_FOUND',
+            404,
+          );
+        }
+        throw error;
+      }
 
       if (data.directionIds !== undefined) {
         try {
           const unread = await pb.collection('notifications').getFullList({
-            filter: `user = "${requesterId}" && urgent = true && read = false && title = "${TEACHER_DIRECTIONS_SETUP_TITLE}"`,
+            filter: `user = "${targetId}" && urgent = true && read = false && title = "${TEACHER_DIRECTIONS_SETUP_TITLE}"`,
           });
           await Promise.all(
             unread.map((n) => pb.collection('notifications').update(n.id, { read: true })),
           );
         } catch {
-          /* best-effort */
+          /* best-effort — missing urgent field must not block profile save */
         }
       }
 
-      return saveSessionUser(record, requesterId);
+      const saved = await saveSessionUser(record, targetId);
+      if (normalizedDirectionIds !== undefined) {
+        saved.directionIds = normalizedDirectionIds;
+        if (pb.authStore.record?.id === targetId) {
+          pb.authStore.save(pb.authStore.token, userToPbRecord(saved, pb.authStore.record));
+        }
+      }
+      return saved;
     });
   },
 

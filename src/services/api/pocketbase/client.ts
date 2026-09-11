@@ -21,7 +21,8 @@ export function getPocketBase(): PocketBase {
 
 export function setPocketBaseAuth(token: string, user: User): void {
   const pb = getPocketBase();
-  pb.authStore.save(token, userToPbRecord(user));
+  const previous = pb.authStore.record ?? undefined;
+  pb.authStore.save(token, userToPbRecord(user, previous ?? undefined));
 }
 
 export function clearPocketBaseAuth(): void {

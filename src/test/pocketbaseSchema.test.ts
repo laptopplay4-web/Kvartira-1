@@ -233,4 +233,13 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(source).toContain('urgent');
     expect(source).toContain('notifications');
   });
+
+  it('users directionIds json migration ensures json field', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790755200_kvartira_users_direction_ids_json.js'),
+      'utf8',
+    );
+    expect(source).toContain('directionIds');
+    expect(source).toContain("type: 'json'");
+  });
 });

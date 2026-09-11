@@ -36,7 +36,12 @@ export function TeacherDirectionsSetupModal() {
   const mutation = useMutation({
     mutationFn: () => api.users.updateProfile(user!.id, { directionIds: selected }),
     onSuccess: (updated) => {
-      updateSessionUser({ ...updated, phone: updated.phone || user!.phone });
+      const withDirections = {
+        ...updated,
+        phone: updated.phone || user!.phone,
+        directionIds: updated.directionIds?.length ? updated.directionIds : selected,
+      };
+      updateSessionUser(withDirections);
       void queryClient.invalidateQueries({ queryKey: ['users'] });
       void queryClient.invalidateQueries({ queryKey: ['notifications'] });
       void queryClient.invalidateQueries({ queryKey: ['teachers'] });

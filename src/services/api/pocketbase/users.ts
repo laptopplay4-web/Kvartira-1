@@ -91,11 +91,12 @@ export const pocketbaseUsersApi: UsersApi = {
       if (data.firstName !== undefined) body.firstName = data.firstName.trim();
       if (data.lastName !== undefined) body.lastName = data.lastName.trim();
       if (data.directionIds !== undefined) {
+        const current = mapUserRecord(await pb.collection('users').getOne(requesterId));
         const directions = await pb.collection('directions').getFullList({ fields: 'id' });
         const idsError = validateDirectionIdsSelection(
           data.directionIds,
           directions.map((d) => ({ id: d.id })),
-          { required: true },
+          { required: current.role !== 'admin' },
         );
         if (idsError) {
           throw new ApiError(idsError, 'VALIDATION_ERROR', 400);

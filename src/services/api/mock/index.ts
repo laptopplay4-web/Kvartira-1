@@ -974,7 +974,7 @@ export const mockUsersApi: UsersApi = {
     if (data.lastName !== undefined) user.lastName = data.lastName.trim();
     if (data.directionIds !== undefined) {
       const idsError = validateDirectionIdsSelection(data.directionIds, db.directions, {
-        required: true,
+        required: user.role !== 'admin',
       });
       if (idsError) {
         throw new ApiError(idsError, 'VALIDATION_ERROR', 400);

@@ -1832,8 +1832,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 
 - `/admin/directions` в хабе администрирования.
 - Регистрация: `DirectionPicker` multi-select.
-- Профиль → «Направления» (`/profile/directions`) — ученик и преподаватель (не в настройках аккаунта).
-- `TeacherDirectionsSetupModal` (не dismissible) + badge «Срочно» в `/notifications` (link → `/profile/directions`).
+- Профиль → «Направления» (`/profile/directions`) — ученик и преподаватель (не в настройках аккаунта); **admin** — по желанию, без модалки и без обязательного выбора.
+- `TeacherDirectionsSetupModal` (не dismissible) + badge «Срочно» в `/notifications` (link → `/profile/directions`) — **только** `role === teacher` без `directionIds`.
 
 ### Tests
 

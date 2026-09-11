@@ -22,6 +22,8 @@ export default function ProfileDirectionsPage() {
   const isOnline = useOnlineStatus();
 
   const canEdit = user.role === 'student' || actsAsTeacher(user.role);
+  /** Админ выбирает направления по желанию, без обязательного минимума и без модалки. */
+  const directionsRequired = user.role !== 'admin';
   const [directionIds, setDirectionIds] = useState<string[]>(user.directionIds ?? []);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -66,11 +68,24 @@ export default function ProfileDirectionsPage() {
     JSON.stringify([...(user.directionIds ?? [])].sort()) ===
     JSON.stringify([...directionIds].sort());
 
-  const label = user.role === 'student' ? 'Направления обучения' : 'Направления преподавания';
+  const label =
+    user.role === 'student'
+      ? 'Направления обучения'
+      : user.role === 'admin'
+        ? 'Направления (по желанию)'
+        : 'Направления преподавания';
   const hint =
     user.role === 'student'
       ? 'Можно добавить новое направление, если перешли в другую группу'
-      : 'Можно добавить направление после повышения квалификации';
+      : user.role === 'admin'
+        ? 'Выберите направления, если ведёте занятия. Можно оставить пустым — без всплывающих окон.'
+        : 'Можно добавить направление после повышения квалификации';
+
+  const saveDisabled =
+    !isOnline ||
+    mutation.isPending ||
+    unchanged ||
+    (directionsRequired && directionIds.length === 0);
 
   return (
     <div className="page-container max-w-lg">
@@ -92,7 +107,11 @@ export default function ProfileDirectionsPage() {
         <EmptyState
           icon={Music2}
           title="Нет направлений"
-          description="Обратитесь к администратору школы"
+          description={
+            user.role === 'admin'
+              ? 'Создайте направления в Администрирование → Направления'
+              : 'Обратитесь к администратору школы'
+          }
           className="py-8"
         />
       ) : (
@@ -102,7 +121,7 @@ export default function ProfileDirectionsPage() {
             onSubmit={(e) => {
               e.preventDefault();
               if (!isOnline) return;
-              if (directionIds.length === 0) {
+              if (directionsRequired && directionIds.length === 0) {
                 setError('Выберите хотя бы одно направление');
                 return;
               }
@@ -120,12 +139,11 @@ export default function ProfileDirectionsPage() {
               disabled={!isOnline || mutation.isPending}
               error={error}
               label={label}
+              hint={
+                user.role === 'admin' ? 'Необязательно — отметьте только то, что ведёте' : undefined
+              }
             />
-            <Button
-              type="submit"
-              disabled={!isOnline || mutation.isPending || unchanged || directionIds.length === 0}
-              loading={mutation.isPending}
-            >
+            <Button type="submit" disabled={saveDisabled} loading={mutation.isPending}>
               {saved ? 'Сохранено' : 'Сохранить'}
             </Button>
           </form>

@@ -133,4 +133,14 @@ describe('register + teacher directions setup (mock)', () => {
     });
     expect(updated.directionIds).toEqual(['dir-vocal', 'dir-guitar']);
   });
+
+  it('admin may set or clear directions without forced setup', async () => {
+    expect(needsTeacherDirectionSetup(admin)).toBe(false);
+    const withDirs = await mockUsersApi.updateProfile(admin.id, {
+      directionIds: ['dir-vocal'],
+    });
+    expect(withDirs.directionIds).toEqual(['dir-vocal']);
+    const cleared = await mockUsersApi.updateProfile(admin.id, { directionIds: [] });
+    expect(cleared.directionIds).toEqual([]);
+  });
 });

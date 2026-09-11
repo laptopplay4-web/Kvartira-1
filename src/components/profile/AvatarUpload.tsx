@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { Camera, Plus } from 'lucide-react';
 
@@ -44,7 +44,7 @@ export function AvatarUpload({
 }: AvatarUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const closeTimerRef = useRef<number | null>(null);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -60,49 +60,14 @@ export function AvatarUpload({
   const fullPhotoUrl = getAvatarFullPhotoUrl(user);
   const userHasAvatar = hasAvatarPhoto(user);
 
-  const clearCloseTimer = () => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
-
   const openMenu = () => {
     if (busy) return;
-    clearCloseTimer();
     setMenuOpen(true);
   };
 
-  const scheduleCloseMenu = () => {
-    clearCloseTimer();
-    closeTimerRef.current = window.setTimeout(() => setMenuOpen(false), 120);
-  };
-
   const closeMenu = () => {
-    clearCloseTimer();
     setMenuOpen(false);
   };
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    const handler = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        closeMenu();
-      }
-    };
-
-    const id = window.requestAnimationFrame(() => {
-      document.addEventListener('pointerdown', handler, true);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(id);
-      document.removeEventListener('pointerdown', handler, true);
-    };
-  }, [menuOpen]);
-
-  useEffect(() => () => clearCloseTimer(), []);
 
   const openFilePicker = () => inputRef.current?.click();
 
@@ -168,15 +133,6 @@ export function AvatarUpload({
 
   const handleChangePhoto = () => {
     closeMenu();
-    openFilePicker();
-  };
-
-  const handleChangeThumbnail = async () => {
-    closeMenu();
-    if (fullPhotoUrl) {
-      await openCropModal(null, fullPhotoUrl);
-      return;
-    }
     openFilePicker();
   };
 
@@ -264,9 +220,9 @@ export function AvatarUpload({
         ref={rootRef}
         className="relative z-20 flex flex-col items-center"
         onMouseEnter={prefersHover ? openMenu : undefined}
-        onMouseLeave={prefersHover ? scheduleCloseMenu : undefined}
       >
         <button
+          ref={avatarButtonRef}
           type="button"
           onClick={handleAvatarClick}
           onKeyDown={handleAvatarKeyDown}
@@ -296,13 +252,11 @@ export function AvatarUpload({
           hasAvatar={userHasAvatar}
           disabled={busy}
           removing={removing}
+          anchorRef={avatarButtonRef}
           onOpenPhoto={handleOpenPhoto}
           onChangePhoto={handleChangePhoto}
-          onChangeThumbnail={handleChangeThumbnail}
           onRemove={handleRemovePhoto}
           onClose={closeMenu}
-          onMouseEnter={prefersHover ? openMenu : undefined}
-          onMouseLeave={prefersHover ? scheduleCloseMenu : undefined}
         />
 
         {displayError && (

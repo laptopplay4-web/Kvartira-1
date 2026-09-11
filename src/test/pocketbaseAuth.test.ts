@@ -56,7 +56,8 @@ describe('PocketBase auth hooks (ROADMAP 1.3)', () => {
     const authLib = readFileSync(AUTH_LIB, 'utf8');
     const securityLib = readFileSync(SECURITY_LIB, 'utf8');
     expect(authLib).toMatch(/rows\s*=\s*app\.findRecordsByFilter/);
-    expect(securityLib).toMatch(/existingRows\s*=\s*app\.findRecordsByFilter/);
+    expect(securityLib).toMatch(/rows\s*=\s*app\.findRecordsByFilter/);
+    expect(securityLib).not.toMatch(/findRecordsByFilter\([^)]+,\s*\[/);
   });
 
   it('relaxes login_history.success required bool', () => {

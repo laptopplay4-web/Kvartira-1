@@ -6,8 +6,10 @@ import type { Conversation, User } from '@/types';
 import { getConversationDisplayTitle, isGroupLike } from '@/services/chat/helpers';
 import { Avatar } from '@/components/ui/Avatar';
 import { backNavIconButtonClassName } from '@/components/ui/BackLink';
-import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/utils';
+import { isDisplayableAvatarSrc } from '@/services/profile/constants';
+import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
 import { ConversationSettings } from './ConversationSettings';
 import { api } from '@/services/api';
 import { formatLessonDateTime } from '@/utils/dates';
@@ -70,35 +72,53 @@ export function ChatHeader({
           )}
 
           {isGroup ? (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-muted text-accent">
-              <Users className="h-4 w-4" aria-hidden />
-            </div>
+            <>
+              {conversation.avatarUrl && isDisplayableAvatarSrc(conversation.avatarUrl) ? (
+                <img
+                  src={conversation.avatarUrl}
+                  alt=""
+                  className="h-9 w-9 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-muted text-accent">
+                  <Users className="h-4 w-4" aria-hidden />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-h3">{title}</h1>
+                <p className="text-caption text-text-muted">
+                  {memberCount}{' '}
+                  {memberCount === 1 ? 'участник' : memberCount < 5 ? 'участника' : 'участников'}
+                </p>
+              </div>
+            </>
           ) : other ? (
-            <Avatar
-              src={other.avatarUrl}
-              firstName={other.firstName}
-              lastName={other.lastName}
-              size="sm"
-            />
-          ) : null}
+            <UserPreviewTrigger
+              user={other}
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-0"
+            >
+              <Avatar
+                src={other.avatarUrl}
+                firstName={other.firstName}
+                lastName={other.lastName}
+                size="sm"
+              />
+              <div className="min-w-0 flex-1 text-left">
+                <h1 className="truncate text-h3">{title}</h1>
+              </div>
+            </UserPreviewTrigger>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-h3">{title}</h1>
+            </div>
+          )}
 
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-h3">{title}</h1>
-            {isGroup && (
-              <p className="text-caption text-text-muted">
-                {memberCount} {memberCount === 1 ? 'участник' : memberCount < 5 ? 'участника' : 'участников'}
-              </p>
-            )}
-          </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Настройки чата"
+          <IconButton
+            label="Настройки чата"
             onClick={() => setSettingsOpen(true)}
           >
-            <MoreHorizontal className="h-5 w-5" />
-          </Button>
+            <MoreHorizontal className="h-5 w-5" aria-hidden />
+          </IconButton>
         </div>
 
         {lesson && (

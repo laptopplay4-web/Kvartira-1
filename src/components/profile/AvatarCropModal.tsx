@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-
+import { createPortal } from 'react-dom';
 import { Loader2 } from 'lucide-react';
 
+import { Button } from '@/components/ui/Button';
 import {
   clampCropState,
   cropImageToDataUrl,
@@ -26,7 +27,8 @@ interface PointerPoint {
 
 function getViewportSize() {
   if (typeof window === 'undefined') return 300;
-  return Math.min(window.innerWidth - 48, 320);
+  const chrome = 220;
+  return Math.min(window.innerWidth - 32, window.innerHeight - chrome, 420);
 }
 
 function getDistance(a: PointerPoint, b: PointerPoint) {
@@ -81,12 +83,18 @@ export function AvatarCropModal({
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => e.key === 'Escape' && !applying && onClose();
-    document.addEventListener('keydown', handler);
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || applying) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      onClose();
+    };
+    document.addEventListener('keydown', handler, true);
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      document.removeEventListener('keydown', handler);
-      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handler, true);
+      document.body.style.overflow = prevOverflow;
     };
   }, [open, onClose, applying]);
 
@@ -229,18 +237,24 @@ export function AvatarCropModal({
     handleZoom(crop.scale + delta, focalX, focalY);
   };
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
   const screenMask =
     cropHole.r > 0
-      ? `radial-gradient(circle ${cropHole.r}px at ${cropHole.cx}px ${cropHole.cy}px, transparent ${cropHole.r - 1}px, black ${cropHole.r}px)`
+      ? `radial-gradient(circle ${cropHole.r}px at ${cropHole.cx}px ${cropHole.cy}px, transparent ${cropHole.r - 0.5}px, #000 ${cropHole.r}px)`
       : undefined;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-[#0a0a0a]" role="dialog" aria-modal aria-label="Кадрирование фото">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-lightbox flex flex-col bg-black"
+      role="dialog"
+      aria-modal
+      aria-label="Новое фото"
+    >
+      {/* Затемнение вне круга — как в ВК */}
       {screenMask && (
         <div
-          className="pointer-events-none fixed inset-0 z-[65] bg-black/70"
+          className="pointer-events-none fixed inset-0 z-[1] bg-black/75"
           style={{
             WebkitMaskImage: screenMask,
             maskImage: screenMask,
@@ -249,61 +263,72 @@ export function AvatarCropModal({
         />
       )}
 
-      <header className="relative z-[70] flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button
+      <header className="relative z-[2] flex shrink-0 items-center justify-between px-2 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={onClose}
           disabled={applying}
-          className="min-h-11 min-w-11 rounded-lg px-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
+          className="min-h-11 min-w-11 text-white hover:bg-white/10 hover:text-white"
         >
           Отмена
-        </button>
-        <span className="text-sm font-semibold text-text-primary">Фото профиля</span>
-        <button
+        </Button>
+        <span className="text-sm font-semibold text-white">Новое фото</span>
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => previewUrl && onApply(previewUrl)}
           disabled={!previewUrl || applying}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-sm font-semibold text-brand transition-colors hover:text-brand-hover disabled:opacity-50"
+          className="min-h-11 min-w-11 font-semibold text-sky-400 hover:bg-white/10 hover:text-sky-300"
         >
           {applying ? <Loader2 className="h-5 w-5 animate-spin" aria-label="Сохранение" /> : 'Готово'}
-        </button>
+        </Button>
       </header>
 
-      <div className="relative z-[60] flex flex-1 flex-col items-center justify-center px-6 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="relative z-0 flex min-h-0 flex-1 flex-col items-center justify-center px-4">
         {image && crop && zoomBounds ? (
-          <>
-            <p className="relative z-[70] mb-4 text-center text-caption text-text-muted">
-              Сведите или разведите пальцы для масштаба
-            </p>
+          <div
+            ref={cropAreaRef}
+            className="relative touch-none select-none overflow-visible"
+            style={{ width: viewportSize, height: viewportSize, touchAction: 'none' }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onWheel={handleWheel}
+            role="img"
+            aria-label="Перетащите и масштабируйте фото"
+          >
+            <img
+              src={image.src}
+              alt=""
+              draggable={false}
+              className="pointer-events-none absolute max-w-none"
+              style={{
+                width: image.naturalWidth * crop.scale,
+                height: image.naturalHeight * crop.scale,
+                transform: `translate(${crop.offsetX}px, ${crop.offsetY}px)`,
+              }}
+            />
+            {/* Белая обводка круга миниатюры */}
             <div
-              ref={cropAreaRef}
-              className="relative touch-none select-none overflow-hidden rounded-full ring-2 ring-white/90 ring-offset-2 ring-offset-[#0a0a0a]"
-              style={{ width: viewportSize, height: viewportSize, touchAction: 'none' }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-              onWheel={handleWheel}
-              role="img"
-              aria-label="Перетащите и масштабируйте фото"
-            >
-              <img
-                src={image.src}
-                alt=""
-                draggable={false}
-                className="pointer-events-none absolute max-w-none"
-                style={{
-                  width: image.naturalWidth * crop.scale,
-                  height: image.naturalHeight * crop.scale,
-                  transform: `translate(${crop.offsetX}px, ${crop.offsetY}px)`,
-                }}
-              />
-            </div>
-          </>
+              className="pointer-events-none absolute inset-0 rounded-full ring-[1.5px] ring-white/90"
+              aria-hidden
+            />
+          </div>
         ) : (
-          <Loader2 className="h-8 w-8 animate-spin text-brand" aria-label="Загрузка" />
+          <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-label="Загрузка" />
         )}
       </div>
-    </div>
+
+      <footer className="relative z-[2] shrink-0 px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
+        <p className="text-center text-caption text-white/55">
+          Перемещайте и масштабируйте фото внутри круга
+        </p>
+      </footer>
+    </div>,
+    document.body,
   );
 }

@@ -60,7 +60,14 @@ interface AuthState {
   isLoading: boolean;
   login: (phone: string, password: string) => Promise<void>;
   demoLogin: (role: 'student' | 'teacher' | 'admin') => Promise<void>;
-  register: (phone: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  register: (
+    phone: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    directionIds: string[],
+    inviteToken: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   setSession: (session: AuthSession | null) => void;
   updateSessionUser: (user: User) => void;
@@ -88,6 +95,9 @@ export const useAuthStore = create<AuthState>()(
       },
 
       demoLogin: async (role) => {
+        if (import.meta.env.PROD) {
+          throw new Error('Демо-вход отключён в production-сборке');
+        }
         set({ isLoading: true });
         try {
           const session = withSessionPhone(await api.auth.demoLogin(role));
@@ -100,11 +110,18 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      register: async (phone, password, firstName, lastName) => {
+      register: async (phone, password, firstName, lastName, directionIds, inviteToken) => {
         set({ isLoading: true });
         try {
           const session = withSessionPhone(
-            await api.auth.register(phone, password, firstName, lastName),
+            await api.auth.register(
+              phone,
+              password,
+              firstName,
+              lastName,
+              directionIds,
+              inviteToken,
+            ),
             phone,
           );
           queryClient.clear();

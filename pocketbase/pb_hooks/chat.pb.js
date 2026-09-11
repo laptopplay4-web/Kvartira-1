@@ -4,6 +4,7 @@
  * - force message sender = auth (non-admin)
  * - sync conversations.lastMessage after message write
  * - sync read receipts when conversation_members.lastReadAt changes
+ * - lock pinnedMessageIds to teacher|admin
  */
 
 onRecordCreateRequest((e) => {
@@ -40,3 +41,9 @@ onRecordAfterUpdateSuccess((e) => {
   chat.syncReadReceipts($app, e.record);
   e.next();
 }, 'conversation_members');
+
+onRecordUpdateRequest((e) => {
+  const chat = require(`${__hooks}/lib/kvartiraChat.js`);
+  chat.assertConversationPinUpdate(e);
+  e.next();
+}, 'conversations');

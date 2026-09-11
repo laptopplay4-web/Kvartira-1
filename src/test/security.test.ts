@@ -10,6 +10,7 @@ import {
   resolveSecuritySessions,
   sortLoginHistoryByDate,
 } from '@/services/security/helpers';
+import { fingerprintAuthToken } from '@/services/security/sessionFingerprint';
 import { validateChangePasswordInput } from '@/services/security/validation';
 import { createMockSecurityApi, buildPasswordMap, recordAuthLogin } from '@/services/api/mock/security';
 import {
@@ -71,7 +72,7 @@ describe('security helpers', () => {
     expect(last).toBeDefined();
   });
 
-  it('resolves a single current session when multiple are flagged', () => {
+  it('keeps sessions with the same deviceLabel and picks one current', () => {
     const resolved = resolveSecuritySessions([
       {
         id: 'a',
@@ -105,9 +106,18 @@ describe('security helpers', () => {
       },
     ]);
 
-    expect(resolved).toHaveLength(2);
+    expect(resolved).toHaveLength(3);
     expect(resolved.filter((s) => s.isCurrent)).toHaveLength(1);
     expect(resolved.find((s) => s.isCurrent)?.id).toBe('b');
+  });
+
+  it('fingerprints auth tokens with stable SHA-256 hex', async () => {
+    const a = await fingerprintAuthToken('test-token');
+    const b = await fingerprintAuthToken('test-token');
+    const c = await fingerprintAuthToken('other-token');
+    expect(a).toHaveLength(64);
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
   });
 });
 
@@ -190,17 +200,28 @@ describe('security api', () => {
     ).rejects.toMatchObject({ code: 'VALIDATION' });
   });
 
-  it('reuses session for same device on login', () => {
-    const chromeBefore = db.securitySessions.filter(
-      (s) => s.userId === student.id && s.deviceLabel === 'Chrome · Windows',
-    );
-    recordAuthLogin(db, student.id, 'token-relogin', true, 'Chrome · Windows');
-    recordAuthLogin(db, student.id, 'token-relogin-2', true, 'Chrome · Windows');
-    const chromeAfter = db.securitySessions.filter(
-      (s) => s.userId === student.id && s.deviceLabel === 'Chrome · Windows',
-    );
-    expect(chromeAfter).toHaveLength(chromeBefore.length);
-    expect(chromeAfter[0]?.token).toBe('token-relogin-2');
+  it('creates a separate session per login token even with the same deviceLabel', async () => {
+    const before = db.securitySessions.filter((s) => s.userId === student.id).length;
+    recordAuthLogin(db, student.id, 'token-device-a', true, 'Chrome · Windows', '10.0.0.1');
+    recordAuthLogin(db, student.id, 'token-device-b', true, 'Chrome · Windows', '10.0.0.2');
+    const after = db.securitySessions.filter((s) => s.userId === student.id);
+    expect(after).toHaveLength(before + 2);
+
+    const sessions = await api.getSessions(student.id, 'token-device-b');
+    expect(sessions).toHaveLength(before + 2);
+    expect(sessions.filter((s) => s.isCurrent)).toHaveLength(1);
+    expect(sessions.find((s) => s.isCurrent)?.ipAddress).toBe('10.0.0.2');
+    expect(sessions.some((s) => s.ipAddress === '10.0.0.1' && !s.isCurrent)).toBe(true);
+  });
+
+  it('updates existing session when the same auth token logs in again', () => {
+    recordAuthLogin(db, student.id, 'token-same', true, 'Chrome · Windows');
+    const countAfterFirst = db.securitySessions.filter((s) => s.userId === student.id).length;
+    recordAuthLogin(db, student.id, 'token-same', true, 'Chrome · Windows', '10.0.0.9');
+    const sameToken = db.securitySessions.filter((s) => s.token === 'token-same');
+    expect(sameToken).toHaveLength(1);
+    expect(sameToken[0]?.ipAddress).toBe('10.0.0.9');
+    expect(db.securitySessions.filter((s) => s.userId === student.id)).toHaveLength(countAfterFirst);
   });
 
   it('creates in-app notification on failed login', () => {

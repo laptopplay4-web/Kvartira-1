@@ -46,7 +46,7 @@ export function PublicLandingContent({ data }: PublicLandingContentProps) {
           </Link>
           <Link to="/register" className="hidden sm:block">
             <Button size="sm" variant="secondary">
-              Регистрация
+              QR-регистрация
             </Button>
           </Link>
         </div>
@@ -63,7 +63,7 @@ export function PublicLandingContent({ data }: PublicLandingContentProps) {
           <p className="mx-auto mt-6 max-w-xl text-body text-text-secondary">{school.about}</p>
           <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
             <Link to="/register">
-              <Button size="lg">Начать обучение</Button>
+              <Button size="lg">Записаться по QR в школе</Button>
             </Link>
             <a href="#directions">
               <Button size="lg" variant="secondary">
@@ -192,7 +192,7 @@ export function PublicLandingContent({ data }: PublicLandingContentProps) {
             <SchoolAboutContent school={school} hideHeader />
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/register" className="flex-1">
-                <Button className="w-full">Записаться</Button>
+                <Button className="w-full">Регистрация по QR</Button>
               </Link>
               <Link to="/login" className="flex-1">
                 <Button className="w-full" variant="secondary">

@@ -10,10 +10,12 @@ describe('permissions', () => {
   it('student can book lessons', () => {
     expect(can(student, 'lessons:book')).toBe(true);
     expect(can(student, 'assignments:view-own')).toBe(true);
-    expect(can(student, 'progress:view-own')).toBe(true);
     expect(can(student, 'support:view-faq')).toBe(true);
     expect(can(student, 'security:view-own')).toBe(true);
     expect(can(student, 'legal:view-own')).toBe(true);
+    expect(can(student, 'chat:create')).toBe(false);
+    expect(can(student, 'chat:delete')).toBe(false);
+    expect(can(student, 'chat:pin_message')).toBe(false);
     expect(can(student, 'admin:access')).toBe(false);
   });
 
@@ -21,10 +23,10 @@ describe('permissions', () => {
     expect(can(teacher, 'availability:manage')).toBe(true);
     expect(can(teacher, 'assignments:create')).toBe(true);
     expect(can(teacher, 'assignments:manage-groups')).toBe(true);
-    expect(can(teacher, 'progress:view-assigned')).toBe(true);
-    expect(can(teacher, 'progress:manage-goals')).toBe(true);
-    expect(can(teacher, 'progress:manage-skills')).toBe(true);
     expect(can(teacher, 'events:manage')).toBe(true);
+    expect(can(teacher, 'chat:create')).toBe(true);
+    expect(can(teacher, 'chat:delete')).toBe(true);
+    expect(can(teacher, 'chat:pin_message')).toBe(true);
     expect(can(teacher, 'lessons:book')).toBe(false);
   });
 
@@ -38,13 +40,13 @@ describe('permissions', () => {
     expect(can(admin, 'availability:manage')).toBe(true);
     expect(can(admin, 'assignments:create')).toBe(true);
     expect(can(admin, 'lessons:book')).toBe(false);
-    expect(can(admin, 'progress:view-all')).toBe(true);
-    expect(can(admin, 'progress:manage-goals')).toBe(true);
     expect(can(admin, 'support:reply-ticket')).toBe(true);
     expect(can(admin, 'support:manage-faq')).toBe(true);
     expect(can(admin, 'legal:manage')).toBe(true);
     expect(can(admin, 'admin:events')).toBe(true);
     expect(can(admin, 'admin:school-settings')).toBe(true);
+    expect(can(admin, 'admin:directions')).toBe(true);
+    expect(can(admin, 'chat:pin_message')).toBe(true);
     expect(actsAsTeacher(admin.role)).toBe(true);
     expect(actsAsTeacher(teacher.role)).toBe(true);
     expect(actsAsTeacher(student.role)).toBe(false);
@@ -56,6 +58,7 @@ describe('permissions', () => {
     expect(can(teacher, 'admin:users')).toBe(false);
     expect(can(teacher, 'admin:events')).toBe(false);
     expect(can(teacher, 'admin:school-settings')).toBe(false);
+    expect(can(teacher, 'admin:directions')).toBe(false);
   });
 
   it('null user has no permissions', () => {

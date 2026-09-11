@@ -3,13 +3,15 @@ const NAME_MIN_LENGTH = 2;
 export interface UpdateProfileFields {
   firstName?: string;
   lastName?: string;
+  directionIds?: string[];
 }
 
 export function validateUpdateProfileInput(data: UpdateProfileFields): string | null {
   const hasFirstName = data.firstName !== undefined;
   const hasLastName = data.lastName !== undefined;
+  const hasDirectionIds = data.directionIds !== undefined;
 
-  if (!hasFirstName && !hasLastName) {
+  if (!hasFirstName && !hasLastName && !hasDirectionIds) {
     return 'Укажите данные для сохранения';
   }
 

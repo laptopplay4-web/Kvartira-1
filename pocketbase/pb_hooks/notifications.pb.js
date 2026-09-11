@@ -2,14 +2,14 @@
 
 /**
  * ROADMAP 2.10 — notifications hooks:
- * - create: self / admin / teacher
+ * - create: self / admin / teacher sharing a lesson, group or chat with target
  * - update: lock content fields (read-only mark-as-read)
  * - preferences: own user only
  */
 
 onRecordCreateRequest((e) => {
   const notificationsModule = require(`${__hooks}/lib/kvartiraNotifications.js`);
-  notificationsModule.assertNotificationCreate(e);
+  notificationsModule.assertNotificationCreate($app, e);
   e.next();
 }, 'notifications');
 

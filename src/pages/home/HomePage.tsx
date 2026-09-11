@@ -13,8 +13,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { BookLessonLink } from '@/components/ui/BookLessonLink';
 import { HomeEventCard } from '@/components/events/HomeEventCard';
 import { HomeAssignmentsBlock } from '@/components/assignments/HomeAssignmentsBlock';
-import { isProgressFeatureEnabled } from '@/config/features';
-import { HomeProgressBlock } from '@/components/progress/HomeProgressBlock';
 import { getNextUpcomingEvent } from '@/services/events/helpers';
 import { formatUserName } from '@/utils';
 import { formatLessonDateTime } from '@/utils/dates';
@@ -114,7 +112,6 @@ export default function HomePage() {
   const showStudentInCard = teacherView;
   const showBookCta = can(user, 'lessons:book');
   const showAssignmentsBlock = can(user, 'assignments:view-own');
-  const showProgressBlock = isProgressFeatureEnabled() && can(user, 'progress:view-own');
 
   const retryLessons = () => void refetchLessons();
   const retryEvents = () => void refetchEvents();
@@ -196,8 +193,6 @@ export default function HomePage() {
       {showAssignmentsBlock && (
         <HomeAssignmentsBlock studentId={user.id} requesterId={user.id} />
       )}
-
-      {showProgressBlock && <HomeProgressBlock studentId={user.id} requesterId={user.id} />}
 
       <section>
         <div className="mb-3 flex items-center justify-between">

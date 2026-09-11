@@ -1,5 +1,27 @@
 import { formatUserName } from '@/utils';
-import type { User } from '@/types';
+import type { Direction, User } from '@/types';
+
+/** Названия направлений пользователя через « · ». */
+export function formatUserDirectionLabels(
+  user: Pick<User, 'directionIds'>,
+  directions: Pick<Direction, 'id' | 'name'>[],
+): string {
+  return resolveUserDirections(user, directions)
+    .map((d) => d.name)
+    .join(' · ');
+}
+
+/** Список направлений пользователя (порядок как в directionIds). */
+export function resolveUserDirections(
+  user: Pick<User, 'directionIds'>,
+  directions: Pick<Direction, 'id' | 'name'>[],
+): Pick<Direction, 'id' | 'name'>[] {
+  if (!user.directionIds?.length) return [];
+  const byId = new Map(directions.map((d) => [d.id, d]));
+  return user.directionIds
+    .map((id) => byId.get(id))
+    .filter((d): d is Pick<Direction, 'id' | 'name'> => !!d);
+}
 
 function normalizeUserSearchQuery(query: string): string {
   return query.trim().toLowerCase().replace(/\s+/g, ' ');

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, CalendarDays, ChevronRight, FileText, Users } from 'lucide-react';
+import { Building2, CalendarDays, ChevronRight, FileText, Music2, QrCode, Users } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { can, type Permission } from '@/permissions';
 import { BackLink } from '@/components/ui/BackLink';
@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/Card';
 const ADMIN_LINKS: { to: string; icon: typeof CalendarDays; label: string; permission: Permission }[] = [
   { to: '/admin/schedule', icon: CalendarDays, label: 'Расписание', permission: 'admin:schedule' },
   { to: '/admin/users', icon: Users, label: 'Пользователи', permission: 'admin:users' },
+  { to: '/admin/directions', icon: Music2, label: 'Направления', permission: 'admin:directions' },
+  { to: '/admin/registration-qr', icon: QrCode, label: 'QR регистрации', permission: 'admin:school-settings' },
   { to: '/admin/school', icon: Building2, label: 'Школа', permission: 'admin:school-settings' },
   { to: '/admin/legal', icon: FileText, label: 'Документы', permission: 'legal:manage' },
 ];

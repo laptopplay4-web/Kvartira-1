@@ -136,18 +136,23 @@ function removeUserFromJsonArrayField(app, collection, fieldName, userId) {
 function purgeUserDependents(app, userId) {
   const params = { userId };
 
-  deleteAllByFilter(app, 'messages', 'sender = {:userId}', params);
+  // Keep chat history for remaining participants (personal chats stay visible).
+  // messages.sender must be optional + non-cascade (see migration 1790572800).
+  clearOptionalRelation(app, 'messages', 'sender', userId);
+
   deleteAllByFilter(app, 'lesson_history', 'user = {:userId}', params);
   deleteAllByFilter(app, 'lessons', 'student = {:userId} || teacher = {:userId}', params);
   deleteAllByFilter(app, 'assignments', 'teacher = {:userId}', params);
   deleteAllByFilter(app, 'assignment_groups', 'teacher = {:userId}', params);
   deleteAllByFilter(app, 'teacher_availability', 'teacher = {:userId}', params);
 
-  clearOptionalRelation(app, 'progress_goals', 'teacher', userId);
   clearOptionalRelation(app, 'audit_logs', 'actor', userId);
   removeFromAssignmentGroupMembers(app, userId);
   removeUserFromJsonArrayField(app, 'events', 'registeredUserIds', userId);
   removeUserFromJsonArrayField(app, 'events', 'invitedUserIds', userId);
+  // Drop from all chats' participantIds (school-wide + groups + personal).
+  // conversation_members rows cascade-delete with the user record.
+  // Personal conversations remain for the other participant with message history.
   removeUserFromJsonArrayField(app, 'conversations', 'participantIds', userId);
 }
 

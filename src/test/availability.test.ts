@@ -99,7 +99,38 @@ describe('availability validation', () => {
   });
 });
 
+/**
+ * Slots in the past are filtered out, so a hardcoded date turns the suite into
+ * a time bomb. Always test against the next upcoming Monday.
+ */
+function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function nextMonday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  do {
+    d.setDate(d.getDate() + 1);
+  } while (d.getDay() !== 1);
+  return d;
+}
+
+function shiftDays(from: Date, days: number): string {
+  const d = new Date(from);
+  d.setDate(d.getDate() + days);
+  return toIsoDate(d);
+}
+
 describe('availability → calculateAvailableSlots integration', () => {
+  const mondayDate = nextMonday();
+  const MONDAY = toIsoDate(mondayDate);
+  const periodAroundMonday = {
+    startDate: shiftDays(mondayDate, -7),
+    endDate: shiftDays(mondayDate, 7),
+  };
+  const MONDAY_OUTSIDE_PERIOD = shiftDays(mondayDate, 70);
+
   const mondayAvailability: TeacherAvailability = {
     teacherId: 't1',
     slotIntervalMinutes: 30,
@@ -117,7 +148,7 @@ describe('availability → calculateAvailableSlots integration', () => {
     const slots = calculateAvailableSlots({
       availability: mondayAvailability,
       existingLessons: [],
-      date: '2026-09-07',
+      date: MONDAY,
       dayOfWeek: 1,
     });
     const starts = slots.map((s) => s.startTime);
@@ -132,10 +163,10 @@ describe('availability → calculateAvailableSlots integration', () => {
     const slots = calculateAvailableSlots({
       availability: {
         ...mondayAvailability,
-        exceptions: [{ date: '2026-09-07', off: true }],
+        exceptions: [{ date: MONDAY, off: true }],
       },
       existingLessons: [],
-      date: '2026-09-07',
+      date: MONDAY,
       dayOfWeek: 1,
     });
     expect(slots).toHaveLength(0);
@@ -145,10 +176,10 @@ describe('availability → calculateAvailableSlots integration', () => {
     const slots = calculateAvailableSlots({
       availability: {
         ...mondayAvailability,
-        exceptions: [{ date: '2026-09-07', ranges: [{ start: '12:00', end: '14:00' }] }],
+        exceptions: [{ date: MONDAY, ranges: [{ start: '12:00', end: '14:00' }] }],
       },
       existingLessons: [],
-      date: '2026-09-07',
+      date: MONDAY,
       dayOfWeek: 1,
     });
     expect(slots.map((s) => s.startTime)).toContain('12:00');
@@ -159,10 +190,10 @@ describe('availability → calculateAvailableSlots integration', () => {
     const slots = calculateAvailableSlots({
       availability: {
         ...mondayAvailability,
-        planningPeriod: { startDate: '2026-09-01', endDate: '2026-09-30' },
+        planningPeriod: periodAroundMonday,
       },
       existingLessons: [],
-      date: '2026-10-05',
+      date: MONDAY_OUTSIDE_PERIOD,
       dayOfWeek: 1,
     });
     expect(slots).toHaveLength(0);
@@ -172,10 +203,10 @@ describe('availability → calculateAvailableSlots integration', () => {
     const slots = calculateAvailableSlots({
       availability: {
         ...mondayAvailability,
-        planningPeriod: { startDate: '2026-09-01', endDate: '2026-09-30' },
+        planningPeriod: periodAroundMonday,
       },
       existingLessons: [],
-      date: '2026-09-07',
+      date: MONDAY,
       dayOfWeek: 1,
     });
     expect(slots.length).toBeGreaterThan(0);

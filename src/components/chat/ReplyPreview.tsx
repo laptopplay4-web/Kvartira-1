@@ -1,5 +1,5 @@
 import { X, Reply } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import type { Message, User } from '@/types';
 import { formatUserName } from '@/utils';
 import { getReplyPreviewText } from '@/services/chat/helpers';
@@ -20,9 +20,9 @@ export function ReplyPreview({ message, sender, onCancel }: ReplyPreviewProps) {
         </p>
         <p className="truncate text-caption text-text-muted">{getReplyPreviewText(message)}</p>
       </div>
-      <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Отменить ответ" className="shrink-0">
-        <X className="h-4 w-4" />
-      </Button>
+      <IconButton label="Отменить ответ" size="sm" onClick={onCancel} className="shrink-0">
+        <X className="h-4 w-4" aria-hidden />
+      </IconButton>
     </div>
   );
 }

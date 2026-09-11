@@ -3,6 +3,7 @@ import { ApiError } from '@/services/api/types';
 import type { NotificationsApi } from '@/services/api/types';
 import {
   createDefaultNotificationPreferences,
+  isPassiveUnreadNotification,
   mergeNotificationPreferences,
   shouldDeliverPushNotification,
 } from '@/services/notifications/helpers';
@@ -49,6 +50,7 @@ export function tryPushNotification(
   title: string,
   body: string,
   link?: string,
+  urgent?: boolean,
 ): void {
   const createdAt = new Date().toISOString();
 
@@ -61,6 +63,7 @@ export function tryPushNotification(
     read: false,
     createdAt,
     link,
+    ...(urgent ? { urgent: true } : {}),
   });
 
   const preferences = getPreferencesForUser(db, userId);
@@ -104,7 +107,12 @@ export function createMockNotificationsApi(
 
     async markAllAsRead(userId) {
       await delay(50);
-      db.notifications.filter((n) => n.userId === userId).forEach((n) => (n.read = true));
+      // Пассивные только: urgent (требуют действия) остаются непрочитанными.
+      db.notifications
+        .filter((n) => n.userId === userId && isPassiveUnreadNotification(n))
+        .forEach((n) => {
+          n.read = true;
+        });
     },
 
     async getPreferences(requesterId) {

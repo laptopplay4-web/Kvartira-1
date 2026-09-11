@@ -16,3 +16,32 @@ onRecordUpdateRequest((e) => {
   legal.assertLegalDocumentUpdate($app, e);
   e.next();
 }, 'legal_documents');
+
+/**
+ * Withdraw consent (152-ФЗ, ст. 9 ч. 2).
+ *
+ * `user_consents` has no update rule on purpose: the journal must only be
+ * changed here, where the server owns the timestamp and writes the audit entry.
+ */
+routerAdd('POST', '/api/kvartira/consents/revoke', (e) => {
+  const legal = require(`${__hooks}/lib/kvartiraLegal.js`);
+  const audit = require(`${__hooks}/lib/kvartiraAudit.js`);
+
+  const body = e.requestInfo().body || {};
+  const consentId = String(body.consentId || '').trim();
+  if (!consentId) {
+    throw new ApiError(400, 'Укажите согласие');
+  }
+
+  const consent = legal.revokeConsentRecord($app, e, consentId);
+
+  audit.logConsentEvent($app, e, 'consent.revoked', consent);
+
+  return e.json(200, consent);
+});
+
+onRecordAfterCreateSuccess((e) => {
+  const audit = require(`${__hooks}/lib/kvartiraAudit.js`);
+  audit.logConsentEvent($app, e, 'consent.accepted', e.record);
+  e.next();
+}, 'user_consents');

@@ -1,4 +1,5 @@
 import type { AssignmentGroup, User } from '@/types';
+import { formatUserDirectionLabels } from '@/services/users/helpers';
 
 export const GENERAL_ASSIGNMENT_GROUP_ID = 'grp-general';
 export const GENERAL_ASSIGNMENT_GROUP_LABEL = 'Общее задание';
@@ -31,10 +32,17 @@ export function sortRecipientGroups(groups: AssignmentGroup[]): AssignmentGroup[
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 }
 
+function hasComparablePhone(phone: string | undefined | null): phone is string {
+  return typeof phone === 'string' && phone.trim().length > 0;
+}
+
+/** Match by id; phone fallback only when both phones are non-empty (sanitized '' must not match). */
 export function isUserAmongMembers(user: User, members: User[]): boolean {
-  return members.some(
-    (member) => member.id === user.id || (member.phone === user.phone && member.role === user.role),
-  );
+  return members.some((member) => {
+    if (member.id === user.id) return true;
+    if (!hasComparablePhone(member.phone) || !hasComparablePhone(user.phone)) return false;
+    return member.phone === user.phone && member.role === user.role;
+  });
 }
 
 export type GroupMemberDirectionFilter = 'all' | string;
@@ -51,9 +59,5 @@ export function formatStudentDirectionLabels(
   student: User,
   directions: { id: string; name: string }[],
 ): string {
-  if (!student.directionIds?.length) return '';
-  return directions
-    .filter((d) => student.directionIds!.includes(d.id))
-    .map((d) => d.name)
-    .join(' · ');
+  return formatUserDirectionLabels(student, directions);
 }

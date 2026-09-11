@@ -28,7 +28,8 @@ export function useSendMessage() {
         attachments,
       }),
     onMutate: async ({ conversationId, userId, text, clientMutationId, replyToMessageId, attachments }) => {
-      await queryClient.cancelQueries({ queryKey: ['messages', conversationId, userId] });
+      // Don't await — awaiting in-flight refetches delays the optimistic bubble.
+      void queryClient.cancelQueries({ queryKey: ['messages', conversationId, userId] });
       const previous = queryClient.getQueryData(['messages', conversationId, userId]);
 
       const optimistic: Message = {
@@ -49,14 +50,14 @@ export function useSendMessage() {
         if (!old || typeof old !== 'object' || !('pages' in old)) return old;
         const data = old as { pages: { messages: Message[]; hasMore: boolean; nextCursor?: string }[] };
         const pages = [...data.pages];
-        const lastIdx = pages.length - 1;
-        if (lastIdx >= 0) {
-          pages[lastIdx] = {
-            ...pages[lastIdx]!,
-            messages: [...pages[lastIdx]!.messages, optimistic],
-          };
-        } else {
+        // Page 0 = newest window — append new messages there (not to last/oldest page)
+        if (pages.length === 0) {
           pages.push({ messages: [optimistic], hasMore: false });
+        } else {
+          pages[0] = {
+            ...pages[0]!,
+            messages: [...pages[0]!.messages, optimistic],
+          };
         }
         return { ...data, pages };
       });
@@ -72,7 +73,9 @@ export function useSendMessage() {
           pages: data.pages.map((page) => ({
             ...page,
             messages: page.messages.map((m) =>
-              m.clientMutationId === clientMutationId ? { ...msg, status: 'sent' as const } : m,
+              m.clientMutationId === clientMutationId || m.id === clientMutationId
+                ? { ...msg, status: 'sent' as const, clientMutationId }
+                : m,
             ),
           })),
         };
@@ -89,15 +92,25 @@ export function useSendMessage() {
           ...data,
           pages: data.pages.map((page) => ({
             ...page,
-            messages: page.messages.map((m) =>
-              m.clientMutationId === clientMutationId ? { ...m, status: 'failed' as const } : m,
-            ),
+            messages: page.messages.map((m) => {
+              if (m.clientMutationId !== clientMutationId && m.id !== clientMutationId) return m;
+              // Never downgrade a server-confirmed message to failed (race with
+              // realtime refetch after create + failed post-create side-effect).
+              if (m.status === 'sending' || m.id === clientMutationId) {
+                return { ...m, status: 'failed' as const };
+              }
+              return m;
+            }),
           })),
         };
       });
     },
-    onSettled: (_data, _err, { conversationId, userId }) => {
-      queryClient.invalidateQueries({ queryKey: ['messages', conversationId, userId] });
+    onSettled: (_data, err, { conversationId, userId }) => {
+      // Success path already patched the cache; refetch only on error to recover
+      // if the message actually landed on the server.
+      if (err) {
+        queryClient.invalidateQueries({ queryKey: ['messages', conversationId, userId] });
+      }
     },
   });
 }

@@ -26,7 +26,7 @@ export function resolveBootstrapSession(
   const record = pb.authStore.record as PbUserRecord | null;
   if (!pb.authStore.isValid || !pb.authStore.token || !record?.id) return null;
 
-  const user = mapUserRecord(record);
+  const user = mapUserRecord(record, { ownRecord: true });
   if (!isKnownUserRole(user.role)) return null;
 
   const phone = resolveOwnPhoneNumber(

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, UserMinus } from 'lucide-react';
+import { Plus, Trash2, UserMinus } from 'lucide-react';
 import { BackLink } from '@/components/ui/BackLink';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
@@ -12,16 +12,20 @@ import { AddGroupMembersModal } from '@/components/assignments/AddGroupMembersMo
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
+import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
 import { formatUserName } from '@/utils';
 
 export default function AssignmentGroupDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useCurrentUser()!;
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [actionError, setActionError] = useState('');
 
   const { data: group, isLoading, error, refetch } = useQuery({
@@ -68,6 +72,15 @@ export default function AssignmentGroupDetailPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => api.assignmentGroups.deleteGroup(id!, user.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['assignment-groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      navigate('/assignments/groups', { replace: true });
+    },
+  });
+
   const availableStudents = useMemo(() => {
     if (!users || !group) return [];
     return users
@@ -97,9 +110,31 @@ export default function AssignmentGroupDetailPage() {
 
   const members = group.members;
 
+  const closeDeleteModal = () => {
+    if (deleteMutation.isPending) return;
+    setDeleteOpen(false);
+  };
+
   return (
     <div className="page-container max-w-lg">
-      <BackLink label="К группам" fallbackTo="/assignments/groups" />
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <BackLink label="К группам" fallbackTo="/assignments/groups" className="mb-0" />
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="min-h-11 min-w-11 text-danger hover:text-danger"
+          aria-label="Удалить группу"
+          disabled={!isOnline || deleteMutation.isPending}
+          onClick={() => {
+            deleteMutation.reset();
+            setDeleteOpen(true);
+          }}
+        >
+          <Trash2 className="h-5 w-5" aria-hidden />
+        </Button>
+      </div>
+
       <h1 className="mb-2 text-h1">{group.name}</h1>
       <p className="mb-6 text-body-sm text-text-secondary">
         Управление участниками группы
@@ -139,7 +174,10 @@ export default function AssignmentGroupDetailPage() {
             {members.map((member) => (
               <li key={member.id}>
                 <Card padding="sm" className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
+                  <UserPreviewTrigger
+                    user={member}
+                    className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-0"
+                  >
                     <Avatar
                       src={member.avatarUrl}
                       firstName={member.firstName}
@@ -147,7 +185,7 @@ export default function AssignmentGroupDetailPage() {
                       size="sm"
                     />
                     <span className="truncate">{formatUserName(member)}</span>
-                  </div>
+                  </UserPreviewTrigger>
                   <Button
                     type="button"
                     variant="ghost"
@@ -180,6 +218,32 @@ export default function AssignmentGroupDetailPage() {
         onAdd={async (studentIds) => {
           await addMembersMutation.mutateAsync(studentIds);
         }}
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={closeDeleteModal}
+        title="Удалить группу?"
+        description={
+          <>
+            <p>
+              «{group.name}» будет удалена без возможности восстановления.
+              Связанные задания этой группы также будут удалены.
+            </p>
+            {deleteMutation.error && (
+              <p className="mt-2 text-caption text-danger" role="alert">
+                {deleteMutation.error instanceof ApiError
+                  ? deleteMutation.error.message
+                  : 'Не удалось удалить группу'}
+              </p>
+            )}
+          </>
+        }
+        confirmLabel="Удалить"
+        tone="destructive"
+        loading={deleteMutation.isPending}
+        disabled={!isOnline}
+        onConfirm={() => deleteMutation.mutate()}
       />
     </div>
   );

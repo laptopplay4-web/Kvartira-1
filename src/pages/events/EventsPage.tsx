@@ -9,6 +9,7 @@ import { canManageEvents } from '@/services/events/access';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -39,15 +40,15 @@ export default function EventsPage() {
       <header className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-h1">Мероприятия</h1>
         {canManage && (
-          <Button
-            size="icon"
-            className="min-h-11 min-w-11 shrink-0"
+          <IconButton
+            label="Добавить мероприятие"
+            variant="tonal"
+            className="shrink-0"
             disabled={!isOnline}
-            aria-label="Добавить мероприятие"
             onClick={() => setCreating(true)}
           >
             <Plus className="h-5 w-5" aria-hidden />
-          </Button>
+          </IconButton>
         )}
       </header>
 

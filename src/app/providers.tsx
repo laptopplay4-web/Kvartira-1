@@ -4,6 +4,8 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { queryClient } from './queryClient';
 import { useAuthStore } from '@/stores/authStore';
+import { ToastProvider } from '@/components/ui/Toast';
+import { UserPreviewProvider } from '@/components/users/UserPreviewProvider';
 
 function AuthHydrationGate({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
@@ -30,9 +32,13 @@ function AuthHydrationGate({ children }: { children: ReactNode }) {
 export function AppProviders() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthHydrationGate>
-        <RouterProvider router={router} />
-      </AuthHydrationGate>
+      <ToastProvider>
+        <AuthHydrationGate>
+          <UserPreviewProvider>
+            <RouterProvider router={router} />
+          </UserPreviewProvider>
+        </AuthHydrationGate>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

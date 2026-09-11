@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PROGRESS_FEATURE_ENABLED } from '@/config/features';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -13,8 +12,6 @@ const mockGetTeachers = vi.fn();
 const mockGetEvents = vi.fn();
 const mockGetConversations = vi.fn();
 const mockGetAllUsers = vi.fn();
-const mockGetProgressSummary = vi.fn();
-const mockGetProgressSkills = vi.fn();
 const mockGetAssignments = vi.fn();
 
 vi.mock('@/services/api', () => ({
@@ -32,10 +29,6 @@ vi.mock('@/services/api', () => ({
     },
     users: {
       getAllUsers: (...args: unknown[]) => mockGetAllUsers(...args),
-    },
-    progress: {
-      getSummary: (...args: unknown[]) => mockGetProgressSummary(...args),
-      getSkills: (...args: unknown[]) => mockGetProgressSkills(...args),
     },
     assignments: {
       getAssignments: (...args: unknown[]) => mockGetAssignments(...args),
@@ -100,31 +93,6 @@ const lesson = {
   createdAt: '2024-01-01',
   updatedAt: '2024-01-01',
 };
-
-const progressSummary = {
-  studentId: 'student-1',
-  lessonsCompleted: 3,
-  lessonsUpcoming: 1,
-  lessonsTotal: 4,
-  lessonsAttended: 3,
-  lessonsMissed: 1,
-  lessonsCancelled: 0,
-  attendanceRate: 75,
-  assignmentsTotal: 2,
-  activeGoals: 1,
-  completedGoals: 1,
-  achievementsUnlocked: 2,
-  achievementsTotal: 5,
-  averageSkillLevel: 45,
-};
-
-function mockProgressDefaults() {
-  mockGetProgressSummary.mockResolvedValue(progressSummary);
-  mockGetProgressSkills.mockResolvedValue([
-    { id: 'skill-1', name: 'Интонция', maxLevel: 100, level: 60, category: 'vocal' },
-    { id: 'skill-2', name: 'Сцена', maxLevel: 100, level: 30, category: 'performance' },
-  ]);
-}
 
 function mockAssignmentsDefaults() {
   mockGetAssignments.mockResolvedValue([]);
@@ -267,7 +235,6 @@ describe('HomePage P0', () => {
     mockGetTeachers.mockResolvedValue([teacherUser]);
     mockGetConversations.mockResolvedValue([]);
     mockGetEvents.mockResolvedValue([]);
-    mockProgressDefaults();
     mockAssignmentsDefaults();
   });
 
@@ -350,7 +317,6 @@ describe('HomePage P1', () => {
     mockGetTeachers.mockResolvedValue([teacherUser]);
     mockGetConversations.mockResolvedValue([]);
     mockGetEvents.mockResolvedValue([]);
-    mockProgressDefaults();
     mockAssignmentsDefaults();
   });
 
@@ -510,94 +476,6 @@ describe('HomePage admin as teacher', () => {
   });
 });
 
-describe.skipIf(!PROGRESS_FEATURE_ENABLED)('HomePage progress block', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetDirections.mockResolvedValue([{ id: 'dir-1', name: 'Фортепиано' }]);
-    mockGetTeachers.mockResolvedValue([teacherUser]);
-    mockGetEvents.mockResolvedValue([]);
-    mockProgressDefaults();
-    mockAssignmentsDefaults();
-  });
-
-  it('student sees progress summary and link to progress page', async () => {
-    mockUser = studentUser;
-    mockGetLessons.mockResolvedValue([
-      { ...lesson, studentId: studentUser.id, teacherId: teacherUser.id },
-    ]);
-
-    renderHome();
-
-    expect(await screen.findByText('Прогресс')).toBeInTheDocument();
-    expect(await screen.findByText('Интонция')).toBeInTheDocument();
-    expect(screen.getByText('2/5')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Подробнее/i })).toHaveAttribute('href', '/profile/progress');
-    expect(mockGetProgressSummary).toHaveBeenCalledWith(studentUser.id, studentUser.id);
-  });
-
-  it('shows ErrorState on progress error without blocking lessons', async () => {
-    mockUser = studentUser;
-    mockGetLessons.mockResolvedValue([
-      { ...lesson, studentId: studentUser.id, teacherId: teacherUser.id },
-    ]);
-    mockGetProgressSummary.mockRejectedValue(new Error('progress fail'));
-
-    renderHome();
-
-    expect(await screen.findByRole('heading', { name: formatUserName(teacherUser) })).toBeInTheDocument();
-    expect(screen.getByText('Прогресс')).toBeInTheDocument();
-    expect(screen.getByText('Что-то пошло не так')).toBeInTheDocument();
-  });
-
-  it('teacher does not fetch or show progress block', async () => {
-    mockUser = teacherUser;
-    mockGetLessons.mockResolvedValue([lesson]);
-    mockGetAllUsers.mockResolvedValue([teacherStudent]);
-
-    renderHome();
-
-    await screen.findByRole('heading', { name: formatUserName(teacherStudent) });
-    expect(screen.queryByText('Прогресс')).not.toBeInTheDocument();
-    expect(mockGetProgressSummary).not.toHaveBeenCalled();
-  });
-
-  it('admin does not show progress block', async () => {
-    mockUser = adminUser;
-    mockGetLessons.mockResolvedValue([]);
-    mockGetAllUsers.mockResolvedValue([]);
-
-    renderHome();
-
-    await screen.findByRole('heading', { name: formatUserName(adminUser) });
-    expect(screen.queryByText('Прогресс')).not.toBeInTheDocument();
-    expect(mockGetProgressSummary).not.toHaveBeenCalled();
-  });
-});
-
-describe.skipIf(PROGRESS_FEATURE_ENABLED)('HomePage progress block hidden', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetDirections.mockResolvedValue([{ id: 'dir-1', name: 'Фортепиано' }]);
-    mockGetTeachers.mockResolvedValue([teacherUser]);
-    mockGetEvents.mockResolvedValue([]);
-    mockProgressDefaults();
-    mockAssignmentsDefaults();
-  });
-
-  it('student does not fetch or show progress when feature is disabled', async () => {
-    mockUser = studentUser;
-    mockGetLessons.mockResolvedValue([
-      { ...lesson, studentId: studentUser.id, teacherId: teacherUser.id },
-    ]);
-
-    renderHome();
-
-    await screen.findByRole('heading', { name: formatUserName(teacherUser) });
-    expect(screen.queryByText('Прогресс')).not.toBeInTheDocument();
-    expect(mockGetProgressSummary).not.toHaveBeenCalled();
-  });
-});
-
 describe('HomePage assignments block', () => {
   const pendingAssignment = {
     id: 'asgn-home-1',
@@ -616,7 +494,6 @@ describe('HomePage assignments block', () => {
     mockGetDirections.mockResolvedValue([{ id: 'dir-1', name: 'Фортепиано' }]);
     mockGetTeachers.mockResolvedValue([teacherUser]);
     mockGetEvents.mockResolvedValue([]);
-    mockProgressDefaults();
     mockAssignmentsDefaults();
   });
 

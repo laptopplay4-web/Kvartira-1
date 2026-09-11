@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
-import type { Message, User } from '@/types';
-import { buildMessageListWithSeparators } from '@/services/chat/helpers';
+import type { Conversation, ConversationMember, Message, User } from '@/types';
+import {
+  buildMessageListWithSeparators,
+  resolvePinnedIndexForViewport,
+} from '@/services/chat/helpers';
 import { formatChatDateSeparator } from '@/utils/dates';
 import { MessageBubble } from './MessageBubble';
 import { SystemMessage } from './SystemMessage';
@@ -8,7 +11,9 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { MessageCircle, ChevronDown } from 'lucide-react';
+import { cn } from '@/utils';
 
 export interface MessageListHandle {
   scrollToMessage: (messageId: string) => void;
@@ -31,9 +36,19 @@ interface MessageListProps {
   onReply?: (message: Message) => void;
   onEdit?: (message: Message) => void;
   onDelete?: (message: Message) => void;
+  onForward?: (message: Message) => void;
+  onReact?: (message: Message, emoji: string) => void;
+  onPin?: (message: Message) => void;
   onImageClick?: (message: Message, index: number) => void;
   onDragDrop?: (files: FileList) => void;
   highlightMessageId?: string | null;
+  conversation?: Conversation | null;
+  members?: ConversationMember[];
+  /** Newest → oldest pin ids; drives Telegram-style pin bar sync on scroll. */
+  pinnedIdsNewestFirst?: string[];
+  onPinnedIndexChange?: (index: number) => void;
+  /** Fired on real user scroll intent (wheel/touch/scrollbar), not programmatic. */
+  onPinnedScrollResume?: () => void;
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
@@ -53,9 +68,17 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     onReply,
     onEdit,
     onDelete,
+    onForward,
+    onReact,
+    onPin,
     onImageClick,
     onDragDrop,
     highlightMessageId,
+    conversation,
+    members,
+    pinnedIdsNewestFirst,
+    onPinnedIndexChange,
+    onPinnedScrollResume,
   },
   ref,
 ) {
@@ -67,6 +90,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const prevCountRef = useRef(messages.length);
   const prevScrollHeightRef = useRef(0);
   const loadingMoreRef = useRef(false);
+  const pinSyncRafRef = useRef(0);
+  const lastEmittedPinIndexRef = useRef<number | null>(null);
+  const pinnedIdsRef = useRef(pinnedIdsNewestFirst);
+  const onPinnedIndexChangeRef = useRef(onPinnedIndexChange);
+  pinnedIdsRef.current = pinnedIdsNewestFirst;
+  onPinnedIndexChangeRef.current = onPinnedIndexChange;
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     bottomRef.current?.scrollIntoView({ behavior });
@@ -95,13 +124,20 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   useEffect(() => {
     if (isLoading) return;
-    if (messages.length > prevCountRef.current && isAtBottom) {
-      scrollToBottom();
-    } else if (messages.length > prevCountRef.current && !isAtBottom) {
+    if (messages.length <= prevCountRef.current) {
+      prevCountRef.current = messages.length;
+      return;
+    }
+    const newest = messages[messages.length - 1];
+    const ownNew = newest?.senderId === currentUserId;
+    if (isAtBottom || ownNew) {
+      scrollToBottom('smooth');
+      setShowNewIndicator(false);
+    } else {
       setShowNewIndicator(true);
     }
     prevCountRef.current = messages.length;
-  }, [messages.length, isLoading, isAtBottom, scrollToBottom]);
+  }, [messages, isLoading, isAtBottom, scrollToBottom, currentUserId]);
 
   useEffect(() => {
     if (!isLoading && messages.length > 0 && !loadingMoreRef.current) {
@@ -126,6 +162,57 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     }
   }, [isFetchingMore, messages.length]);
 
+  const syncPinnedIndex = useCallback(() => {
+    const ids = pinnedIdsRef.current;
+    const onChange = onPinnedIndexChangeRef.current;
+    const el = containerRef.current;
+    if (!ids?.length || !onChange || !el) return;
+
+    const viewportTop = el.getBoundingClientRect().top + 4;
+    const pinTopById: Record<string, number | null> = {};
+    for (const id of ids) {
+      const node = document.getElementById(`message-${id}`);
+      pinTopById[id] = node ? node.getBoundingClientRect().top : null;
+    }
+    const next = resolvePinnedIndexForViewport(ids, pinTopById, viewportTop);
+    if (lastEmittedPinIndexRef.current === next) return;
+    lastEmittedPinIndexRef.current = next;
+    onChange(next);
+  }, []);
+
+  const schedulePinnedSync = useCallback(() => {
+    if (pinSyncRafRef.current) cancelAnimationFrame(pinSyncRafRef.current);
+    pinSyncRafRef.current = requestAnimationFrame(() => {
+      pinSyncRafRef.current = 0;
+      syncPinnedIndex();
+    });
+  }, [syncPinnedIndex]);
+
+  useEffect(() => {
+    lastEmittedPinIndexRef.current = null;
+    schedulePinnedSync();
+  }, [pinnedIdsNewestFirst, messages.length, schedulePinnedSync]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !onPinnedScrollResume) return;
+    const resume = () => onPinnedScrollResume();
+    el.addEventListener('wheel', resume, { passive: true });
+    el.addEventListener('touchstart', resume, { passive: true });
+    el.addEventListener('pointerdown', resume);
+    return () => {
+      el.removeEventListener('wheel', resume);
+      el.removeEventListener('touchstart', resume);
+      el.removeEventListener('pointerdown', resume);
+    };
+  }, [onPinnedScrollResume, isLoading]);
+
+  useEffect(() => {
+    return () => {
+      if (pinSyncRafRef.current) cancelAnimationFrame(pinSyncRafRef.current);
+    };
+  }, []);
+
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
@@ -136,6 +223,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     if (el.scrollTop < 80 && hasMore && !isFetchingMore) {
       onLoadMore?.();
     }
+    schedulePinnedSync();
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -171,7 +259,11 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     );
   }
 
-  if (messages.length === 0) {
+  const visibleMessages = messages.filter((m) => !m.deletedAt);
+  const messageMap = new Map(visibleMessages.map((m) => [m.id, m]));
+  const entries = buildMessageListWithSeparators(visibleMessages, currentUserId, formatChatDateSeparator);
+
+  if (visibleMessages.length === 0 && !isLoading) {
     return (
       <EmptyState
         icon={MessageCircle}
@@ -181,9 +273,6 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       />
     );
   }
-
-  const messageMap = new Map(messages.map((m) => [m.id, m]));
-  const entries = buildMessageListWithSeparators(messages, currentUserId, formatChatDateSeparator);
 
   return (
     <div
@@ -209,23 +298,28 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-4"
+        className="scrollbar-none min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[color-mix(in_srgb,var(--color-surface)_90%,var(--color-brand)_10%)] px-2 py-3 md:px-3"
         role="log"
         aria-live="polite"
         aria-relevant="additions"
       >
-        <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3 overflow-hidden">
+        <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col overflow-hidden">
           {entries.map((entry) =>
             entry.type === 'separator' ? (
-              <div key={entry.key} className="flex justify-center py-2">
-                <span className="rounded-full bg-surface-elevated px-3 py-1 text-caption text-text-muted">
+              <div key={entry.key} className="my-3 flex justify-center py-1">
+                <span className="glass-card rounded-full px-3 py-1 text-caption text-text-muted">
                   {entry.label}
                 </span>
               </div>
             ) : entry.group.message.messageType === 'system' ? (
-              <SystemMessage key={entry.key} message={entry.group.message} />
+              <div key={entry.key} className="mt-3 first:mt-0">
+                <SystemMessage message={entry.group.message} />
+              </div>
             ) : (
-              <div key={entry.key}>
+              <div
+                key={entry.key}
+                className={entry.group.clusterStart ? 'mt-2.5 first:mt-0' : 'mt-0.5'}
+              >
                 <MessageBubble
                   message={entry.group.message}
                   sender={users.find((u) => u.id === entry.group.message.senderId)}
@@ -234,6 +328,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                   showAvatar={entry.group.showAvatar}
                   isGroup={isGroup}
                   user={user}
+                  conversation={conversation}
+                  members={members}
                   replyToMessage={
                     entry.group.message.replyToMessageId
                       ? messageMap.get(entry.group.message.replyToMessageId)
@@ -250,6 +346,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                   onReply={onReply}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onForward={onForward}
+                  onReact={onReact}
+                  onPin={onPin}
                   onReplyClick={(id) => scrollToMessage(id)}
                   onImageClick={onImageClick}
                   highlighted={highlightMessageId === entry.group.message.id}
@@ -268,20 +367,36 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         </div>
       </div>
 
-      {showNewIndicator && (
-        <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              scrollToBottom();
-              setShowNewIndicator(false);
-            }}
-            className="shadow-lg"
-          >
-            <ChevronDown className="h-4 w-4" />
-            Новые сообщения
-          </Button>
+      {!isAtBottom && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-3">
+          <div className="pointer-events-auto relative">
+            <IconButton
+              label={
+                showNewIndicator
+                  ? 'Новые сообщения — вниз'
+                  : 'Вниз к последним сообщениям'
+              }
+              variant="secondary"
+              size="md"
+              onClick={() => {
+                scrollToBottom();
+                setShowNewIndicator(false);
+                setIsAtBottom(true);
+              }}
+              className={cn(
+                'rounded-full border border-border bg-surface-elevated text-text-primary shadow-lg',
+                'hover:bg-surface-hover',
+              )}
+            >
+              <ChevronDown className="h-5 w-5" aria-hidden />
+            </IconButton>
+            {showNewIndicator && (
+              <span
+                className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-surface"
+                aria-hidden
+              />
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,35 +1,29 @@
-import type { LessonsApi } from '@/services/api/types';
-
+import type {
+  CreateDirectionInput,
+  LessonsApi,
+  UpdateDirectionInput,
+} from '@/services/api/types';
 import { ApiError } from '@/services/api/types';
-
 import { getPocketBase } from '@/services/api/pocketbase/client';
-
 import { withPbError } from '@/services/api/pocketbase/errors';
-
 import {
-
   mapDirectionRecord,
-
   mapLessonHistoryRecord,
-
   mapLessonRecord,
-
   mapUserRecord,
-
 } from '@/services/api/pocketbase/mappers';
-
 import { getPocketBaseAvailability } from '@/services/api/pocketbase/availability';
 import { resolveUsersAvatars } from '@/services/api/pocketbase/files';
-
 import { canViewLesson, canRescheduleLesson, canCancelLesson, canEditTeacherNotes } from '@/services/lessons/access';
-
 import { sanitizeLessonForViewer } from '@/services/lessons/helpers';
-
 import { calculateAvailableSlots, slotsConflict } from '@/services/slots/calculateSlots';
-
 import { getDayOfWeekFromDate } from '@/utils/dates';
-
-import type { Lesson, LessonHistoryEntry, User } from '@/types';
+import { canManageDirections } from '@/services/directions/access';
+import {
+  normalizeDirectionInput,
+  validateDirectionInput,
+} from '@/services/directions/validation';
+import type { Direction, Lesson, LessonHistoryEntry, User } from '@/types';
 
 
 
@@ -220,20 +214,86 @@ async function loadTeacherLessons(teacherId: string): Promise<Lesson[]> {
 export const pocketbaseLessonsApi: LessonsApi = {
 
   async getDirections() {
-
     return withPbError(async () => {
-
       const pb = getPocketBase();
-
       const records = await pb.collection('directions').getFullList({ sort: 'name' });
-
       return records.map(mapDirectionRecord);
-
     });
-
   },
 
+  async createDirection(input: CreateDirectionInput, adminId) {
+    return withPbError(async () => {
+      const pb = getPocketBase();
+      const admin = mapUserRecord(await pb.collection('users').getOne(adminId));
+      if (!canManageDirections(admin)) {
+        throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+      }
+      const validationError = validateDirectionInput(input);
+      if (validationError) {
+        throw new ApiError(validationError, 'VALIDATION_ERROR', 400);
+      }
+      const normalized = normalizeDirectionInput(input);
+      const record = await pb.collection('directions').create(normalized);
+      return mapDirectionRecord(record);
+    });
+  },
 
+  async updateDirection(id: string, input: UpdateDirectionInput, adminId) {
+    return withPbError(async () => {
+      const pb = getPocketBase();
+      const admin = mapUserRecord(await pb.collection('users').getOne(adminId));
+      if (!canManageDirections(admin)) {
+        throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+      }
+      const current = mapDirectionRecord(await pb.collection('directions').getOne(id));
+      const next: Direction = {
+        ...current,
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.icon !== undefined ? { icon: input.icon } : {}),
+      };
+      const validationError = validateDirectionInput(next);
+      if (validationError) {
+        throw new ApiError(validationError, 'VALIDATION_ERROR', 400);
+      }
+      const normalized = normalizeDirectionInput(next);
+      const record = await pb.collection('directions').update(id, {
+        name: normalized.name,
+        description: normalized.description ?? '',
+        icon: normalized.icon ?? '',
+      });
+      return mapDirectionRecord(record);
+    });
+  },
+
+  async deleteDirection(id: string, adminId) {
+    return withPbError(async () => {
+      const pb = getPocketBase();
+      const admin = mapUserRecord(await pb.collection('users').getOne(adminId));
+      if (!canManageDirections(admin)) {
+        throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+      }
+      const lessons = await pb.collection('lessons').getList(1, 1, {
+        filter: `direction = "${id}"`,
+      });
+      if (lessons.totalItems > 0) {
+        throw new ApiError('Нельзя удалить направление: есть занятия', 'CONFLICT', 409);
+      }
+      const users = await pb.collection('users').getFullList({ fields: 'id,directionIds' });
+      const assigned = users.some((u) => {
+        const ids = (u as { directionIds?: string[] }).directionIds ?? [];
+        return ids.includes(id);
+      });
+      if (assigned) {
+        throw new ApiError(
+          'Нельзя удалить направление: оно назначено пользователям',
+          'CONFLICT',
+          409,
+        );
+      }
+      await pb.collection('directions').delete(id);
+    });
+  },
 
   async getTeachers(directionId) {
 
@@ -265,7 +325,7 @@ export const pocketbaseLessonsApi: LessonsApi = {
 
 
 
-      const users = await resolveUsersAvatars(filtered.map(mapUserRecord));
+      const users = await resolveUsersAvatars(filtered.map((record) => mapUserRecord(record)));
       return users.map((user) => ({ ...user, phone: '' }));
 
     });

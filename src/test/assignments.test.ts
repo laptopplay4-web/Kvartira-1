@@ -11,7 +11,10 @@ import {
   canManageAssignmentGroups,
   canViewAssignmentGroup,
 } from '@/services/assignments/groups/access';
-import { filterStudentsByDirection } from '@/services/assignments/groups/helpers';
+import {
+  filterStudentsByDirection,
+  isUserAmongMembers,
+} from '@/services/assignments/groups/helpers';
 import { getRecentAssignmentsForHome } from '@/services/assignments/helpers';
 import {
   validateAssignmentContentFile,
@@ -263,6 +266,31 @@ describe('mock assignment groups API', () => {
     expect(detail.members.length).toBeGreaterThan(0);
     expect(detail.members.some((m) => m.id === student.id)).toBe(true);
   });
+
+  it('teacher deletes custom group and cascades assignments', async () => {
+    const before = await mockAssignmentsApi.getAssignments({ requesterId: teacher.id });
+    expect(before.some((a) => a.groupId === 'grp-vocalists')).toBe(true);
+
+    await mockAssignmentGroupsApi.deleteGroup('grp-vocalists', teacher.id);
+
+    const groups = await mockAssignmentGroupsApi.getGroups(teacher.id);
+    expect(groups.some((g) => g.id === 'grp-vocalists')).toBe(false);
+
+    const after = await mockAssignmentsApi.getAssignments({ requesterId: teacher.id });
+    expect(after.every((a) => a.groupId !== 'grp-vocalists')).toBe(true);
+  });
+
+  it('cannot delete general assignment group', async () => {
+    await expect(
+      mockAssignmentGroupsApi.deleteGroup('grp-general', teacher.id),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('student cannot delete group (IDOR)', async () => {
+    await expect(
+      mockAssignmentGroupsApi.deleteGroup('grp-vocalists', student.id),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
 });
 
 describe('assignment group member helpers', () => {
@@ -273,5 +301,30 @@ describe('assignment group member helpers', () => {
 
     expect(filterStudentsByDirection(list, 'dir-vocal')).toHaveLength(1);
     expect(filterStudentsByDirection(list, 'all')).toHaveLength(2);
+  });
+
+  it('isUserAmongMembers matches by id', () => {
+    const member = { ...student, phone: '' };
+    const other = { ...otherStudent, phone: '' };
+    expect(isUserAmongMembers(member, [member])).toBe(true);
+    expect(isUserAmongMembers(other, [member])).toBe(false);
+  });
+
+  it('empty phones do not false-positive membership', () => {
+    const member = { ...student, phone: '' };
+    const other = { ...otherStudent, phone: '' };
+    const sanitized = { ...otherStudent, id: 'user-student-3', phone: undefined as unknown as string };
+
+    expect(isUserAmongMembers(other, [member])).toBe(false);
+    expect(isUserAmongMembers(sanitized, [member])).toBe(false);
+    expect(isUserAmongMembers({ ...other, phone: '   ' }, [{ ...member, phone: '   ' }])).toBe(
+      false,
+    );
+  });
+
+  it('non-empty matching phones still identify same person', () => {
+    const member = { ...student, phone: '+79001112233' };
+    const samePhoneOtherId = { ...otherStudent, phone: '+79001112233' };
+    expect(isUserAmongMembers(samePhoneOtherId, [member])).toBe(true);
   });
 });

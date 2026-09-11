@@ -1,6 +1,5 @@
 import { addDays, format, getDay } from 'date-fns';
 import type {
-  AchievementDefinition,
   AppNotification,
   Assignment,
   AssignmentGroup,
@@ -10,14 +9,9 @@ import type {
   Lesson,
   LessonHistoryEntry,
   Message,
-  ProgressGoal,
-  ProgressHistoryEntry,
   SchoolEvent,
-  Skill,
-  StudentSkillProgress,
   TeacherAvailability,
   User,
-  UserAchievement,
   HelpArticle,
   SupportTicket,
   PublicSchoolInfo,
@@ -36,8 +30,8 @@ export const DEMO_ACCOUNTS = {
 
 export const directions: Direction[] = [
   { id: 'dir-vocal', name: 'Вокал', description: 'Современный и академический вокал', icon: '🎤' },
-  { id: 'dir-piano', name: 'Фортепиано', description: 'Классика и джаз', icon: '🎹' },
   { id: 'dir-guitar', name: 'Гитара', description: 'Акустика и электрогитара', icon: '🎸' },
+  { id: 'dir-piano', name: 'Фортепиано', description: 'Классика и джаз', icon: '🎹' },
   { id: 'dir-drums', name: 'Ударные', description: 'Ритм-секция и импровизация', icon: '🥁' },
 ];
 
@@ -510,201 +504,6 @@ export const initialAssignments: Assignment[] = [
   },
 ];
 
-export const skills: Skill[] = [
-  {
-    id: 'skill-breathing',
-    name: 'Дыхание',
-    description: 'Контроль дыхания и опора',
-    directionId: 'dir-vocal',
-    maxLevel: 100,
-  },
-  {
-    id: 'skill-intonation',
-    name: 'Интонция',
-    description: 'Точность высоты и тембр',
-    directionId: 'dir-vocal',
-    maxLevel: 100,
-  },
-  {
-    id: 'skill-stage',
-    name: 'Сценическое движение',
-    description: 'Подвижность и выразительность на сцене',
-    directionId: 'dir-vocal',
-    maxLevel: 100,
-  },
-  {
-    id: 'skill-scales',
-    name: 'Гаммы и арпеджио',
-    description: 'Техника фортепианной школы',
-    directionId: 'dir-piano',
-    maxLevel: 100,
-  },
-];
-
-export const initialSkillProgress: StudentSkillProgress[] = [
-  {
-    id: 'prog-1',
-    studentId: 'user-student',
-    skillId: 'skill-breathing',
-    level: 45,
-    note: 'Стабильнее на средних нотах',
-    updatedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-  },
-  {
-    id: 'prog-2',
-    studentId: 'user-student',
-    skillId: 'skill-intonation',
-    level: 60,
-    updatedAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'prog-3',
-    studentId: 'user-student',
-    skillId: 'skill-stage',
-    level: 30,
-    updatedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-  },
-  {
-    id: 'prog-4',
-    studentId: 'user-student-2',
-    skillId: 'skill-scales',
-    level: 55,
-    updatedAt: new Date(Date.now() - 172800000).toISOString(),
-  },
-];
-
-export const initialProgressGoals: ProgressGoal[] = [
-  {
-    id: 'goal-1',
-    studentId: 'user-student',
-    teacherId: 'user-teacher-1',
-    title: 'Подготовить арию к концерту',
-    description: 'Выучить партию и отработать с аккомпанементом',
-    targetDate: format(addDays(today, 14), 'yyyy-MM-dd'),
-    status: 'active',
-    createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
-  },
-  {
-    id: 'goal-2',
-    studentId: 'user-student',
-    teacherId: 'user-teacher-1',
-    title: 'Освоить сольфеджио — мажорные интервалы',
-    status: 'completed',
-    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-    completedAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-  },
-  {
-    id: 'goal-3',
-    studentId: 'user-student-2',
-    teacherId: 'user-teacher-1',
-    title: 'Сыграть этюд без остановок',
-    targetDate: format(addDays(today, 7), 'yyyy-MM-dd'),
-    status: 'active',
-    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-  },
-];
-
-export const initialProgressHistory: ProgressHistoryEntry[] = [
-  {
-    id: 'hist-prog-1',
-    studentId: 'user-student',
-    type: 'lesson',
-    title: 'Занятие по вокалу завершено',
-    description: 'Отработали дыхательные упражнения',
-    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-  },
-  {
-    id: 'hist-prog-2',
-    studentId: 'user-student',
-    type: 'assignment',
-    title: 'Задание отправлено на проверку',
-    description: 'Анализ произведения',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'hist-prog-3',
-    studentId: 'user-student',
-    type: 'skill',
-    title: 'Прогресс: Интонция',
-    description: 'Уровень повышен до 60%',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'hist-prog-4',
-    studentId: 'user-student',
-    type: 'achievement',
-    title: 'Достижение: Первое занятие',
-    createdAt: new Date(Date.now() - 86400000 * 20).toISOString(),
-  },
-  {
-    id: 'hist-prog-5',
-    studentId: 'user-student-2',
-    type: 'assignment',
-    title: 'Задание проверено',
-    description: 'Гаммы соль мажор — оценка 4',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
-
-export const achievementDefinitions: AchievementDefinition[] = [
-  {
-    id: 'ach-first-lesson',
-    code: 'first_lesson',
-    title: 'Первое занятие',
-    description: 'Посетили первое занятие в школе',
-    icon: 'music',
-  },
-  {
-    id: 'ach-ten-lessons',
-    code: 'ten_lessons',
-    title: '10 занятий',
-    description: 'Провели 10 занятий',
-    icon: 'calendar',
-  },
-  {
-    id: 'ach-skill-master',
-    code: 'skill_master',
-    title: 'Освоенный навык',
-    description: 'Достигли 80% по любому навыку',
-    icon: 'star',
-  },
-  {
-    id: 'ach-regular',
-    code: 'regularity',
-    title: 'Регулярность',
-    description: 'Занимались 4 недели подряд',
-    icon: 'award',
-  },
-  {
-    id: 'ach-performance',
-    code: 'first_performance',
-    title: 'Первое выступление',
-    description: 'Участие в концерте или мероприятии',
-    icon: 'mic',
-  },
-];
-
-export const initialUserAchievements: UserAchievement[] = [
-  {
-    id: 'uach-1',
-    studentId: 'user-student',
-    achievementId: 'ach-first-lesson',
-    unlockedAt: new Date(Date.now() - 86400000 * 20).toISOString(),
-  },
-  {
-    id: 'uach-2',
-    studentId: 'user-student-2',
-    achievementId: 'ach-first-lesson',
-    unlockedAt: new Date(Date.now() - 86400000 * 15).toISOString(),
-  },
-  {
-    id: 'uach-3',
-    studentId: 'user-student-2',
-    achievementId: 'ach-skill-master',
-    unlockedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-];
-
 export const helpArticles: HelpArticle[] = [
   {
     id: 'faq-1',
@@ -860,18 +659,27 @@ export const initialSecuritySessions: SecuritySessionRecord[] = [
   },
 ];
 
-const LEGAL_DISCLAIMER =
-  'Текст носит демонстрационный характер и требует юридической проверки перед публикацией.';
+import {
+  LEGAL_COMMUNICATION_CONSENT_TEXT,
+  LEGAL_GUARDIAN_CONSENT_TEXT,
+  LEGAL_PERSONAL_DATA_CONSENT_TEXT,
+  LEGAL_PRIVACY_POLICY_TEXT,
+  LEGAL_PUBLICATION_CONSENT_TEXT,
+  LEGAL_SCHOOL_RULES_TEXT,
+  LEGAL_TERMS_OF_SERVICE_TEXT,
+} from '@/services/legal/documentTexts';
 
 export const initialLegalDocuments: LegalDocument[] = [
   {
     id: 'legal-privacy',
     type: 'privacy_policy',
     title: 'Политика конфиденциальности',
-    content: `Политика описывает, как школа «Квартира» обрабатывает персональные данные учеников и посетителей сайта.\n\n${LEGAL_DISCLAIMER}`,
+    content: LEGAL_PRIVACY_POLICY_TEXT,
     currentVersion: '2.0',
     effectiveAt: format(addDays(today, -14), 'yyyy-MM-dd'),
     requiresConsent: true,
+    purpose: 'service',
+    required: true,
     versionHistory: [
       {
         version: '2.0',
@@ -889,10 +697,12 @@ export const initialLegalDocuments: LegalDocument[] = [
     id: 'legal-personal-data',
     type: 'personal_data',
     title: 'Согласие на обработку персональных данных',
-    content: `Документ определяет перечень обрабатываемых данных, цели и права субъекта персональных данных.\n\n${LEGAL_DISCLAIMER}`,
+    content: LEGAL_PERSONAL_DATA_CONSENT_TEXT,
     currentVersion: '1.0',
     effectiveAt: format(addDays(today, -180), 'yyyy-MM-dd'),
     requiresConsent: true,
+    purpose: 'service',
+    required: true,
     versionHistory: [
       {
         version: '1.0',
@@ -905,10 +715,12 @@ export const initialLegalDocuments: LegalDocument[] = [
     id: 'legal-terms',
     type: 'terms_of_service',
     title: 'Пользовательское соглашение',
-    content: `Условия использования приложения школы «Квартира»: регистрация, запись на занятия, чат и уведомления.\n\n${LEGAL_DISCLAIMER}`,
+    content: LEGAL_TERMS_OF_SERVICE_TEXT,
     currentVersion: '1.0',
     effectiveAt: format(addDays(today, -180), 'yyyy-MM-dd'),
     requiresConsent: true,
+    purpose: 'service',
+    required: true,
     versionHistory: [
       {
         version: '1.0',
@@ -921,10 +733,64 @@ export const initialLegalDocuments: LegalDocument[] = [
     id: 'legal-school-rules',
     type: 'school_rules',
     title: 'Правила школы',
-    content: `Внутренние правила посещения занятий, отмены, поведения на мероприятиях и в общих пространствах.\n\n${LEGAL_DISCLAIMER}`,
+    content: LEGAL_SCHOOL_RULES_TEXT,
     currentVersion: '1.0',
     effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
     requiresConsent: false,
+    versionHistory: [
+      {
+        version: '1.0',
+        effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
+        changeSummary: 'Первая публикуемая версия.',
+      },
+    ],
+  },
+  {
+    id: 'legal-communication',
+    type: 'personal_data',
+    title: 'Согласие на уведомления и рассылки',
+    content: LEGAL_COMMUNICATION_CONSENT_TEXT,
+    currentVersion: '1.0',
+    effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
+    requiresConsent: true,
+    purpose: 'communication',
+    required: false,
+    versionHistory: [
+      {
+        version: '1.0',
+        effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
+        changeSummary: 'Первая публикуемая версия.',
+      },
+    ],
+  },
+  {
+    id: 'legal-publication',
+    type: 'personal_data',
+    title: 'Согласие на публикацию фото и видео',
+    content: LEGAL_PUBLICATION_CONSENT_TEXT,
+    currentVersion: '1.0',
+    effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
+    requiresConsent: true,
+    purpose: 'publication',
+    required: false,
+    versionHistory: [
+      {
+        version: '1.0',
+        effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
+        changeSummary: 'Первая публикуемая версия.',
+      },
+    ],
+  },
+  {
+    id: 'legal-guardian',
+    type: 'personal_data',
+    title: 'Согласие законного представителя',
+    content: LEGAL_GUARDIAN_CONSENT_TEXT,
+    currentVersion: '1.0',
+    effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
+    requiresConsent: true,
+    purpose: 'minor_guardian',
+    required: false,
     versionHistory: [
       {
         version: '1.0',
@@ -943,6 +809,7 @@ export const initialUserConsents: UserConsent[] = [
     documentType: 'privacy_policy',
     documentTitle: 'Политика конфиденциальности',
     version: '1.0',
+    purpose: 'service',
     acceptedAt: new Date(Date.now() - 86400000 * 200).toISOString(),
   },
   {
@@ -952,6 +819,7 @@ export const initialUserConsents: UserConsent[] = [
     documentType: 'personal_data',
     documentTitle: 'Согласие на обработку персональных данных',
     version: '1.0',
+    purpose: 'service',
     acceptedAt: new Date(Date.now() - 86400000 * 150).toISOString(),
   },
   {
@@ -961,6 +829,17 @@ export const initialUserConsents: UserConsent[] = [
     documentType: 'terms_of_service',
     documentTitle: 'Пользовательское соглашение',
     version: '1.0',
+    purpose: 'service',
+    acceptedAt: new Date(Date.now() - 86400000 * 150).toISOString(),
+  },
+  {
+    id: 'consent-communication',
+    userId: 'user-student',
+    documentId: 'legal-communication',
+    documentType: 'personal_data',
+    documentTitle: 'Согласие на уведомления и рассылки',
+    version: '1.0',
+    purpose: 'communication',
     acceptedAt: new Date(Date.now() - 86400000 * 150).toISOString(),
   },
   {

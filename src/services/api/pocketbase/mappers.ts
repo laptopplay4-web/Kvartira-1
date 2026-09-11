@@ -1,11 +1,11 @@
 import type { RecordModel } from 'pocketbase';
 import type {
-  AchievementDefinition,
   AppNotification,
   Assignment,
   AssignmentContentBlock,
   AssignmentGroup,
   CompetitionApplication,
+  ConsentPurpose,
   Conversation,
   ConversationLastMessage,
   ConversationMember,
@@ -16,6 +16,7 @@ import type {
   Direction,
   EventRegistration,
   EventType,
+  GuardianDetails,
   Lesson,
   LessonHistoryEntry,
   LessonMaterial,
@@ -26,15 +27,9 @@ import type {
   MessageStatus,
   MessageType,
   PlanningPeriod,
-  ProgressGoal,
-  ProgressGoalStatus,
   PublicNewsItem,
-  ProgressHistoryEntry,
-  ProgressHistoryType,
   PublicSchoolInfo,
   SchoolEvent,
-  Skill,
-  StudentSkillProgress,
   SupportTicket,
   SupportTicketAttachment,
   SupportTicketCategory,
@@ -53,11 +48,9 @@ import type {
   SlotInterval,
   TeacherAvailability,
   User,
-  UserAchievement,
   UserRole,
   AvailabilityException,
 } from '@/types';
-import { fromPbSkillLevel } from '@/services/progress/skillLevel';
 import {
   emptyToUndefined,
   getPbRecordCreatedAt,
@@ -84,10 +77,24 @@ export interface PbUserRecord extends RecordModel {
   directionIds?: string[];
 }
 
-export function mapUserRecord(record: PbUserRecord | RecordModel): User {
+export interface MapUserRecordOptions {
+  /**
+   * Recover the phone from the synthetic `{digits}@kvartira.local` email.
+   * Only allowed for the viewer's OWN record — otherwise it re-creates the
+   * phone that PocketBase deliberately hid.
+   */
+  ownRecord?: boolean;
+}
+
+export function mapUserRecord(
+  record: PbUserRecord | RecordModel,
+  options: MapUserRecordOptions = {},
+): User {
   const r = record as PbUserRecord & { email?: string };
   const phone =
-    (typeof r.phone === 'string' && r.phone) || phoneFromSyntheticEmail(r.email) || '';
+    (typeof r.phone === 'string' && r.phone) ||
+    (options.ownRecord ? phoneFromSyntheticEmail(r.email) : '') ||
+    '';
   const user: User = {
     id: record.id,
     phone,
@@ -376,8 +383,17 @@ export function mapConversationRecord(record: PbConversationRecord | RecordModel
   const lastMessage = mapLastMessage(r.lastMessage);
   if (lastMessage) conversation.lastMessage = lastMessage;
 
-  if (r.metadata && typeof r.metadata === 'object' && r.metadata.lessonId) {
-    conversation.metadata = { lessonId: r.metadata.lessonId };
+  if (r.metadata && typeof r.metadata === 'object') {
+    const meta: Conversation['metadata'] = {};
+    if (typeof r.metadata.lessonId === 'string' && r.metadata.lessonId) {
+      meta.lessonId = r.metadata.lessonId;
+    }
+    if (r.metadata.schoolWide === true) {
+      meta.schoolWide = true;
+    }
+    if (Object.keys(meta).length > 0) {
+      conversation.metadata = meta;
+    }
   }
 
   const pinned = asIdList(r.pinnedMessageIds);
@@ -416,6 +432,9 @@ export function mapConversationMemberRecord(
 
   const mutedUntil = normalizePbDateTime(r.mutedUntil);
   if (mutedUntil) member.mutedUntil = mutedUntil;
+
+  const pinnedAt = normalizePbDateTime((r as { pinnedAt?: string }).pinnedAt);
+  if (pinnedAt) member.pinnedAt = pinnedAt;
 
   return member;
 }
@@ -468,8 +487,11 @@ export function mapMessageRecord(record: PbMessageRecord | RecordModel): Message
 
   if (r.messageType) message.messageType = r.messageType;
 
-  if (r.metadata && typeof r.metadata === 'object' && r.metadata.system) {
+  if (r.metadata && typeof r.metadata === 'object') {
     message.metadata = r.metadata;
+    if (Array.isArray(r.metadata.reactions)) {
+      message.reactions = r.metadata.reactions;
+    }
   }
 
   return message;
@@ -523,153 +545,6 @@ export function mapAssignmentGroupRecord(record: PbAssignmentGroupRecord | Recor
     isGeneral: r.kind === 'general',
     createdAt: getPbRecordCreatedAt(record),
     updatedAt: getPbRecordUpdatedAt(record),
-  };
-}
-
-export interface PbSkillRecord extends RecordModel {
-  name: string;
-  description?: string;
-  direction?: string | RecordModel | null;
-  maxLevel: number;
-}
-
-export function mapSkillRecord(record: PbSkillRecord | RecordModel): Skill {
-  const r = record as PbSkillRecord;
-  const skill: Skill = {
-    id: record.id,
-    name: r.name,
-    maxLevel: fromPbSkillLevel(r.maxLevel || 10),
-  };
-
-  const description = emptyToUndefined(r.description);
-  if (description) skill.description = description;
-
-  const directionId = emptyToUndefined(relId(r.direction));
-  if (directionId) skill.directionId = directionId;
-
-  return skill;
-}
-
-export interface PbSkillProgressRecord extends RecordModel {
-  student: string | RecordModel;
-  skill: string | RecordModel;
-  level: number;
-  note?: string;
-}
-
-export function mapSkillProgressRecord(
-  record: PbSkillProgressRecord | RecordModel,
-): StudentSkillProgress {
-  const r = record as PbSkillProgressRecord;
-  const progress: StudentSkillProgress = {
-    id: record.id,
-    studentId: relId(r.student),
-    skillId: relId(r.skill),
-    level: fromPbSkillLevel(r.level ?? 0),
-    updatedAt: getPbRecordUpdatedAt(record),
-  };
-
-  const note = emptyToUndefined(r.note);
-  if (note) progress.note = note;
-
-  return progress;
-}
-
-export interface PbProgressGoalRecord extends RecordModel {
-  student: string | RecordModel;
-  teacher?: string | RecordModel | null;
-  title: string;
-  description?: string;
-  targetDate?: string;
-  status: ProgressGoalStatus;
-  completedAt?: string;
-}
-
-export function mapProgressGoalRecord(record: PbProgressGoalRecord | RecordModel): ProgressGoal {
-  const r = record as PbProgressGoalRecord;
-  const goal: ProgressGoal = {
-    id: record.id,
-    studentId: relId(r.student),
-    title: r.title,
-    status: r.status,
-    createdAt: getPbRecordCreatedAt(record, r.completedAt),
-  };
-
-  const teacherId = emptyToUndefined(relId(r.teacher));
-  if (teacherId) goal.teacherId = teacherId;
-
-  const description = emptyToUndefined(r.description);
-  if (description) goal.description = description;
-
-  const targetDate = normalizePbDate(r.targetDate);
-  if (targetDate) goal.targetDate = targetDate;
-
-  const completedAt = normalizePbDateTime(r.completedAt);
-  if (completedAt) goal.completedAt = completedAt;
-
-  return goal;
-}
-
-export interface PbProgressHistoryRecord extends RecordModel {
-  student: string | RecordModel;
-  type: ProgressHistoryType;
-  title: string;
-  description?: string;
-}
-
-export function mapProgressHistoryRecord(
-  record: PbProgressHistoryRecord | RecordModel,
-): ProgressHistoryEntry {
-  const r = record as PbProgressHistoryRecord;
-  const entry: ProgressHistoryEntry = {
-    id: record.id,
-    studentId: relId(r.student),
-    type: r.type,
-    title: r.title,
-    createdAt: getPbRecordCreatedAt(record),
-  };
-
-  const description = emptyToUndefined(r.description);
-  if (description) entry.description = description;
-
-  return entry;
-}
-
-export interface PbAchievementDefinitionRecord extends RecordModel {
-  code: string;
-  title: string;
-  description: string;
-  icon: string;
-}
-
-export function mapAchievementDefinitionRecord(
-  record: PbAchievementDefinitionRecord | RecordModel,
-): AchievementDefinition {
-  const r = record as PbAchievementDefinitionRecord;
-  return {
-    id: record.id,
-    code: r.code,
-    title: r.title,
-    description: r.description,
-    icon: r.icon,
-  };
-}
-
-export interface PbUserAchievementRecord extends RecordModel {
-  student: string | RecordModel;
-  achievement: string | RecordModel;
-  unlockedAt: string;
-}
-
-export function mapUserAchievementRecord(
-  record: PbUserAchievementRecord | RecordModel,
-): UserAchievement {
-  const r = record as PbUserAchievementRecord;
-  return {
-    id: record.id,
-    studentId: relId(r.student),
-    achievementId: relId(r.achievement),
-    unlockedAt: normalizePbDateTime(r.unlockedAt) ?? r.unlockedAt,
   };
 }
 
@@ -729,6 +604,8 @@ export interface PbLegalDocumentRecord extends RecordModel {
   currentVersion: string;
   effectiveAt: string;
   requiresConsent: boolean;
+  purpose?: ConsentPurpose | '';
+  required?: boolean;
   versionHistory?: LegalDocumentVersionHistory[];
 }
 
@@ -736,7 +613,7 @@ export function mapLegalDocumentRecord(
   record: PbLegalDocumentRecord | RecordModel,
 ): LegalDocument {
   const r = record as PbLegalDocumentRecord;
-  return {
+  const document: LegalDocument = {
     id: record.id,
     type: r.type,
     title: r.title,
@@ -744,8 +621,11 @@ export function mapLegalDocumentRecord(
     currentVersion: r.currentVersion,
     effectiveAt: normalizePbDate(r.effectiveAt),
     requiresConsent: Boolean(r.requiresConsent),
+    required: Boolean(r.required),
     versionHistory: Array.isArray(r.versionHistory) ? r.versionHistory : [],
   };
+  if (r.purpose) document.purpose = r.purpose;
+  return document;
 }
 
 export interface PbUserConsentRecord extends RecordModel {
@@ -755,11 +635,17 @@ export interface PbUserConsentRecord extends RecordModel {
   documentTitle: string;
   version: string;
   acceptedAt: string;
+  purpose?: ConsentPurpose | '';
+  revokedAt?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  consentTextVersion?: string;
+  guardian?: GuardianDetails | null;
 }
 
 export function mapUserConsentRecord(record: PbUserConsentRecord | RecordModel): UserConsent {
   const r = record as PbUserConsentRecord;
-  return {
+  const consent: UserConsent = {
     id: record.id,
     userId: relId(r.user),
     documentId: relId(r.document),
@@ -768,6 +654,15 @@ export function mapUserConsentRecord(record: PbUserConsentRecord | RecordModel):
     version: r.version,
     acceptedAt: normalizePbDateTime(r.acceptedAt) ?? r.acceptedAt,
   };
+
+  if (r.purpose) consent.purpose = r.purpose;
+  if (r.revokedAt) consent.revokedAt = normalizePbDateTime(r.revokedAt) ?? r.revokedAt;
+  if (r.ipAddress) consent.ipAddress = r.ipAddress;
+  if (r.userAgent) consent.userAgent = r.userAgent;
+  if (r.consentTextVersion) consent.consentTextVersion = r.consentTextVersion;
+  if (r.guardian && typeof r.guardian === 'object') consent.guardian = r.guardian;
+
+  return consent;
 }
 
 export interface PbSecuritySessionRecord extends RecordModel {
@@ -777,6 +672,7 @@ export interface PbSecuritySessionRecord extends RecordModel {
   ipAddress: string;
   lastActiveAt: string;
   isCurrent: boolean;
+  tokenFingerprint?: string;
 }
 
 export function mapSecuritySessionRecord(
@@ -793,6 +689,17 @@ export function mapSecuritySessionRecord(
     createdAt: getPbRecordCreatedAt(record, r.lastActiveAt),
     isCurrent: Boolean(r.isCurrent),
   };
+}
+
+/** Internal fingerprint for matching the viewing JWT (not exposed on SecuritySession). */
+export function getSecuritySessionTokenFingerprint(
+  record: PbSecuritySessionRecord | RecordModel,
+): string {
+  const r = record as PbSecuritySessionRecord & { getString?: (key: string) => string };
+  if (typeof r.getString === 'function') {
+    return r.getString('tokenFingerprint') || '';
+  }
+  return typeof r.tokenFingerprint === 'string' ? r.tokenFingerprint : '';
 }
 
 export interface PbLoginHistoryRecord extends RecordModel {
@@ -852,7 +759,7 @@ export function mapNotificationRecord(
   record: PbNotificationRecord | RecordModel,
 ): AppNotification {
   const r = record as PbNotificationRecord;
-  return {
+  const notification: AppNotification = {
     id: record.id,
     userId: relId(r.user),
     type: r.type,
@@ -862,6 +769,10 @@ export function mapNotificationRecord(
     createdAt: getPbRecordCreatedAt(record),
     link: emptyToUndefined(r.link),
   };
+  if ((r as { urgent?: boolean }).urgent) {
+    notification.urgent = true;
+  }
+  return notification;
 }
 
 interface PbNotificationPreferencesRecord {

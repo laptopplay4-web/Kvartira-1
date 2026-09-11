@@ -11,6 +11,7 @@ function createTestDb() {
     users: [...users],
     events: structuredClone(events) as SchoolEvent[],
     schoolInfo: structuredClone(publicSchoolInfo),
+    directions: structuredClone(directions),
   };
 }
 

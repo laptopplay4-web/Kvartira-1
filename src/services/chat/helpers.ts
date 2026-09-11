@@ -3,11 +3,39 @@ import { formatUserName } from '@/utils';
 import { compareIsoDates } from '@/utils/dates';
 import { LAST_MESSAGE_PREVIEW_LENGTH, MESSAGE_SEARCH_MIN_LENGTH } from './constants';
 import { getMessageDisplayText } from './messages';
+import { isSchoolWideConversation } from './schoolWide';
 
-export type ChatFilter = 'all' | 'unread' | 'personal' | 'group';
+export type ChatFilter = 'all' | 'personal' | 'group' | 'school';
 
 export function sortConversations(conversations: Conversation[]): Conversation[] {
   return [...conversations].sort((a, b) => {
+    const aTime = a.lastMessageAt ?? a.createdAt;
+    const bTime = b.lastMessageAt ?? b.createdAt;
+    return bTime.localeCompare(aTime);
+  });
+}
+
+/** Pinned (for current user) first, then by last message time. */
+export function sortConversationsWithPins(
+  conversations: Conversation[],
+  members: ConversationMember[],
+  currentUserId: string,
+): Conversation[] {
+  const pinAt = new Map<string, string>();
+  for (const m of members) {
+    if (m.userId === currentUserId && m.pinnedAt) {
+      pinAt.set(m.conversationId, m.pinnedAt);
+    }
+  }
+  for (const c of conversations) {
+    if (c.viewerPinnedAt) pinAt.set(c.id, c.viewerPinnedAt);
+  }
+  return [...conversations].sort((a, b) => {
+    const aPin = pinAt.get(a.id) ?? a.viewerPinnedAt ?? undefined;
+    const bPin = pinAt.get(b.id) ?? b.viewerPinnedAt ?? undefined;
+    if (aPin && !bPin) return -1;
+    if (!aPin && bPin) return 1;
+    if (aPin && bPin) return bPin.localeCompare(aPin);
     const aTime = a.lastMessageAt ?? a.createdAt;
     const bTime = b.lastMessageAt ?? b.createdAt;
     return bTime.localeCompare(aTime);
@@ -18,6 +46,53 @@ export function truncatePreview(text: string, max = LAST_MESSAGE_PREVIEW_LENGTH)
   const trimmed = text.trim();
   if (trimmed.length <= max) return trimmed;
   return `${trimmed.slice(0, max - 1)}…`;
+}
+
+/**
+ * Pinned messages in Telegram order: by position in chat, newest first
+ * (from the end of the dialogue toward the start).
+ */
+export function orderPinnedMessagesNewestFirst(
+  pinnedIds: string[],
+  messages: Message[],
+): Message[] {
+  if (pinnedIds.length === 0) return [];
+  const pinnedSet = new Set(pinnedIds);
+  const byId = new Map<string, Message>();
+  for (const m of messages) {
+    if (pinnedSet.has(m.id) && !m.deletedAt) byId.set(m.id, m);
+  }
+  return [...byId.values()].sort((a, b) =>
+    compareIsoDates(b.createdAt, a.createdAt),
+  );
+}
+
+/**
+ * Active pin for current viewport (Telegram-style).
+ * `pinnedIdsNewestFirst` — newest → oldest.
+ * `pinTopById` — getBoundingClientRect().top for each pin in the list.
+ * `viewportTop` — top edge of the scroll viewport (sticky bar line).
+ *
+ * The bar shows the newest pin that has scrolled to/above the top edge;
+ * scrolling up/down past pins moves the index toward older/newer.
+ */
+export function resolvePinnedIndexForViewport(
+  pinnedIdsNewestFirst: string[],
+  pinTopById: Readonly<Record<string, number | null | undefined>>,
+  viewportTop: number,
+): number {
+  const n = pinnedIdsNewestFirst.length;
+  if (n === 0) return 0;
+
+  const oldestFirst = [...pinnedIdsNewestFirst].reverse();
+  let lastPassedOldestFirst = -1;
+  for (let i = 0; i < oldestFirst.length; i++) {
+    const top = pinTopById[oldestFirst[i]!];
+    if (top == null || Number.isNaN(top)) continue;
+    if (top <= viewportTop) lastPassedOldestFirst = i;
+  }
+  if (lastPassedOldestFirst < 0) return n - 1;
+  return n - 1 - lastPassedOldestFirst;
 }
 
 export function getConversationDisplayTitle(
@@ -47,12 +122,12 @@ export function filterConversations(
   const { search = '', filter = 'all', currentUserId, users } = options;
   let result = conversations;
 
-  if (filter === 'unread') {
-    result = result.filter((c) => (c.unreadCount ?? 0) > 0);
-  } else if (filter === 'personal') {
+  if (filter === 'personal') {
     result = result.filter((c) => c.type === 'personal');
   } else if (filter === 'group') {
-    result = result.filter((c) => c.type !== 'personal');
+    result = result.filter((c) => c.type !== 'personal' && !isSchoolWideConversation(c));
+  } else if (filter === 'school') {
+    result = result.filter((c) => isSchoolWideConversation(c));
   }
 
   const q = search.trim().toLowerCase();
@@ -102,6 +177,8 @@ export interface MessageGroupItem {
   message: Message;
   showSender: boolean;
   showAvatar: boolean;
+  /** First message in a visual stack (VK-style spacing). */
+  clusterStart: boolean;
 }
 
 export function groupMessagesForDisplay(
@@ -112,15 +189,18 @@ export function groupMessagesForDisplay(
     const prev = messages[index - 1];
     const sameSender = prev?.senderId === message.senderId && !message.replyToMessageId;
     const sameMinute =
-      prev &&
+      !!prev &&
       !message.replyToMessageId &&
-      Math.abs(new Date(message.createdAt).getTime() - new Date(prev.createdAt).getTime()) < 5 * 60_000;
+      Math.abs(new Date(message.createdAt).getTime() - new Date(prev.createdAt).getTime()) <
+        5 * 60_000;
     const isOwn = message.senderId === currentUserId;
     const isSystem = message.messageType === 'system';
+    const clusterStart = !prev || !sameSender || !sameMinute || isSystem;
     return {
       message,
-      showSender: !isOwn && !isSystem && (!sameSender || !sameMinute),
-      showAvatar: !isOwn && !isSystem && (!sameSender || !sameMinute),
+      showSender: !isOwn && !isSystem && clusterStart,
+      showAvatar: !isOwn && !isSystem && clusterStart,
+      clusterStart,
     };
   });
 }

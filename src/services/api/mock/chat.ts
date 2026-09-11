@@ -25,6 +25,7 @@ import {
   canAddMember,
   canCreateGroupChat,
   canCreatePersonalChat,
+  canCreateSchoolWideChat,
   canDeleteConversation,
   canLeaveConversation,
   canRemoveMember,
@@ -32,6 +33,7 @@ import {
   canUpdateConversation,
   getConversationMember,
   isMemberMuted,
+  isValidTeacherStudentPersonalPair,
 } from '@/services/chat/access';
 import {
   computeUnreadCount,
@@ -39,12 +41,19 @@ import {
   isValidMessageText,
   matchesMessageSearch,
   normalizeMessageText,
+  sortConversationsWithPins,
 } from '@/services/chat/helpers';
-import { canDeleteMessage, canEditMessage, canPinMessage } from '@/services/chat/messages';
-import { MESSAGE_MAX_LENGTH, MESSAGE_PAGE_SIZE, MESSAGE_SEARCH_MIN_LENGTH } from '@/services/chat/constants';
+import { canDeleteMessage, canEditMessage, canPinMessage, toggleReactionList } from '@/services/chat/messages';
+import {
+  MESSAGE_MAX_LENGTH,
+  MESSAGE_PAGE_SIZE,
+  MESSAGE_SEARCH_MIN_LENGTH,
+  SCHOOL_WIDE_CHAT_DEFAULT_TITLE,
+} from '@/services/chat/constants';
 import { detectAttachmentType, validateAttachment, validateMessageContent } from '@/services/chat/validation';
 import { chatRealtimeService } from '@/services/chat/realtime';
 import { findConversationForLesson } from '@/services/lessons/helpers';
+import { ensureSchoolWideMembership, isSchoolWideConversation } from '@/services/chat/schoolWide';
 
 export interface MockChatDb {
   users: User[];
@@ -118,21 +127,22 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
 
   function enrichConversation(conv: Conversation, userId: string): Conversation {
     const member = getConversationMember(conv.id, userId, db.conversationMembers);
-    const convMessages = db.messages.filter((m) => m.conversationId === conv.id);
+    const convMessages = db.messages.filter((m) => m.conversationId === conv.id && !m.deletedAt);
     const unreadCount = computeUnreadCount(conv.id, userId, convMessages, member);
-    const visible = convMessages.filter((m) => !m.deletedAt || m.senderId === userId);
-    const lastMessage = [...visible].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
+    const lastMessage = [...convMessages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
     return {
       ...conv,
       unreadCount,
+      viewerPinnedAt: member?.pinnedAt ?? null,
+      viewerMuted: member ? isMemberMuted(member) : false,
       lastMessage: lastMessage
         ? {
             id: lastMessage.id,
-            text: lastMessage.deletedAt ? 'Сообщение удалено' : lastMessage.text,
+            text: lastMessage.text || lastMessage.attachments?.[0]?.filename || 'Вложение',
             senderId: lastMessage.senderId,
             createdAt: lastMessage.createdAt,
           }
-        : conv.lastMessage,
+        : undefined,
       lastMessageAt: lastMessage?.createdAt ?? conv.lastMessageAt,
       updatedAt: lastMessage?.createdAt ?? conv.updatedAt,
     };
@@ -173,6 +183,21 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       createdAt: new Date().toISOString(),
       link: `/chat/${conversationId}`,
     });
+    try {
+      // Dynamic import avoids circular deps with notifications module.
+      void import('./notifications').then(({ tryPushNotification }) => {
+        tryPushNotification(
+          db as never,
+          recipientId,
+          'message',
+          'Новое сообщение',
+          `${formatUserName(sender)}: ${preview.slice(0, 80)}`,
+          `/chat/${conversationId}`,
+        );
+      });
+    } catch {
+      /* ignore push failures */
+    }
   }
 
   function notifyMembers(conversationId: string, senderId: string, preview: string, suppress = false) {
@@ -190,10 +215,11 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       await delay();
       const user = getUserById(userId);
       if (!can(user, 'chat:read')) throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
-      return db.conversations
+      ensureSchoolWideMembership(db, userId);
+      const list = db.conversations
         .filter((c) => canAccessConversation(user, c, db.conversationMembers))
-        .map((c) => enrichConversation(c, userId))
-        .sort((a, b) => (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt));
+        .map((c) => enrichConversation(c, userId));
+      return sortConversationsWithPins(list, db.conversationMembers, userId);
     },
 
     async getConversation(conversationId, userId) {
@@ -222,7 +248,7 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       assertConversationAccess(conversationId, userId);
       const limit = params.limit ?? MESSAGE_PAGE_SIZE;
       const sorted = db.messages
-        .filter((m) => m.conversationId === conversationId)
+        .filter((m) => m.conversationId === conversationId && !m.deletedAt)
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
       let slice = sorted;
@@ -341,20 +367,66 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
     async deleteMessage(conversationId, messageId, userId) {
       await delay(80);
       const user = getUserById(userId);
-      assertConversationAccess(conversationId, userId);
+      const conv = assertConversationAccess(conversationId, userId);
       const msg = getMessageOrThrow(conversationId, messageId);
 
-      if (!canDeleteMessage(user, msg)) {
+      if (!canDeleteMessage(user, msg, conv)) {
         throw new ApiError('Нет прав на удаление', 'FORBIDDEN', 403);
       }
 
-      const now = new Date().toISOString();
-      msg.deletedAt = now;
-      msg.updatedAt = now;
+      const snapshot = { ...msg, deletedAt: new Date().toISOString() };
+      db.messages = db.messages.filter((m) => m.id !== messageId);
+      if (conv.pinnedMessageIds?.includes(messageId)) {
+        conv.pinnedMessageIds = conv.pinnedMessageIds.filter((id) => id !== messageId);
+      }
       syncConversationMeta(conversationId);
 
-      chatRealtimeService.emit({ type: 'message.deleted', conversationId, message: msg });
+      chatRealtimeService.emit({ type: 'message.deleted', conversationId, message: snapshot });
+      return snapshot;
+    },
+
+    async pinConversation(conversationId, userId, pinned) {
+      await delay(50);
+      assertConversationAccess(conversationId, userId);
+      const member = getConversationMember(conversationId, userId, db.conversationMembers);
+      if (!member) throw new ApiError('Участник не найден', 'NOT_FOUND', 404);
+      member.pinnedAt = pinned ? new Date().toISOString() : null;
+      return member;
+    },
+
+    async setMessageReaction(conversationId, messageId, userId, emoji) {
+      await delay(50);
+      assertConversationAccess(conversationId, userId);
+      const msg = getMessageOrThrow(conversationId, messageId);
+      if (msg.deletedAt) throw new ApiError('Сообщение удалено', 'NOT_FOUND', 404);
+      const next = toggleReactionList(msg.reactions ?? [], emoji, userId);
+      msg.reactions = next;
+      msg.metadata = { ...msg.metadata, reactions: next };
+      msg.updatedAt = new Date().toISOString();
+      chatRealtimeService.emit({ type: 'message.updated', conversationId, message: msg });
       return msg;
+    },
+
+    async forwardMessage(sourceConversationId, messageId, userId, targetConversationIds) {
+      await delay(100);
+      const user = getUserById(userId);
+      assertConversationAccess(sourceConversationId, userId);
+      const source = getMessageOrThrow(sourceConversationId, messageId);
+      if (source.deletedAt) throw new ApiError('Сообщение удалено', 'NOT_FOUND', 404);
+
+      const created: Message[] = [];
+      for (const targetId of targetConversationIds) {
+        const conv = assertConversationAccess(targetId, userId);
+        if (!canSendToConversation(user, conv, db.conversationMembers)) {
+          throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
+        }
+        const forwarded = await api.sendMessage(targetId, userId, source.text, {
+          attachments: source.attachments,
+          suppressNotification: false,
+        });
+        created.push(forwarded);
+      }
+      return created;
     },
 
     async markAsRead(conversationId, userId) {
@@ -394,9 +466,28 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
     async createConversation(userId, input: CreateConversationInput) {
       await delay(120);
       const user = getUserById(userId);
-      const uniqueParticipants = [...new Set([userId, ...input.participantIds])];
-      if (uniqueParticipants.length < 2) {
-        throw new ApiError('Укажите участников', 'VALIDATION', 400);
+
+      let uniqueParticipants: string[];
+      if (input.allUsers) {
+        if (input.type === 'personal') {
+          throw new ApiError('Общий чат не может быть личным', 'VALIDATION', 400);
+        }
+        if (!canCreateSchoolWideChat(user)) {
+          throw new ApiError('Нет прав на создание общего чата', 'FORBIDDEN', 403);
+        }
+        const fromClient = input.participantIds ?? [];
+        uniqueParticipants =
+          fromClient.length > 0
+            ? [...new Set([userId, ...fromClient])]
+            : [...new Set(db.users.map((u) => u.id))];
+        if (!uniqueParticipants.includes(userId)) {
+          uniqueParticipants.push(userId);
+        }
+      } else {
+        uniqueParticipants = [...new Set([userId, ...input.participantIds])];
+        if (uniqueParticipants.length < 2) {
+          throw new ApiError('Укажите участников', 'VALIDATION', 400);
+        }
       }
 
       if (input.type === 'personal') {
@@ -406,18 +497,29 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         if (uniqueParticipants.length !== 2) {
           throw new ApiError('Личный чат — только два участника', 'VALIDATION', 400);
         }
+        const pair = uniqueParticipants.map((id) => getUserById(id));
+        if (!isValidTeacherStudentPersonalPair(pair)) {
+          throw new ApiError('Личный чат только между преподавателем и учеником', 'VALIDATION', 400);
+        }
         const existing = db.conversations.find((c) => {
           if (c.type !== 'personal') return false;
           const ids = new Set(c.participantIds);
           return uniqueParticipants.every((id) => ids.has(id)) && ids.size === 2;
         });
-        if (existing) return enrichConversation(existing, userId);
+        if (existing) {
+          if (input.metadata?.lessonId) {
+            existing.metadata = { ...existing.metadata, ...input.metadata };
+          }
+          return enrichConversation(existing, userId);
+        }
       } else {
-        if (!canCreateGroupChat(user)) {
+        if (!input.allUsers && !canCreateGroupChat(user)) {
           throw new ApiError('Нет прав на создание группы', 'FORBIDDEN', 403);
         }
-        const title = input.title?.trim();
-        if (!title) throw new ApiError('Укажите название группы', 'VALIDATION', 400);
+        if (!input.allUsers) {
+          const title = input.title?.trim();
+          if (!title) throw new ApiError('Укажите название группы', 'VALIDATION', 400);
+        }
       }
 
       const now = new Date().toISOString();
@@ -427,7 +529,9 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
           ? otherUser
             ? formatUserName(otherUser)
             : 'Личный чат'
-          : input.title!.trim();
+          : input.allUsers
+            ? input.title?.trim() || SCHOOL_WIDE_CHAT_DEFAULT_TITLE
+            : input.title!.trim();
 
       const conv: Conversation = {
         id: uid('conv'),
@@ -436,10 +540,19 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         participantIds: uniqueParticipants,
         createdAt: now,
         updatedAt: now,
-        metadata: input.metadata,
+        metadata: {
+          ...input.metadata,
+          ...(input.allUsers ? { schoolWide: true as const } : {}),
+        },
         unreadCount: 0,
         pinnedMessageIds: [],
       };
+      if (!conv.metadata?.lessonId && !conv.metadata?.schoolWide) {
+        delete conv.metadata;
+      }
+      if (input.avatarUrl?.trim()) {
+        conv.avatarUrl = input.avatarUrl.trim();
+      }
       db.conversations.push(conv);
 
       uniqueParticipants.forEach((pid) => {
@@ -501,13 +614,16 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       await delay(80);
       const user = getUserById(userId);
       assertConversationAccess(conversationId, userId);
-      if (!canAddMember(user, conversationId, db.conversationMembers)) {
+      const conv = getConversationOrThrow(conversationId);
+      if (!canAddMember(user, conversationId, db.conversationMembers, conv)) {
         throw new ApiError('Нет прав на управление участниками', 'FORBIDDEN', 403);
       }
 
-      const conv = getConversationOrThrow(conversationId);
       if (conv.type === 'personal') {
         throw new ApiError('Нельзя добавить участника в личный чат', 'VALIDATION', 400);
+      }
+      if (isSchoolWideConversation(conv)) {
+        throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
       getUserById(targetUserId);
@@ -543,11 +659,13 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       await delay(80);
       const user = getUserById(userId);
       assertConversationAccess(conversationId, userId);
-      if (!canRemoveMember(user, conversationId, targetUserId, db.conversationMembers)) {
+      const conv = getConversationOrThrow(conversationId);
+      if (!canRemoveMember(user, conversationId, targetUserId, db.conversationMembers, conv)) {
         throw new ApiError('Нет прав на удаление участника', 'FORBIDDEN', 403);
       }
-
-      const conv = getConversationOrThrow(conversationId);
+      if (isSchoolWideConversation(conv)) {
+        throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
+      }
       db.conversationMembers = db.conversationMembers.filter(
         (m) => !(m.conversationId === conversationId && m.userId === targetUserId),
       );
@@ -597,7 +715,10 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
 
       const previousTitle = conv.title;
       if (input.title?.trim()) conv.title = input.title.trim();
-      if (input.avatarUrl !== undefined) conv.avatarUrl = input.avatarUrl;
+      if (input.avatarUrl !== undefined) {
+        if (input.avatarUrl.trim()) conv.avatarUrl = input.avatarUrl.trim();
+        else delete conv.avatarUrl;
+      }
       conv.updatedAt = new Date().toISOString();
 
       if (input.title && input.title.trim() !== previousTitle) {

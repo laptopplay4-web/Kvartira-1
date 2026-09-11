@@ -2,9 +2,14 @@
 /**
  * ROADMAP 2.9 — security session + alert hooks.
  * Mirrors mock security behavior in src/services/api/mock/security.ts.
+ *
+ * Multi-device: each password login creates a new security_sessions row.
+ * tokenFingerprint (SHA-256 of JWT) identifies the viewing device as current.
  */
 
 const auth = require(`${__hooks}/lib/kvartiraAuth.js`);
+
+const MAX_SECURITY_SESSIONS = 20;
 
 /**
  * @param {unknown} value
@@ -16,6 +21,19 @@ function relId(value) {
     return String(value.id);
   }
   return '';
+}
+
+/**
+ * @param {unknown} token
+ * @returns {string}
+ */
+function fingerprintToken(token) {
+  if (typeof token !== 'string' || !token.trim()) return '';
+  try {
+    return String($security.sha256(token.trim()));
+  } catch (_) {
+    return '';
+  }
 }
 
 /**
@@ -71,66 +89,69 @@ function markOnlyCurrentSession(app, userId, currentSessionId) {
 /**
  * @param {import('pocketbase').PocketBase} app
  * @param {string} userId
- * @param {{ request?: { header?: { get: (name: string) => string } } }} e
+ */
+function trimSecuritySessions(app, userId) {
+  /** @type {Record[]} */
+  let rows = [];
+  try {
+    rows =
+      app.findRecordsByFilter(
+        'security_sessions',
+        'user = {:userId}',
+        '-lastActiveAt',
+        MAX_SECURITY_SESSIONS + 10,
+        0,
+        { userId },
+      ) || [];
+  } catch (_) {
+    return;
+  }
+
+  for (let i = MAX_SECURITY_SESSIONS; i < rows.length; i++) {
+    try {
+      app.delete(rows[i]);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * @param {import('pocketbase').PocketBase} app
+ * @param {string} userId
+ * @param {{ token?: string, request?: { header?: { get: (name: string) => string } } }} e
  */
 function recordSecuritySession(app, userId, e) {
   const deviceLabel = auth.getDeviceLabel(e);
   const ipAddress = auth.getClientIp(e);
   const now = new Date().toISOString();
-
-  /** @type {Record[]} */
-  let existingRows = [];
-  try {
-    existingRows =
-      app.findRecordsByFilter(
-        'security_sessions',
-        'user = {:userId} && deviceLabel = {:deviceLabel}',
-        '',
-        1,
-        0,
-        { userId, deviceLabel },
-      ) || [];
-  } catch (_) {
-    existingRows = [];
-  }
+  const tokenFingerprint = fingerprintToken(e && e.token);
 
   const sessionsCol = app.findCollectionByNameOrId('security_sessions');
-  let currentSessionId;
-  let isNewDevice = false;
-
-  if (existingRows.length > 0) {
-    const session = existingRows[0];
-    session.set('lastActiveAt', now);
-    session.set('ipAddress', ipAddress);
-    session.set('isCurrent', true);
-    app.save(session);
-    currentSessionId = session.id;
-  } else {
-    const session = new Record(sessionsCol);
-    session.set('user', userId);
-    session.set('deviceLabel', deviceLabel);
-    session.set('platform', 'web');
-    session.set('ipAddress', ipAddress);
-    session.set('lastActiveAt', now);
-    session.set('isCurrent', true);
-    app.save(session);
-    currentSessionId = session.id;
-    isNewDevice = true;
+  const session = new Record(sessionsCol);
+  session.set('user', userId);
+  session.set('deviceLabel', deviceLabel);
+  session.set('platform', 'web');
+  session.set('ipAddress', ipAddress);
+  session.set('lastActiveAt', now);
+  session.set('isCurrent', true);
+  if (tokenFingerprint) {
+    session.set('tokenFingerprint', tokenFingerprint);
   }
+  app.save(session);
 
-  markOnlyCurrentSession(app, userId, currentSessionId);
+  markOnlyCurrentSession(app, userId, session.id);
+  trimSecuritySessions(app, userId);
 
-  if (isNewDevice) {
-    const notifications = require(`${__hooks}/lib/kvartiraNotifications.js`);
-    notifications.createNotificationForUser(
-      app,
-      userId,
-      'system',
-      'Вход в аккаунт',
-      `Обнаружен вход с ${deviceLabel}.`,
-      '/profile/settings/security',
-    );
-  }
+  const notifications = require(`${__hooks}/lib/kvartiraNotifications.js`);
+  notifications.createNotificationForUser(
+    app,
+    userId,
+    'system',
+    'Вход в аккаунт',
+    `Обнаружен вход с ${deviceLabel}.`,
+    '/profile/settings/security',
+  );
 }
 
 /**
@@ -188,8 +209,10 @@ function assertSecurityAlertUpdate(e) {
 
 module.exports = {
   relId,
+  fingerprintToken,
   recordSecuritySession,
   markOnlyCurrentSession,
+  trimSecuritySessions,
   assertSecuritySessionCreate,
   assertSecuritySessionUpdate,
   assertSecurityAlertUpdate,

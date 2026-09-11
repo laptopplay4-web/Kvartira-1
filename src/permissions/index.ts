@@ -26,16 +26,12 @@ export type Permission =
   | 'assignments:view-all'
   | 'assignments:create'
   | 'assignments:manage-groups'
-  | 'progress:view-own'
-  | 'progress:view-assigned'
-  | 'progress:view-all'
-  | 'progress:manage-goals'
-  | 'progress:manage-skills'
   | 'admin:access'
   | 'admin:users'
   | 'admin:schedule'
   | 'admin:events'
   | 'admin:school-settings'
+  | 'admin:directions'
   | 'profile:view-own'
   | 'profile:edit-own'
   | 'notifications:view'
@@ -61,12 +57,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'chat:read',
     'chat:write',
     'chat:send',
-    'chat:create',
     'chat:delete_message',
     'events:view',
     'events:register',
     'assignments:view-own',
-    'progress:view-own',
     'profile:view-own',
     'profile:edit-own',
     'notifications:view',
@@ -92,6 +86,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'chat:send',
     'chat:create',
     'chat:manage_members',
+    'chat:delete',
     'chat:delete_message',
     'chat:pin_message',
     'events:view',
@@ -100,9 +95,6 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'assignments:view-assigned',
     'assignments:create',
     'assignments:manage-groups',
-    'progress:view-assigned',
-    'progress:manage-goals',
-    'progress:manage-skills',
     'profile:view-own',
     'profile:edit-own',
     'notifications:view',
@@ -138,14 +130,12 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'assignments:view-all',
     'assignments:create',
     'assignments:manage-groups',
-    'progress:view-all',
-    'progress:manage-goals',
-    'progress:manage-skills',
     'admin:access',
     'admin:users',
     'admin:schedule',
     'admin:events',
     'admin:school-settings',
+    'admin:directions',
     'profile:view-own',
     'profile:edit-own',
     'notifications:view',
@@ -188,4 +178,16 @@ export function getRoleLabel(role: UserRole): string {
     admin: 'Администратор',
   };
   return labels[role] ?? '';
+}
+
+/** Badge color for role — same as Admin Users. */
+export function getRoleBadgeVariant(
+  role: UserRole,
+): 'default' | 'brand' | 'info' | 'warning' {
+  const variants: Record<UserRole, 'default' | 'brand' | 'info' | 'warning'> = {
+    student: 'info',
+    teacher: 'brand',
+    admin: 'warning',
+  };
+  return variants[role] ?? 'default';
 }

@@ -22,6 +22,11 @@ onRecordAuthWithPasswordRequest((e) => {
   }
 
   const record = e.record;
+
+  if (record) {
+    auth.assertLoginNotThrottled($app, record.id, e);
+  }
+
   if (record && e.password && !record.validatePassword(e.password)) {
     try {
       auth.recordLoginAttempt($app, record.id, false, e);
@@ -49,6 +54,12 @@ onRecordAuthRequest((e) => {
       } catch (_) {
         /* login must succeed even if session write fails */
       }
+      try {
+        const chat = require(`${__hooks}/lib/kvartiraChat.js`);
+        chat.joinUserToSchoolWideChats($app, String(e.record.id));
+      } catch (_) {
+        /* login must succeed even if school-wide join fails */
+      }
     }
   } catch (_) {
     /* never fail auth because of side-effect hooks */
@@ -58,6 +69,7 @@ onRecordAuthRequest((e) => {
 
 onRecordCreateRequest((e) => {
   const auth = require(`${__hooks}/lib/kvartiraAuth.js`);
+  const invite = require(`${__hooks}/lib/kvartiraInvite.js`);
   const record = e.record;
   const phone = auth.normalizePhone(record.getString('phone'));
 
@@ -72,6 +84,8 @@ onRecordCreateRequest((e) => {
     if (err instanceof BadRequestError) throw err;
     /* record not found — ok to create */
   }
+
+  invite.assertRegistrationInviteOnUserCreate(e);
 
   record.set('phone', phone);
 

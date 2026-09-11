@@ -1,40 +1,31 @@
 import { cn } from '@/utils';
 import type { LucideIcon } from 'lucide-react';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import type { ChatFilter } from '@/services/chat/helpers';
 
 interface ChatFiltersProps {
-  value: 'all' | 'unread' | 'personal' | 'group';
-  onChange: (value: 'all' | 'unread' | 'personal' | 'group') => void;
+  value: ChatFilter;
+  onChange: (value: ChatFilter) => void;
 }
 
-const FILTERS: { id: 'all' | 'unread' | 'personal' | 'group'; label: string }[] = [
-  { id: 'all', label: 'Все' },
-  { id: 'unread', label: 'Непрочитанные' },
-  { id: 'personal', label: 'Личные' },
-  { id: 'group', label: 'Группы' },
+const FILTERS: { value: ChatFilter; label: string }[] = [
+  { value: 'all', label: 'Все' },
+  { value: 'personal', label: 'Личные' },
+  { value: 'group', label: 'Группы' },
+  { value: 'school', label: 'Общие' },
 ];
 
 export function ChatFilters({ value, onChange }: ChatFiltersProps) {
   return (
     <div className="scroll-x-contained">
-      <div className="flex gap-2 pb-1 scrollbar-none" role="tablist" aria-label="Фильтры чатов">
-      {FILTERS.map(({ id, label }) => (
-        <button
-          key={id}
-          type="button"
-          role="tab"
-          aria-selected={value === id}
-          onClick={() => onChange(id)}
-          className={cn(
-            'shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-ring min-h-[44px] md:min-h-0',
-            value === id
-              ? 'bg-brand-muted text-brand'
-              : 'bg-surface-elevated text-text-secondary hover:text-text-primary',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-      </div>
+      <SegmentedControl
+        className="w-max min-w-full"
+        aria-label="Фильтры чатов"
+        size="sm"
+        value={value}
+        options={FILTERS}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -49,7 +40,7 @@ export function ChatSearch({
   icon: LucideIcon;
 }) {
   return (
-    <div className="relative">
+    <div className={cn('relative')}>
       <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" aria-hidden />
       <input
         type="search"

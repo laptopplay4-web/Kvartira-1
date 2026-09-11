@@ -44,9 +44,6 @@ const CONVERSATION_MEMBER = `${ADMIN} || (@collection.conversation_members.conve
 /** Message access via conversation membership */
 const MESSAGE_ACCESS = `${ADMIN} || (@collection.conversation_members.conversation ?= conversation && @collection.conversation_members.user ?= @request.auth.id)`;
 
-/** progress:view-own | view-assigned | view-all */
-const PROGRESS_STUDENT_ROW = `${ADMIN} || student = @request.auth.id || (${TEACHER})`;
-
 /** support:view-own-tickets | view-all-tickets */
 const TICKET_ACCESS = `${ADMIN} || user = @request.auth.id`;
 
@@ -57,16 +54,55 @@ const FILE_ACCESS = `${ADMIN} || owner = @request.auth.id || purpose = "school" 
 const OWN_USER_OR_ADMIN = `${ADMIN} || user = @request.auth.id`;
 
 /**
+ * teacher_availability read — authenticated only.
+ *
+ * Booking requires every student to read any teacher's schedule, so this stays
+ * broad, but guests get nothing and the record carries working hours only.
+ */
+const AVAILABILITY_READ = `${ADMIN} || teacher = @request.auth.id || ${AUTH}`;
+
+/**
+ * users list/view — who may see whose directory card.
+ *
+ * Before: `@request.auth.id != ""` — any student could enumerate the whole
+ * school in a single request. Now:
+ *
+ * - admin — everyone;
+ * - own record;
+ * - teachers — public (landing page and booking flow list them);
+ * - staff sees students (teacher needs the roster for chats, groups, ДЗ);
+ * - student ↔ co-members of a shared assignment group;
+ * - student ↔ co-participants of a shared conversation.
+ *
+ * The last two clauses correlate inside a SINGLE row: one `@collection.x`
+ * alias resolves to one joined row, so this is a real join and not two
+ * independent existence checks. `participantIds` is a json array kept in sync
+ * by the chat adapter on create/add/remove/leave.
+ *
+ * Phone and email stay hidden regardless — see pb_hooks/users.pb.js.
+ */
+const USER_DIRECTORY_ACCESS = [
+  ADMIN,
+  'id = @request.auth.id',
+  'role = "teacher"',
+  `(${TEACHER} && role = "student")`,
+  '(@collection.assignment_groups.members ?= @request.auth.id && @collection.assignment_groups.members ?= id)',
+  '(@collection.conversations.participantIds ?~ @request.auth.id && @collection.conversations.participantIds ?~ id)',
+].join(' || ');
+
+/**
  * Collection API rules — maps to permissions/index.ts + services access helpers
  * @type {Record<string, { listRule: string, viewRule: string, createRule: string, updateRule: string, deleteRule: string | null }>}
  */
 const COLLECTION_RULES = {
   users: {
-    listRule: `${AUTH} || role = "teacher"`,
-    viewRule: `${AUTH} || role = "teacher"`,
+    listRule: USER_DIRECTORY_ACCESS,
+    viewRule: USER_DIRECTORY_ACCESS,
     createRule: PUBLIC,
     updateRule: `${ADMIN} || id = @request.auth.id`,
-    deleteRule: null,
+    // Self-service erasure (152-ФЗ, ст. 21). Admins delete through the PB Admin
+    // UI as superusers; nobody can delete somebody else through the API.
+    deleteRule: 'id = @request.auth.id',
   },
   directions: {
     listRule: PUBLIC,
@@ -76,8 +112,11 @@ const COLLECTION_RULES = {
     deleteRule: ADMIN,
   },
   teacher_availability: {
-    listRule: `${ADMIN} || teacher = @request.auth.id || ${AUTH}`,
-    viewRule: `${ADMIN} || teacher = @request.auth.id || ${AUTH}`,
+    // Booking needs every student to read the schedule of any teacher, so this
+    // stays broad — but authenticated only (guests get nothing) and the record
+    // holds working hours, never personal data.
+    listRule: AVAILABILITY_READ,
+    viewRule: AVAILABILITY_READ,
     createRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
     updateRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
     deleteRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
@@ -97,8 +136,8 @@ const COLLECTION_RULES = {
     deleteRule: ADMIN,
   },
   conversations: {
-    listRule: CONVERSATION_MEMBER,
-    viewRule: CONVERSATION_MEMBER,
+    listRule: `${ADMIN} || ${CONVERSATION_MEMBER} || metadata.schoolWide = true`,
+    viewRule: `${ADMIN} || ${CONVERSATION_MEMBER} || metadata.schoolWide = true`,
     createRule: AUTH,
     updateRule: CONVERSATION_MEMBER,
     deleteRule: `${ADMIN} || (@collection.conversation_members.conversation ?= id && @collection.conversation_members.user ?= @request.auth.id && @collection.conversation_members.role ?= "owner")`,
@@ -145,48 +184,6 @@ const COLLECTION_RULES = {
     updateRule: ASSIGNMENT_ACCESS,
     deleteRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
   },
-  skills: {
-    listRule: AUTH,
-    viewRule: AUTH,
-    createRule: `${ADMIN} || ${TEACHER}`,
-    updateRule: `${ADMIN} || ${TEACHER}`,
-    deleteRule: ADMIN,
-  },
-  student_skill_progress: {
-    listRule: PROGRESS_STUDENT_ROW,
-    viewRule: PROGRESS_STUDENT_ROW,
-    createRule: `${ADMIN} || ${TEACHER}`,
-    updateRule: `${ADMIN} || ${TEACHER}`,
-    deleteRule: ADMIN,
-  },
-  progress_goals: {
-    listRule: PROGRESS_STUDENT_ROW,
-    viewRule: PROGRESS_STUDENT_ROW,
-    createRule: `${ADMIN} || ${TEACHER}`,
-    updateRule: `${ADMIN} || ${TEACHER}`,
-    deleteRule: `${ADMIN} || ${TEACHER}`,
-  },
-  progress_history: {
-    listRule: PROGRESS_STUDENT_ROW,
-    viewRule: PROGRESS_STUDENT_ROW,
-    createRule: `${ADMIN} || ${TEACHER} || (${AUTH} && student = @request.auth.id)`,
-    updateRule: ADMIN,
-    deleteRule: ADMIN,
-  },
-  achievement_definitions: {
-    listRule: AUTH,
-    viewRule: AUTH,
-    createRule: ADMIN,
-    updateRule: ADMIN,
-    deleteRule: ADMIN,
-  },
-  user_achievements: {
-    listRule: PROGRESS_STUDENT_ROW,
-    viewRule: PROGRESS_STUDENT_ROW,
-    createRule: `${ADMIN} || ${TEACHER} || (${AUTH} && student = @request.auth.id)`,
-    updateRule: ADMIN,
-    deleteRule: ADMIN,
-  },
   help_articles: {
     listRule: PUBLIC,
     viewRule: PUBLIC,
@@ -212,7 +209,9 @@ const COLLECTION_RULES = {
     listRule: OWN_USER_OR_ADMIN,
     viewRule: OWN_USER_OR_ADMIN,
     createRule: `${ADMIN} || (${AUTH} && user = @request.auth.id)`,
-    updateRule: ADMIN,
+    // Withdrawal goes through POST /api/kvartira/consents/revoke so the server
+    // stamps the timestamp — nobody edits the consent journal directly.
+    updateRule: null,
     deleteRule: ADMIN,
   },
   security_sessions: {
@@ -309,10 +308,11 @@ module.exports = {
   ASSIGNMENT_GROUP_ACCESS,
   CONVERSATION_MEMBER,
   MESSAGE_ACCESS,
-  PROGRESS_STUDENT_ROW,
   TICKET_ACCESS,
   FILE_ACCESS,
   OWN_USER_OR_ADMIN,
+  USER_DIRECTORY_ACCESS,
+  AVAILABILITY_READ,
   COLLECTION_RULES,
   isUsersAuth,
 };

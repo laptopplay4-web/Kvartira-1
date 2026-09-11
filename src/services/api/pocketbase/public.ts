@@ -46,7 +46,7 @@ async function loadTeachers(directions: Direction[]): Promise<PublicTeacher[]> {
     sort: 'firstName',
   });
   const teachers = await resolveUsersAvatars(
-    records.map(mapUserRecord).filter((user) => user.role === 'teacher'),
+    records.map((record) => mapUserRecord(record)).filter((user) => user.role === 'teacher'),
   );
   return teachers.map((user) => toPublicTeacher(user, user.directionIds ?? [], directions));
 }

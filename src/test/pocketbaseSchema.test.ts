@@ -96,18 +96,60 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(lib).toContain('purgeUserDependents');
     expect(lib).toContain('deleteAllByFilter');
     expect(lib).toContain('lessons');
-    expect(lib).toContain('messages');
+    expect(lib).toContain("clearOptionalRelation(app, 'messages', 'sender'");
     expect(lib).toContain('assignment_groups');
-    expect(lib).toContain('progress_goals');
+    expect(lib).toContain('audit_logs');
     expect(lib).toContain('participantIds');
+  });
+
+  it('message sender keep-history migration makes sender optional without cascade', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790572800_kvartira_message_sender_keep_history.js'),
+      'utf8',
+    );
+    expect(source).toContain("findCollectionByNameOrId('messages')");
+    expect(source).toContain("getByName('sender')");
+    expect(source).toContain('required = false');
+    expect(source).toContain('cascadeDelete = false');
+  });
+
+  it('security session fingerprint migration adds tokenFingerprint field', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790668800_kvartira_security_session_fingerprint.js'),
+      'utf8',
+    );
+    const doc = readFileSync(SCHEMA_DOC, 'utf8');
+    expect(source).toContain("findCollectionByNameOrId('security_sessions')");
+    expect(source).toContain('tokenFingerprint');
+    expect(doc).toContain('tokenFingerprint');
   });
 
   it('users enrich hook compares auth.id (not getString id) for own phone', () => {
     const hook = readFileSync(USERS_HOOK, 'utf8');
     expect(hook).toContain('onRecordEnrich');
     expect(hook).toContain('auth.id');
-    expect(hook).toContain("e.record.hide('phone'");
+    // goja: hide.apply throws → "Failed to enrich record"; use variadic hide.
+    expect(hook).toContain("hide('phone', 'email', 'avatarOriginalUrl')");
+    expect(hook).not.toMatch(/hide\.apply\s*\(/);
     expect(hook).not.toContain("getString('id')");
+  });
+
+  it('drop progress migration removes all six progress collections', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790227200_kvartira_drop_progress.js'),
+      'utf8',
+    );
+    for (const name of [
+      'skills',
+      'student_skill_progress',
+      'progress_goals',
+      'progress_history',
+      'achievement_definitions',
+      'user_achievements',
+    ]) {
+      expect(source).toContain(`'${name}'`);
+    }
+    expect(source).toContain('app.delete(');
   });
 
   it('users update hook locks role to admin student↔teacher switch', () => {
@@ -152,6 +194,17 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(source).toContain('AVATAR_REF_MAX');
   });
 
+  it('conversation avatar migration stores text pbfile refs instead of url', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790140800_kvartira_conversation_avatar_text.js'),
+      'utf8',
+    );
+    expect(source).toContain('conversations');
+    expect(source).toContain('avatarUrl');
+    expect(source).toContain("type: 'text'");
+    expect(source).toContain('AVATAR_REF_MAX');
+  });
+
   it('avatar purpose select fix migration sets full purpose values list', () => {
     const source = readFileSync(
       resolve(ROOT, 'pocketbase/pb_migrations/1789795200_kvartira_avatar_purpose_select.js'),
@@ -170,5 +223,14 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(source).toContain('directionsVideo');
     expect(source).toContain("'school'");
     expect(source).toContain('purpose = "school"');
+  });
+
+  it('notification urgent migration adds bool field', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790054400_kvartira_notification_urgent.js'),
+      'utf8',
+    );
+    expect(source).toContain('urgent');
+    expect(source).toContain('notifications');
   });
 });

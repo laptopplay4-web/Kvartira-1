@@ -78,8 +78,8 @@ describe('BottomNav active state', () => {
 
     const chatLink = screen.getByRole('link', { name: /Чат/ });
     expect(chatLink).toHaveAttribute('aria-current', 'page');
-    expect(chatLink.className).toMatch(/bg-brand-muted/);
     expect(chatLink.className).toMatch(/text-brand/);
+    expect(chatLink.className).not.toMatch(/bg-brand-muted/);
     expect(screen.getByRole('link', { name: /Главная/ })).not.toHaveAttribute('aria-current');
   });
 

@@ -1,5 +1,6 @@
 import { ClientResponseError } from 'pocketbase';
 import type {
+  AcceptConsentOptions,
   LegalApi,
   PublishLegalVersionInput,
   UpdateLegalDocumentInput,
@@ -12,6 +13,7 @@ import {
   mapLegalDocumentRecord,
   mapUserConsentRecord,
   mapUserRecord,
+  type PbUserConsentRecord,
 } from '@/services/api/pocketbase/mappers';
 import {
   canAcceptDocument,
@@ -77,15 +79,24 @@ function assertManageAccess(user: User): void {
 async function createConsentRecord(
   document: LegalDocument,
   requesterId: string,
+  options?: AcceptConsentOptions,
 ): Promise<UserConsent> {
+  if (document.purpose === 'minor_guardian' && !options?.guardian) {
+    throw new ApiError('Укажите данные законного представителя', 'VALIDATION_ERROR', 400);
+  }
+
   const pb = getPocketBase();
   const now = new Date().toISOString();
+  // documentType / version / purpose / ipAddress / userAgent are overwritten by
+  // the PB hook — sending them here only keeps the optimistic value readable.
   const record = await pb.collection('user_consents').create({
     user: requesterId,
     document: document.id,
     documentType: document.type,
     documentTitle: document.title,
     version: document.currentVersion,
+    purpose: document.purpose ?? '',
+    guardian: document.purpose === 'minor_guardian' ? options?.guardian : null,
     acceptedAt: now,
   });
   return mapUserConsentRecord(record);
@@ -131,7 +142,7 @@ export const pocketbaseLegalApi: LegalApi = {
     });
   },
 
-  async acceptDocument(documentId, requesterId) {
+  async acceptDocument(documentId, requesterId, options) {
     return withPbError(async () => {
       const user = await getRequesterUser(requesterId);
       assertAcceptAccess(requesterId, user);
@@ -141,11 +152,11 @@ export const pocketbaseLegalApi: LegalApi = {
         throw new ApiError('Документ не требует согласия', 'VALIDATION_ERROR', 400);
       }
 
-      return createConsentRecord(document, requesterId);
+      return createConsentRecord(document, requesterId, options);
     });
   },
 
-  async acceptDocuments(documentIds, requesterId) {
+  async acceptDocuments(documentIds, requesterId, options) {
     return withPbError(async () => {
       const user = await getRequesterUser(requesterId);
       assertAcceptAccess(requesterId, user);
@@ -154,9 +165,25 @@ export const pocketbaseLegalApi: LegalApi = {
       for (const documentId of documentIds) {
         const document = await loadDocumentOrThrow(documentId);
         if (!document.requiresConsent) continue;
-        results.push(await createConsentRecord(document, requesterId));
+        results.push(await createConsentRecord(document, requesterId, options));
       }
       return results;
+    });
+  },
+
+  async revokeConsent(consentId, requesterId) {
+    return withPbError(async () => {
+      const user = await getRequesterUser(requesterId);
+      assertViewConsents(requesterId, user);
+
+      // The timestamp is stamped server-side: `user_consents` is not directly
+      // updatable, the consent journal only moves through this endpoint.
+      const pb = getPocketBase();
+      const record = await pb.send('/api/kvartira/consents/revoke', {
+        method: 'POST',
+        body: { consentId },
+      });
+      return mapUserConsentRecord(record as PbUserConsentRecord);
     });
   },
 
@@ -179,6 +206,8 @@ export const pocketbaseLegalApi: LegalApi = {
       if (input.title !== undefined) body.title = input.title.trim();
       if (input.content !== undefined) body.content = input.content.trim();
       if (input.requiresConsent !== undefined) body.requiresConsent = input.requiresConsent;
+      if (input.purpose !== undefined) body.purpose = input.purpose ?? '';
+      if (input.required !== undefined) body.required = input.required;
 
       if (Object.keys(body).length === 0) return existing;
 

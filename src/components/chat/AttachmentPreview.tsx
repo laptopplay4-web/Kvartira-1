@@ -1,5 +1,5 @@
 import { X, FileIcon } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { formatFileSize } from '@/services/chat/attachments';
 import type { PendingAttachment } from './MessageComposer';
 
@@ -29,15 +29,14 @@ export function AttachmentPreview({ attachments, onRemove }: AttachmentPreviewPr
           </div>
           {att.error && <span className="text-[10px] text-danger">{att.error}</span>}
           {att.uploading && <span className="text-[10px] text-text-muted">Загрузка…</span>}
-          <Button
-            variant="ghost"
-            size="icon"
+          <IconButton
+            label="Удалить вложение"
+            size="sm"
             onClick={() => onRemove(att.id)}
-            aria-label="Удалить вложение"
-            className="h-7 w-7"
+            className="h-7 w-7 shrink-0"
           >
-            <X className="h-3.5 w-3.5" />
-          </Button>
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </IconButton>
         </div>
       ))}
     </div>

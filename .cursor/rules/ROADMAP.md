@@ -28,20 +28,23 @@ Production-ready, когда выполнены **все** условия:
 
 ---
 
-## 2. Текущий статус (2026-09-02)
+## 2. Текущий статус (2026-09-09)
 
 | Область | Статус |
 |---------|--------|
 | MVP (auth, lessons, chat, events, profile, admin, PWA) | ✅ mock + pocketbase |
-| Этап 2 (assignments, progress, support, public, security, legal CMS) | ✅ mock + pocketbase |
+| Этап 2 (assignments, support, public, security, legal CMS) | ✅ mock + pocketbase (Progress удалён) |
+| Security review / IDOR / CSP | ✅ 2026-09-09 |
+| 152-ФЗ consents / revoke / delete / export / audit | ✅ 2026-09-09 |
+| UI primitives + animations | ✅ 2026-09-09 |
 | Production backend | ⏳ фазы 3.4–6 |
 | Frontend polish (фаза 0) | ✅ |
-| **Текущая фаза** | **3** |
-| **Следующий шаг** | **3.4** — Email channel (optional) |
-| Тесты | 543 (44 files; 4 skipped) |
-| Graphify | см. `stack.mdc` §42 |
+| **Текущая фаза** | **6** — Deploy (после optional 3.4) |
+| **Следующий шаг** | Figma §126: следующий элемент → уточнения по одному → план → «можно внедрять»; или Deploy |
+| Тесты | 579 (46 files) |
+| Graphify | 2473 / 2635 / 372 — `stack.mdc` §126 |
 
-Полный чеклист реализации — `stack.mdc` §16.
+Полный чеклист реализации — `stack.mdc` §16. РКН — `docs/ROSKOMNADZOR_CHECKLIST.md`.
 
 ---
 
@@ -184,10 +187,10 @@ Handoff для пользователя (новый чат):
 
 | ID | Задача | Статус |
 |----|--------|--------|
-| 4.1 | AuditLog (book/reschedule/cancel, admin, consents) | ⏳ |
+| 4.1 | AuditLog (consents / account delete / data export; IP+UA) | ✅ 2026-09-09 |
 | 4.2 | Admin Security extended view | ⏳ |
-| 4.3 | Admin school settings | ⏳ |
-| 4.4 | Admin events management | ⏳ |
+| 4.3 | Admin school settings | ✅ |
+| 4.4 | Admin events management | ✅ |
 
 ---
 
@@ -196,7 +199,7 @@ Handoff для пользователя (новый чат):
 | ID | Задача | Статус |
 |----|--------|--------|
 | 5.1 | E2E smoke (Playwright) | ⏳ |
-| 5.2 | Security review / IDOR audit | ⏳ |
+| 5.2 | Security review / IDOR audit | ✅ 2026-09-09 |
 | 5.3 | Performance (React Query, pagination) | ⏳ |
 | 5.4 | Accessibility pass | ⏳ |
 | 5.5 | Error boundaries + logging (optional) | ⏳ |
@@ -253,6 +256,7 @@ Deploy checklist (фаза 6.3):
 
 | Дата | Изменение |
 |------|-----------|
+| 2026-09-09 | Security hardening + 152-ФЗ + Progress removed + UI primitives; 4.1/5.2 ✅; next: Deploy / optional 3.4 |
 | 2026-09-02 | Seed: убраны placeholder-файлы ДЗ/занятий/мероприятий; next: 3.4 |
 | 2026-09-02 | Production cutover: no demo login UI; PB assignments/groups + public adapter; next: 3.4 |
 | 2026-08-31 | v1.0 — initial roadmap; backend: PocketBase; фаза 0, next: 0.4 |

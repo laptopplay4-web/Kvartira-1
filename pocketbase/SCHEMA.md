@@ -9,29 +9,23 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 
 | PB collection | TS type / domain | Ключевые поля |
 |---------------|------------------|---------------|
-| `users` *(auth)* | `User` | phone, role, firstName, lastName, avatarUrl (text, `pbfile:` ref), avatarOriginalUrl (text), bio, directionIds (json, teachers) |
-| `directions` | `Direction` | name, description, icon |
+| `users` *(auth)* | `User` | phone, role, firstName, lastName, avatarUrl (text, `pbfile:` ref), avatarOriginalUrl (text), bio, directionIds (json, student learning / teacher teaching) |
+| `directions` | `Direction` | name, description, icon — admin CRUD (`admin:directions`) |
 | `teacher_availability` | `TeacherAvailability` | teacher, schedule (json), exceptions, planningPeriod (json) |
 | `lessons` | `Lesson` | student, teacher, direction, date, startTime, status |
 | `lesson_history` | `LessonHistoryEntry` | lesson, action, user |
-| `conversations` | `Conversation` | type, title, participantIds, metadata |
+| `conversations` | `Conversation` | type, title, participantIds, metadata, avatarUrl (text, `pbfile:` ref) |
 | `conversation_members` | `ConversationMember` | conversation, user, role, muted |
 | `messages` | `Message` | conversation, sender, text, attachments (json) |
 | `events` | `SchoolEvent` | type, date, registeredUserIds |
 | `event_registrations` | `EventRegistration` | event, user, application |
 | `assignments` | `Assignment` | teacher, group, contentBlocks (json) |
 | `assignment_groups` | `AssignmentGroup` | teacher, kind (`general`\|`custom`), members |
-| `skills` | `Skill` | name, direction, maxLevel |
-| `student_skill_progress` | `StudentSkillProgress` | student, skill, level |
-| `progress_goals` | `ProgressGoal` | student, title, status |
-| `progress_history` | `ProgressHistoryEntry` | student, type, title |
-| `achievement_definitions` | `AchievementDefinition` | code, title, icon |
-| `user_achievements` | `UserAchievement` | student, achievement |
 | `help_articles` | `HelpArticle` | question, answer, category |
 | `support_tickets` | `SupportTicket` | user, subject, attachments |
-| `legal_documents` | `LegalDocument` | type, content, versionHistory |
-| `user_consents` | `UserConsent` | user, document, version |
-| `security_sessions` | `SecuritySession` | user, deviceLabel, isCurrent |
+| `legal_documents` | `LegalDocument` | type, content, versionHistory, purpose, required |
+| `user_consents` | `UserConsent` | user, document, version, purpose, revokedAt, ipAddress, userAgent, consentTextVersion |
+| `security_sessions` | `SecuritySession` | user, deviceLabel, isCurrent, tokenFingerprint (SHA-256 JWT, multi-device) |
 | `login_history` | `LoginHistoryEntry` | user, success |
 | `security_alerts` | `SecurityAlert` | user, type, read |
 | `notifications` | `AppNotification` | user, type, title, link |
@@ -40,7 +34,18 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 | `school_settings` | `PublicSchoolInfo` | name, tagline, about, contacts (json: phone/email/address/workingHours + socialLinks + directionsVideo) |
 | `public_news` | `PublicNewsItem` | title, excerpt, publishedAt |
 | `kvartira_files` | file storage | owner, purpose (`chat`/`assignment`/`support`/`avatar`), contextId, file, mimeType, size |
-| `audit_logs` | `AuditLog` | actor, action, entityType, entityId |
+| `audit_logs` | `AuditLog` | actor, action, entityType, entityId, metadata (ip + user-agent) |
+
+### Согласия и 152-ФЗ
+
+Миграция `1790400000_kvartira_consent_purposes.js`:
+
+- `legal_documents.purpose` (`service` \| `communication` \| `publication` \| `minor_guardian`) и `required` — согласие собирается отдельно на каждую цель;
+- `user_consents.revokedAt` — отзыв согласия; строки журнала не удаляются;
+- `user_consents.ipAddress` / `userAgent` / `consentTextVersion` — доказательство согласия, проставляет хук `kvartiraLegal.js` из самого запроса, не из тела;
+- `user_consents.updateRule = null` — журнал меняется только через `POST /api/kvartira/consents/revoke`;
+- `users.deleteRule = 'id = @request.auth.id'` — self-service удаление аккаунта; `onRecordDeleteRequest` пишет `audit_logs` и чистит зависимые записи;
+- `audit_logs` пополняется хуками: `consent.accepted`, `consent.revoked`, `account.deleted`, `account.data_exported`.
 
 ## Индексы (бизнес-инварианты)
 
@@ -51,9 +56,6 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 | `idx_availability_teacher` UNIQUE | одно расписание на препода |
 | `idx_conv_member` UNIQUE | один membership на пару |
 | `idx_event_registration` UNIQUE | одна регистрация на событие |
-| `idx_skill_progress` UNIQUE | один прогресс на навык |
-| `idx_user_achievement` UNIQUE | достижение один раз |
-| `idx_achievement_code` UNIQUE | код достижения |
 | `idx_legal_doc_type` UNIQUE | один документ на тип |
 | `idx_notif_prefs_user` UNIQUE | настройки на пользователя |
 
@@ -174,20 +176,12 @@ API rules на всех 29 коллекциях — маппинг к `src/permi
 
 **Создание:** преподаватель назначает группу + блоки материалов. **Общая группа** (`kind: general`) видна всем ученикам. **Вложения:** `kvartira_files` + signed URLs. Уведомление участникам группы при создании.
 
-## Progress adapter (ROADMAP 2.6 ✅)
+## Progress adapter — удалён
 
-`src/services/api/pocketbase/progress.ts` — контракт `ProgressApi`.
-
-| Компонент | Назначение |
-|-----------|------------|
-| `pocketbase/progress.ts` | summary, skills, goals CRUD, history, achievements, auto-unlock |
-| `mappers.ts` `mapSkillRecord` / `mapProgressGoalRecord` / … | PB → progress types; skill 0–10 ↔ 0–100 |
-| `pb_hooks/progress.pb.js` | teacher writes only assigned students |
-| `pb_hooks/lib/kvartiraProgress.js` | `assertProgressCreate` / `assertProgressUpdate` / `teacherHasStudent` |
-| `pb_migrations/1788672000_kvartira_progress_adapter.js` | student may create own unlocks + history |
-| Client IDOR | `canViewStudentProgress`, `canManageStudentGoals`, `canManageStudentSkills` |
-
-**Шкала навыков:** в PB `maxLevel`/`level` 0–10, в UI 0–100 (`toPbSkillLevel` / `fromPbSkillLevel`). **Достижения:** `evaluateAndUnlockAchievements` при чтении summary/achievements и после updateSkillProgress. Уведомление «Новое достижение» пишется в `notifications`.
+Модуль «Прогресс и достижения» удалён. Коллекции `skills`, `student_skill_progress`,
+`progress_goals`, `progress_history`, `achievement_definitions`, `user_achievements`
+удаляет миграция `pb_migrations/1790227200_kvartira_drop_progress.js`.
+Исторические миграции не переписаны — уже развёрнутые базы приводятся в порядок этой миграцией.
 
 ## Support adapter (ROADMAP 2.7 ✅)
 

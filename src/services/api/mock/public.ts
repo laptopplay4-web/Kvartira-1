@@ -1,23 +1,20 @@
 import type { PublicApi } from '@/services/api/types';
 import { ApiError } from '@/services/api/types';
-import {
-  directions,
-  publicNews,
-  teacherDirections,
-} from '@/mocks/seed';
+import { publicNews } from '@/mocks/seed';
 import { filterPublicEvents, toPublicTeacher } from '@/services/public/helpers';
-import type { SchoolEvent, User, PublicSchoolInfo } from '@/types';
+import type { Direction, SchoolEvent, User, PublicSchoolInfo } from '@/types';
 
 export interface MockPublicDb {
   users: User[];
   events: SchoolEvent[];
   schoolInfo: PublicSchoolInfo;
+  directions: Direction[];
 }
 
 function getPublicTeachers(db: MockPublicDb) {
   return db.users
     .filter((u) => u.role === 'teacher')
-    .map((u) => toPublicTeacher(u, teacherDirections[u.id] ?? [], directions));
+    .map((u) => toPublicTeacher(u, u.directionIds ?? [], db.directions));
 }
 
 export function createMockPublicApi(db: MockPublicDb, delay: (ms?: number) => Promise<void>): PublicApi {
@@ -26,7 +23,7 @@ export function createMockPublicApi(db: MockPublicDb, delay: (ms?: number) => Pr
       await delay();
       return {
         school: structuredClone(db.schoolInfo),
-        directions,
+        directions: structuredClone(db.directions),
         teachers: getPublicTeachers(db),
         events: filterPublicEvents(db.events),
         news: publicNews,
@@ -35,7 +32,7 @@ export function createMockPublicApi(db: MockPublicDb, delay: (ms?: number) => Pr
 
     async getDirection(id) {
       await delay();
-      const direction = directions.find((d) => d.id === id);
+      const direction = db.directions.find((d) => d.id === id);
       if (!direction) {
         throw new ApiError('Направление не найдено', 'NOT_FOUND', 404);
       }
@@ -53,7 +50,7 @@ export function createMockPublicApi(db: MockPublicDb, delay: (ms?: number) => Pr
       if (!user) {
         throw new ApiError('Преподаватель не найден', 'NOT_FOUND', 404);
       }
-      return toPublicTeacher(user, teacherDirections[user.id] ?? [], directions);
+      return toPublicTeacher(user, user.directionIds ?? [], db.directions);
     },
   };
 }

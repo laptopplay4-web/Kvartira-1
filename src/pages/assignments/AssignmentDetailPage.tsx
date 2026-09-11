@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { getAssignmentGroupLabel } from '@/services/assignments/groups/helpers';
 import { formatUserName } from '@/utils';
+import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
 
 export default function AssignmentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -72,7 +73,11 @@ export default function AssignmentDetailPage() {
           {user.role === 'student' && teacher && (
             <div className="flex justify-between gap-4">
               <dt className="text-text-muted">Преподаватель</dt>
-              <dd>{formatUserName(teacher)}</dd>
+              <dd>
+                <UserPreviewTrigger user={teacher} className="rounded-md p-0 font-medium text-brand">
+                  {formatUserName(teacher)}
+                </UserPreviewTrigger>
+              </dd>
             </div>
           )}
         </dl>

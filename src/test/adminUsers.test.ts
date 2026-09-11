@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  mockChatApi,
   mockNotificationsApi,
   mockUsersApi,
   resetMockDatabase,
@@ -115,5 +116,42 @@ describe('admin updateUserRole API', () => {
     await expect(
       mockUsersApi.updateUserRole(admin.id, student.id, 'admin' as User['role'] as 'teacher'),
     ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+});
+
+describe('self-service personal data rights', () => {
+  beforeEach(() => {
+    resetMockDatabase();
+  });
+
+  it('exports the requester profile and related records', async () => {
+    const data = await mockUsersApi.exportOwnData(student.id);
+    expect(data.profile.id).toBe(student.id);
+    expect(data.exportedAt).toBeTruthy();
+    expect(Array.isArray(data.consents)).toBe(true);
+    expect(Array.isArray(data.lessons)).toBe(true);
+  });
+
+  it('deletes the requester account from the mock database', async () => {
+    await mockUsersApi.deleteOwnAccount(student.id);
+    await expect(mockUsersApi.getUser(student.id, admin.id)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  it('keeps personal chat history for the other party after account delete', async () => {
+    const personal = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'personal',
+      participantIds: [student.id],
+    });
+    await mockChatApi.sendMessage(personal.id, student.id, 'Привет от ученика');
+    await mockUsersApi.deleteOwnAccount(student.id);
+
+    const conv = await mockChatApi.getConversation(personal.id, 'user-teacher-1');
+    expect(conv.participantIds).toContain('user-teacher-1');
+    expect(conv.participantIds).not.toContain(student.id);
+
+    const { messages } = await mockChatApi.getMessages(personal.id, 'user-teacher-1');
+    expect(messages.some((m) => m.text?.includes('Привет'))).toBe(true);
   });
 });

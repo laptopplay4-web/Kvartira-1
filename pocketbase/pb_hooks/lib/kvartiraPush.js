@@ -68,10 +68,19 @@ function sendViaRelay(subscription, payload) {
     payload,
   });
 
+  const headers = { 'Content-Type': 'application/json' };
+
+  // The relay can send a push to any endpoint it is handed, so it must not be
+  // an open POST target even on a private network.
+  const secret = $os.getenv('WEB_PUSH_RELAY_SECRET');
+  if (secret) {
+    headers['X-Relay-Secret'] = secret;
+  }
+
   const res = $http.send({
     url: relayUrl,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body,
     timeout: 15,
   });

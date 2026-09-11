@@ -42,6 +42,17 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
 
+  --z-dropdown: 40;
+  --z-sheet: 60;
+  --z-modal: 80;
+  --z-lightbox: 90;
+  --z-toast: 100;
+
+  --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 220ms;
+
   --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
   --mobile-header-height: 3.5rem;
   --bottom-nav-height: calc(3.5rem + var(--spacing-safe-bottom));
@@ -261,6 +272,169 @@
   }
 
   .glass-card {
-    @apply rounded-xl border border-border-subtle bg-surface/80 backdrop-blur-sm;
+    @apply rounded-xl border border-white/10 bg-surface-elevated/60 shadow-lg backdrop-blur-md backdrop-saturate-150;
+  }
+
+  .glass-popup {
+    @apply rounded-2xl border border-white/15 bg-surface-elevated/55 shadow-2xl shadow-black/40 backdrop-blur-xl backdrop-saturate-150 ring-1 ring-white/10;
+  }
+
+  .glass-scrim {
+    @apply bg-black/50 backdrop-blur-md backdrop-saturate-100;
+  }
+
+  .glass-menu-item {
+    @apply rounded-xl transition-colors hover:bg-white/10 focus-ring;
+  }
+
+  .z-dropdown {
+    z-index: var(--z-dropdown);
+  }
+
+  .z-sheet {
+    z-index: var(--z-sheet);
+  }
+
+  .z-modal {
+    z-index: var(--z-modal);
+  }
+
+  .z-lightbox {
+    z-index: var(--z-lightbox);
+  }
+
+  .z-toast {
+    z-index: var(--z-toast);
+  }
+
+  .animate-fade-in {
+    animation: fade-in var(--duration-normal) var(--ease-out-soft) both;
+  }
+
+  .animate-fade-out {
+    animation: fade-out var(--duration-fast) var(--ease-out-soft) both;
+  }
+
+  .animate-slide-up-in {
+    animation: slide-up-in var(--duration-slow) var(--ease-out-soft) both;
+  }
+
+  .animate-slide-up-out {
+    animation: slide-up-out var(--duration-fast) var(--ease-out-soft) both;
+  }
+
+  .animate-scale-in {
+    animation: scale-in var(--duration-normal) var(--ease-out-soft) both;
+  }
+
+  .animate-scale-out {
+    animation: scale-out var(--duration-fast) var(--ease-out-soft) both;
+  }
+
+  .animate-sheet-in {
+    animation: sheet-in var(--duration-slow) var(--ease-out-soft) both;
+  }
+
+  .animate-sheet-out {
+    animation: sheet-out var(--duration-fast) var(--ease-out-soft) both;
+  }
+
+  .animate-chat-long-press {
+    animation: chat-long-press 390ms linear forwards;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@keyframes chat-long-press {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }

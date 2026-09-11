@@ -1,8 +1,8 @@
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { SelectableTile } from '@/components/ui/SelectableTile';
 import { SLOT_INTERVAL_OPTIONS } from '@/services/availability/validateAvailability';
 import type { SlotInterval } from '@/types';
-import { cn } from '@/utils';
 
 const INTERVAL_LABELS: Record<number, string> = {
   15: '15 минут',
@@ -33,27 +33,17 @@ export function AvailabilityIntervalModal({
       </p>
       <fieldset>
         <legend className="sr-only">Интервал между занятиями</legend>
-        <div className="space-y-2">
+        <div className="space-y-2" role="radiogroup" aria-label="Интервал между занятиями">
           {SLOT_INTERVAL_OPTIONS.map((interval) => (
-            <label
+            <SelectableTile
               key={interval}
-              className={cn(
-                'flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-4 py-2 transition-colors',
-                value === interval
-                  ? 'border-brand bg-brand-muted'
-                  : 'border-border-subtle hover:border-border',
-              )}
+              selected={value === interval}
+              onClick={() => onChange(interval)}
+              label={INTERVAL_LABELS[interval]}
+              className="min-h-11"
             >
-              <input
-                type="radio"
-                name="slotInterval"
-                value={interval}
-                checked={value === interval}
-                onChange={() => onChange(interval)}
-                className="h-4 w-4 accent-brand focus-ring"
-              />
-              <span>{INTERVAL_LABELS[interval]}</span>
-            </label>
+              {INTERVAL_LABELS[interval]}
+            </SelectableTile>
           ))}
         </div>
         {error && (

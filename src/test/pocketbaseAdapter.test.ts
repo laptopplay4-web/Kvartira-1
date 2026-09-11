@@ -16,12 +16,6 @@ import {
   mapAssignmentRecord,
   mapAssignmentGroupRecord,
   mapPublicNewsRecord,
-  mapSkillRecord,
-  mapSkillProgressRecord,
-  mapProgressGoalRecord,
-  mapProgressHistoryRecord,
-  mapAchievementDefinitionRecord,
-  mapUserAchievementRecord,
   mapHelpArticleRecord,
   mapSupportTicketRecord,
   mapLegalDocumentRecord,
@@ -44,14 +38,12 @@ import { pocketbaseEventsApi } from '@/services/api/pocketbase/events';
 import { pocketbaseChatApi } from '@/services/api/pocketbase/chat';
 import { pocketbaseAssignmentsApi } from '@/services/api/pocketbase/assignments';
 import { pocketbaseAssignmentGroupsApi } from '@/services/api/pocketbase/groups';
-import { pocketbaseProgressApi } from '@/services/api/pocketbase/progress';
 import { pocketbaseSupportApi } from '@/services/api/pocketbase/support';
 import { pocketbaseLegalApi } from '@/services/api/pocketbase/legal';
 import { pocketbaseSecurityApi } from '@/services/api/pocketbase/security';
 import { pocketbaseNotificationsApi } from '@/services/api/pocketbase/notifications';
 import { pocketbaseSchoolSettingsApi } from '@/services/api/pocketbase/schoolSettings';
 import { pocketbasePublicApi } from '@/services/api/pocketbase/public';
-import { fromPbSkillLevel, toPbSkillLevel } from '@/services/progress/skillLevel';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 
@@ -75,7 +67,6 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       'src/services/api/pocketbase/assignments.ts',
       'src/services/api/pocketbase/groups.ts',
       'src/services/api/pocketbase/public.ts',
-      'src/services/api/pocketbase/progress.ts',
       'src/services/api/pocketbase/support.ts',
       'src/services/api/pocketbase/legal.ts',
       'src/services/api/pocketbase/security.ts',
@@ -150,8 +141,8 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(user.phone).toBe('');
   });
 
-  it('mapUserRecord recovers phone from synthetic email when phone hidden', () => {
-    const user = mapUserRecord({
+  it('mapUserRecord recovers phone from synthetic email only for own record', () => {
+    const record = {
       id: 'rec-email-phone',
       collectionId: 'users',
       collectionName: 'users',
@@ -161,9 +152,19 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       firstName: 'Анна',
       lastName: 'Иванова',
       email: '79001234567@kvartira.local',
-    } as Parameters<typeof mapUserRecord>[0]);
+    } as Parameters<typeof mapUserRecord>[0];
 
-    expect(user.phone).toBe('+79001234567');
+    expect(mapUserRecord(record, { ownRecord: true }).phone).toBe('+79001234567');
+    // Another user's record: synthetic email must never be decoded back to a phone.
+    expect(mapUserRecord(record).phone).toBe('');
+  });
+
+  it('users hook hides email together with phone (synthetic email leaks the phone)', () => {
+    const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/users.pb.js'), 'utf8');
+    expect(hook).toContain("hide('phone', 'email', 'avatarOriginalUrl')");
+    expect(hook).not.toMatch(/hide\.apply\s*\(/);
+    // Superuser Admin UI must not hit hide (otherwise enrich fails / fields vanish).
+    expect(hook).toContain('isUsersAuth');
   });
 
   it('userToPbRecord round-trips through mapUserRecord', () => {
@@ -344,6 +345,9 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(client.users.getAllUsers).toBeTypeOf('function');
     expect(client.users.updateUserRole).toBeTypeOf('function');
     expect(client.lessons.getDirections).toBe(pocketbaseLessonsApi.getDirections);
+    expect(client.lessons.createDirection).toBe(pocketbaseLessonsApi.createDirection);
+    expect(client.lessons.updateDirection).toBe(pocketbaseLessonsApi.updateDirection);
+    expect(client.lessons.deleteDirection).toBe(pocketbaseLessonsApi.deleteDirection);
     expect(client.availability.getTeacherAvailability).toBe(
       pocketbaseAvailabilityApi.getTeacherAvailability,
     );
@@ -352,7 +356,6 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(client.assignments.getAssignments).toBe(pocketbaseAssignmentsApi.getAssignments);
     expect(client.assignmentGroups.getGroups).toBe(pocketbaseAssignmentGroupsApi.getGroups);
     expect(client.public.getLandingData).toBe(pocketbasePublicApi.getLandingData);
-    expect(client.progress.getSummary).toBe(pocketbaseProgressApi.getSummary);
     expect(client.support.getTickets).toBe(pocketbaseSupportApi.getTickets);
     expect(client.legal.getDocuments).toBe(pocketbaseLegalApi.getDocuments);
     expect(client.security.getOverview).toBe(pocketbaseSecurityApi.getOverview);
@@ -441,6 +444,26 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('assertRegistrationCapacity');
     expect(lib).toContain('syncRegisteredUserIds');
     expect(lib).toContain('Мест больше нет');
+  });
+
+  it('lessons hooks lock participant fields and hide teacherNotes from students', () => {
+    const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/lessons.pb.js'), 'utf8');
+    const lib = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraLessons.js'),
+      'utf8',
+    );
+
+    expect(hook).toContain('onRecordEnrich');
+    expect(hook).toContain("hide('teacherNotes')");
+    expect(hook).toContain('assertLessonCreate');
+    expect(hook).toContain('assertLessonUpdate');
+
+    expect(lib).toContain('STUDENT_LOCKED_FIELDS');
+    expect(lib).toContain('TEACHER_LOCKED_FIELDS');
+    // A student must never be able to rewrite notes or swap participants.
+    expect(lib).toContain("'teacherNotes'");
+    expect(lib).toContain("'teacher'");
+    expect(lib).toContain('STUDENT_ALLOWED_STATUSES');
   });
 
   it('chat adapter migration lets conversation owner/admin remove members', () => {
@@ -581,8 +604,10 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).toContain('onRecordAfterUpdateSuccess');
     expect(hook).toContain('messages');
     expect(hook).toContain('conversation_members');
+    expect(hook).toContain('assertConversationPinUpdate');
     expect(lib).toContain('syncConversationLastMessage');
     expect(lib).toContain('syncReadReceipts');
+    expect(lib).toContain('assertConversationPinUpdate');
   });
 
   it('mapAssignmentRecord maps group, dates and content blocks', () => {
@@ -670,145 +695,10 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('assertAssignmentCreate');
     expect(lib).toContain('assertAssignmentUpdate');
     expect(lib).toContain('assertAssignmentGroupCreate');
+    expect(lib).toContain('assertAssignmentGroupDelete');
+    expect(lib).toContain('purgeAssignmentsForGroup');
+    expect(lib).toContain('Общую группу нельзя удалить');
     expect(lib).toContain('Укажите группу получателей');
-  });
-
-  it('toPbSkillLevel and fromPbSkillLevel convert 0–100 ↔ 0–10', () => {
-    expect(toPbSkillLevel(80)).toBe(8);
-    expect(toPbSkillLevel(100)).toBe(10);
-    expect(toPbSkillLevel(8)).toBe(8);
-    expect(fromPbSkillLevel(8)).toBe(80);
-    expect(fromPbSkillLevel(10)).toBe(100);
-    expect(fromPbSkillLevel(0)).toBe(0);
-  });
-
-  it('mapSkillRecord and mapSkillProgressRecord convert PB 0–10 scale to 0–100', () => {
-    const skill = mapSkillRecord({
-      id: 'skill-1',
-      collectionId: 'skills',
-      collectionName: 'skills',
-      created: '',
-      updated: '',
-      name: 'Дыхание',
-      description: 'Опора',
-      direction: 'dir-1',
-      maxLevel: 10,
-    });
-    expect(skill).toMatchObject({
-      id: 'skill-1',
-      name: 'Дыхание',
-      directionId: 'dir-1',
-      maxLevel: 100,
-    });
-
-    const progress = mapSkillProgressRecord({
-      id: 'prog-1',
-      collectionId: 'student_skill_progress',
-      collectionName: 'student_skill_progress',
-      created: '',
-      updated: '2026-08-02 11:00:00.000Z',
-      student: 'user-student',
-      skill: 'skill-1',
-      level: 8,
-      note: 'Хорошо',
-    });
-    expect(progress).toMatchObject({
-      studentId: 'user-student',
-      skillId: 'skill-1',
-      level: 80,
-      note: 'Хорошо',
-    });
-    expect(progress.updatedAt).toBe('2026-08-02T11:00:00.000Z');
-  });
-
-  it('mapProgressGoalRecord and mapUserAchievementRecord map relations and dates', () => {
-    const goal = mapProgressGoalRecord({
-      id: 'goal-1',
-      collectionId: 'progress_goals',
-      collectionName: 'progress_goals',
-      created: '2026-08-01 10:00:00.000Z',
-      updated: '',
-      student: 'user-student',
-      teacher: 'user-teacher-1',
-      title: 'Гаммы',
-      description: 'Каждый день',
-      targetDate: '2026-09-01 00:00:00.000Z',
-      status: 'active',
-    });
-    expect(goal).toMatchObject({
-      studentId: 'user-student',
-      teacherId: 'user-teacher-1',
-      title: 'Гаммы',
-      targetDate: '2026-09-01',
-      status: 'active',
-    });
-    expect(goal.createdAt).toBe('2026-08-01T10:00:00.000Z');
-
-    const unlocked = mapUserAchievementRecord({
-      id: 'ua-1',
-      collectionId: 'user_achievements',
-      collectionName: 'user_achievements',
-      created: '',
-      updated: '',
-      student: 'user-student',
-      achievement: 'ach-1',
-      unlockedAt: '2026-08-02 12:00:00.000Z',
-    });
-    expect(unlocked).toEqual({
-      id: 'ua-1',
-      studentId: 'user-student',
-      achievementId: 'ach-1',
-      unlockedAt: '2026-08-02T12:00:00.000Z',
-    });
-
-    const history = mapProgressHistoryRecord({
-      id: 'hist-1',
-      collectionId: 'progress_history',
-      collectionName: 'progress_history',
-      created: '2026-08-01 09:00:00.000Z',
-      updated: '',
-      student: 'user-student',
-      type: 'goal',
-      title: 'Новая цель',
-    });
-    expect(history.studentId).toBe('user-student');
-    expect(history.type).toBe('goal');
-    expect(history.createdAt).toBe('2026-08-01T09:00:00.000Z');
-
-    const definition = mapAchievementDefinitionRecord({
-      id: 'ach-1',
-      collectionId: 'achievement_definitions',
-      collectionName: 'achievement_definitions',
-      created: '',
-      updated: '',
-      code: 'first_lesson',
-      title: 'Первый урок',
-      description: 'Посетите занятие',
-      icon: 'star',
-    });
-    expect(definition.code).toBe('first_lesson');
-  });
-
-  it('progress adapter migration lets student create own unlocks and history', () => {
-    const source = readFileSync(
-      resolve(ROOT, 'pocketbase/pb_migrations/1788672000_kvartira_progress_adapter.js'),
-      'utf8',
-    );
-    expect(source).toContain('user_achievements');
-    expect(source).toContain('progress_history');
-    expect(source).toContain('student = @request.auth.id');
-  });
-
-  it('progress hooks restrict teacher writes to assigned students', () => {
-    const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/progress.pb.js'), 'utf8');
-    const lib = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraProgress.js'), 'utf8');
-
-    expect(hook).toContain('progress_goals');
-    expect(hook).toContain('student_skill_progress');
-    expect(hook).toContain('user_achievements');
-    expect(lib).toContain('assertProgressCreate');
-    expect(lib).toContain('assertProgressUpdate');
-    expect(lib).toContain('teacherHasStudent');
   });
 
   it('mapHelpArticleRecord and mapSupportTicketRecord map relations and json fields', () => {
@@ -1069,6 +959,11 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/security.pb.js'), 'utf8');
     const lib = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraSecurity.js'), 'utf8');
     const authHook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/auth.pb.js'), 'utf8');
+    const authLib = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraAuth.js'), 'utf8');
+    const migration = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790668800_kvartira_security_session_fingerprint.js'),
+      'utf8',
+    );
 
     expect(hook).toContain('security_sessions');
     expect(hook).toContain('security_alerts');
@@ -1079,7 +974,12 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('assertSecurityAlertUpdate');
     expect(lib).toContain('recordSecuritySession');
     expect(lib).toContain('markOnlyCurrentSession');
+    expect(lib).toContain('tokenFingerprint');
+    expect(lib).toContain('$security.sha256');
+    expect(lib).not.toContain('deviceLabel = {:deviceLabel}');
     expect(authHook).toContain('recordSecuritySession');
+    expect(authLib).toContain('detectBrowserName');
+    expect(migration).toContain('tokenFingerprint');
   });
 
   it('mapNotificationRecord and mapNotificationPreferencesRecord map relations', () => {

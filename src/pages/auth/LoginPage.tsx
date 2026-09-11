@@ -102,7 +102,12 @@ export default function LoginPage() {
         <p className="mt-8 text-center text-body-sm text-text-muted">
           Нет аккаунта?{' '}
           <Link to="/register" className="text-brand hover:underline focus-ring rounded">
-            Зарегистрироваться
+            Регистрация по QR
+          </Link>
+        </p>
+        <p className="mt-4 text-center text-caption text-text-muted">
+          <Link to="/legal" className="hover:text-brand hover:underline focus-ring rounded">
+            Политика конфиденциальности и документы
           </Link>
         </p>
       </div>

@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.108 Production build test TS fix · 2026-09-03
+Версия: 1.133 Avatar VK crop + black lightbox · 2026-09-12
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -24,6 +24,7 @@ alwaysApply: true
 | Серверный стейт | TanStack Query | 5.x |
 | Клиентский стейт | Zustand | 5.x (auth) |
 | Стили | Tailwind CSS 4 + CSS variables | 4.x |
+| UI variants | class-variance-authority + tailwind-merge | — |
 | Формы | React Hook Form + Zod | — |
 | Даты | date-fns | 4.x |
 | Иконки | lucide-react | — |
@@ -107,6 +108,7 @@ kvartira/
 │   │   ├── useSearchMessages.ts
 │   │   ├── useConversationMembers.ts
 │   │   ├── useCreateConversation.ts
+│   │   ├── useMarkPassiveNotificationsOnLeave.ts
 │   │   └── useBackNavigation.ts
 │   ├── services/
 │   │   ├── api/
@@ -175,6 +177,9 @@ kvartira/
 | `src/services/api/pocketbase/schoolSettings.ts` | PocketBase SchoolSettingsApi (admin `/admin/school`) |
 | `src/services/api/pocketbase/users.ts` | UsersApi: профиль, аватар, `updateUserRole` (admin student↔teacher) |
 | `src/services/users/access.ts` | IDOR: только admin, только student↔teacher, не себя |
+| `src/components/users/UserPreviewProvider.tsx` | Context: `openUserPreview` / модалка профиля |
+| `src/components/users/UserPreviewModal.tsx` | Аватар · имя · роль · направления |
+| `src/components/users/UserPreviewTrigger.tsx` | Кликабельная обёртка (button \| span) |
 | `src/services/availability/validateAvailability.ts` | Валидация расписания, перерывов, интервала |
 | `src/services/availability/formHelpers.ts` | Конвертация TeacherAvailability ↔ форма UI |
 | `src/components/calendar/LessonCalendar.tsx` | Единый календарь: day/week/month, навигация, role-aware |
@@ -226,7 +231,8 @@ kvartira/
 | `src/hooks/useChatDraft.ts` | localStorage drafts per conversation |
 | `src/hooks/useEditMessage.ts` | Optimistic edit + rollback |
 | `src/hooks/useDeleteMessage.ts` | Soft-delete optimistic |
-| `src/test/chat.test.ts` | 45 tests: access, send, edit, delete, reply, search, group, mute, pin, attachments, realtime, IDOR |
+| `src/hooks/useMarkPassiveNotificationsOnLeave.ts` | Leave `/notifications` → mark passive as read (urgent keep) |
+| `src/test/chat.test.ts` | 55 tests: access, send, edit, delete, reply, search, group, school-wide, mute, pin, attachments, realtime, IDOR |
 
 ---
 
@@ -269,11 +275,12 @@ kvartira/
 | `/chat`, `/chat/:id` | Чат | Protected |
 | `/events`, `/events/:id` | Мероприятия | Protected |
 | `/profile`, `/profile/settings/account`, `/profile/settings/system`, `/profile/settings/security` | Профиль / настройки (вкладки) | Protected |
+| `/profile/directions` | Направления (ученик / teacher) | Protected |
 | `/profile/security` | Redirect → settings/security | Protected |
 | `/profile/availability` | Redirect → `/lessons/availability` | Protected |
 | `/notifications` | Уведомления | Protected |
 | `/admin` | Админ-хаб настроек | AdminRoute (`admin:access`) + AppLayout |
-| `/admin/schedule`, `/admin/users` | Расписание / Пользователи | AdminRoute + AppLayout |
+| `/admin/schedule`, `/admin/users`, `/admin/directions`, `/admin/registration-qr` | Расписание / Пользователи / Направления / QR регистрации | AdminRoute + AppLayout |
 | `/admin/events` | Redirect → `/events` | AdminRoute (`admin:events`) |
 | `/legal`, `/legal/:id` | Публичные документы | — |
 | `/profile/legal` | Согласия пользователя | Protected |
@@ -336,7 +343,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 
 **Notifications:** suppress если чат открыт (`setOpenConversation`) или muted (`ConversationMember.muted` / `mutedUntil`).
 
-**Group management:** add/remove members, rename, leave, delete; роли `owner|admin|member` (отдельно от global RBAC).
+**Group management:** add/remove members, rename, leave, delete; роли `owner|admin|member` (отдельно от global RBAC). Create/edit/delete conversations — только teacher|admin (`canManageChats`); ученик не создаёт чаты. Personal — только staff↔student. Кнопка «Общий чат для всех» (`allUsers`) — без лимита числа чатов.
 
 **Pinned messages:** `Conversation.pinnedMessageIds`; pin/unpin через API; bar в header area.
 
@@ -348,7 +355,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 
 **Drafts:** `localStorage` key `chatDraft:{conversationId}`.
 
-**Permissions:** `chat:read|send|create|manage_members|delete|delete_message|pin_message`; admin без membership не видит personal chats.
+**Permissions:** `chat:read|send|create|manage_members|delete|delete_message|pin_message`; student без `chat:create`/`chat:delete`; teacher с `chat:delete`; admin без membership не видит personal chats.
 
 **Cache isolation:** `queryClient.clear()` (`src/app/queryClient.ts`) on login/logout/demoLogin.
 
@@ -419,37 +426,40 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `availability.test.ts` | validation, period form, planningPeriod slots, permissions, exceptions, mock save (29 tests) |
 | `calendar.test.ts` | date ranges, IDOR filters, booking/reschedule/cancel → calendar data |
 | `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput (15 tests) |
-| `chat.test.ts` | access, send, edit, delete, reply, search, group, mute, pin, attachments, realtime, pagination, IDOR, notifications, cache isolation |
+| `chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, mute, pin, attachments, realtime, pagination, IDOR, notifications, cache isolation |
 | `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; admin as teacher; progress block (skipped when UI hidden, §85) |
 | `nav.test.tsx` | MobileHeader assignments + bell + «О школе»; SidebarNav без notifications + «О школе»; aria-current; admin active; BottomNav brand (15 tests) |
 | `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back + outline style (6 tests) |
 | `routes.test.ts` | основные маршруты (+ `/assignments/create`) |
 | `routes.test.tsx` | admin shell: redirect, AppLayout, nav links, student block, shared users cache, EmptyState, role toggle (13 tests) |
 | `offline.test.tsx` | BookLessonLink offline; AvailabilityPage save disabled offline (4 tests) |
-| `assignments.test.ts` | access, list IDOR, submit, review, feedback audio, create, upload, validation, notification, overdue display (29 tests) |
+| `assignments.test.ts` | access, groups CRUD/delete, member helpers (empty phone), content validation, home helpers (30 tests) |
 | `progress.test.ts` | access, helpers, summary, achievements, auto-unlock, teacher goals/skills CRUD, attendance (32 tests) |
 | `support.test.ts` | access, FAQ filter/CRUD, validation, tickets search/filters, attachments, IDOR, notifications, permissions (31 tests) |
 | `public.test.ts` | public helpers, API, detail pages, no phone on teachers, event filtering (8 tests) |
-| `security.test.ts` | access, password change, sessions revoke, resolveSecuritySessions, login notifications, IDOR (19 tests) |
+| `security.test.ts` | access, password change, multi-device sessions, resolveSecuritySessions, fingerprint, login notifications, IDOR (21 tests) |
+| `userPreview.test.tsx` | direction helpers, modal name/role/directions, trigger, photo lightbox (5 tests) |
 | `legal.test.ts` | access, helpers, pending consents, accept, public docs, permissions, CMS update/publish, IDOR (21 tests) |
 | `pwa.test.tsx` | helpers, banner, usePwaInstall hook (8 tests) |
-| `notificationPreferences.test.ts` | preferences API, helpers, validation, delivery suppression (9 tests) |
+| `notificationPreferences.test.ts` | preferences API, helpers, validation, delivery, passive/urgent markAllAsRead (11 tests) |
 | `profile.test.ts` | profile validation, update name, avatar upload/remove, crop helpers, mime infer, displayable src guard (19 tests) |
 | `audioPlayer.test.tsx` | formatAudioDuration, speed cycle, seek ratio, AudioPlayer UI (10 tests) |
 | `adminUsers.test.ts` | canChangeUserRole student↔teacher, mock updateUserRole, IDOR, notification, phone privacy sanitize (8 tests) |
-| `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md + user cascade delete + avatar fields + role lock hook (11 tests) |
+| `directions.test.ts` | admin CRUD, register directionIds, teacher urgent setup, profile multi-select (9 tests) |
+| `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md + user cascade delete + avatar fields + role lock hook + session fingerprint (18 tests) |
 | `pocketbaseAuth.test.ts` | phone login hooks, findRecordsByFilter return value, login side-effects isolation, PhoneInput on auth pages, no demo shortcuts (9 tests) |
 | `pocketbaseRbac.test.ts` | PB RBAC migration + kvmartiraRbac.js + RBAC.md coverage (8 tests) |
 | `pocketbaseSeed.test.ts` | PB seed script files, collections coverage, docs (5 tests) |
-| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/groups/public/progress/support/legal/security/notifications/schoolSettings/files/realtime, createApiClient pocketbase mode, other-user avatar resolve, missing phone default (52 tests) |
+| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/groups/public/progress/support/legal/security/notifications/schoolSettings/files/realtime, createApiClient pocketbase mode, other-user avatar resolve, missing phone default (51 tests) |
 | `chatRealtime.test.ts` | PB subscription → ChatRealtimeEvent mappers (2 tests) |
 | `webPush.test.ts` | push helpers, subscription API, delivery gating (6 tests) |
 | `authSessionSync.test.ts` | refreshSession API, syncSession cache clear, PB subscribe hook, route hydration guard (6 tests) |
 | `bootstrapSession.test.ts` | resolveBootstrapSession zustand + pocketbase_auth fallback (3 tests) |
 | `authSessionStorage.test.ts` | sanitize persisted session/user, invalid role rejection (4 tests) |
+| `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 545 passed | 4 skipped (44 files; Progress UI hidden skips 4 home tests).
+**Итого:** 608 passed (47 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -560,6 +570,21 @@ services/chat/{access,messages,validation,realtime,helpers}
 | School About button (header/sidebar) | ✅ 2026-09-03, см. §114 |
 | School social links + directions video | ✅ 2026-09-03, см. §115 |
 | Production build test TS fix | ✅ 2026-09-03, см. §116 |
+| Assignment group delete | ✅ 2026-09-07, см. §117 |
+| Assignment group members phone match | ✅ 2026-09-07, см. §118 |
+| Directions admin + onboarding | ✅ 2026-09-07, см. §119 |
+| QR registration invite (school gate) | ✅ 2026-09-07, см. §120 |
+| Chat create policy (teacher/admin only) | ✅ 2026-09-07, см. §121 |
+| Chat setup modal (title/icon/students) | ✅ 2026-09-07, см. §122 |
+| Chat avatar fix + role labels | ✅ 2026-09-07, см. §123 |
+| Security hardening + Progress removed | ✅ 2026-09-09, см. §124 |
+| 152-ФЗ consents / delete / export | ✅ 2026-09-09, см. §124; delete UI → Account settings §127 |
+| UI primitives + zone migration | ✅ 2026-09-09, см. §124 |
+| Chat messenger-ready | ✅ 2026-09-11, см. §125 |
+| Figma design review → selective adoption | ⏳ по протоколу §126; BottomNav active color ✅ 1.124 |
+| Notifications auto-read on leave | ✅ 2026-09-12, см. §129 |
+| Multi-device security sessions | ✅ 2026-09-12, см. §130 |
+| User preview modal (tap user) | ✅ 2026-09-12, см. §131; lightbox фото ✅ §132; VK crop + чёрный фон ✅ §133 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1368,10 +1393,11 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Поле | Значение |
 |------|----------|
 | MVP + этап 2 (mock) | ✅ |
-| Текущая фаза | **3** — Files + realtime + push |
-| Следующий шаг | **3.4** — Email channel (optional) |
+| Текущая фаза | **6** — Deploy; параллельно Figma Q&A (§126) |
+| Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять» |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
+| Тесты | 608 passed (47 files); §132 preview photo lightbox |
 
 ### Фазы (кратко)
 
@@ -1380,12 +1406,12 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | 0 | Frontend polish (mock) | ✅ |
 | 1 | PocketBase foundation | ✅ |
 | 2 | API adapter по модулям | ✅ |
-| 3 | Files + realtime + push | ⏳ 3.4 next |
-| 4 | Admin & audit | ⏳ |
-| 5 | Production hardening | ⏳ |
+| 3 | Files + realtime + push | ⏳ 3.4 optional |
+| 4 | Admin & audit | ✅ 4.1 consents/account audit (2026-09-09) |
+| 5 | Production hardening | ✅ 5.2 security review (2026-09-09); E2E smoke ⏳ |
 | 6 | Deploy | ⏳ |
 
-Полные таблицы задач, критерии приёмки, env checklist — **`ROADMAP.md`**.
+Полные таблицы задач, критерии приёмки, env checklist — **`ROADMAP.md`**. Чек-лист РКН — **`docs/ROSKOMNADZOR_CHECKLIST.md`**. Готовность к серверу — **`docs/PRODUCTION_READINESS.md`**.
 
 ### Протокол новых чатов
 
@@ -1393,7 +1419,469 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2317 nodes, 2461 edges, 358 communities (graphify update 2026-09-03 post-§116).
+**Graphify stats:** 2532 nodes, 2705 edges, 382 communities (graphify update 2026-09-12 post-§131).
+
+---
+
+## 133. Avatar VK crop + black lightbox (2026-09-12)
+
+**Scope:** просмотр аватара — строго чёрный фон; кадрирование нового фото / миниатюры — UX как в ВК.
+
+**Graphify:** `AvatarPhotoViewer()` / `AvatarCropModal()` → `AvatarUpload()`.
+
+### UI (✅)
+
+- Lightbox: `bg-black`, без blur/скруглений.
+- Crop: чёрный fullscreen, круг с белой обводкой, затемнение вне круга, слайдер зума, pinch/drag; заголовки «Новое фото» / «Выбор миниатюры».
+
+**Graphify stats:** 2533 nodes, 2706 edges, 382 communities.
+
+---
+
+## 132. User preview photo lightbox (2026-09-12)
+
+**Scope:** в модалке профиля тап по аватару → полноэкранный просмотр фото.
+
+**Graphify:** `UserPreviewModal()` → `AvatarPhotoViewer()` → `getAvatarFullPhotoUrl()`.
+
+### Fix (✅)
+
+- Аватар кликабелен только при displayable photo (`hasAvatarPhoto` + `isDisplayableAvatarSrc`).
+- `AvatarPhotoViewer`: portal + `z-lightbox`, Escape с `stopImmediatePropagation` (не закрывает Modal).
+- Оригинал: `avatarOriginalUrl ?? avatarUrl`.
+
+### Tests
+
+`userPreview.test.tsx` +1 lightbox → **608** (47 files). typecheck ✅.
+
+**Graphify stats:** 2532 nodes, 2705 edges, 382 communities.
+
+---
+
+## 131. User preview modal (2026-09-12)
+
+**Scope:** тап по пользователю из чата / занятий / админки / ДЗ → модалка: аватар, имя, статус (роль), направления.
+
+**Graphify:** `UserPreviewProvider()` → `UserPreviewModal()` / `UserPreviewTrigger()` → `getUser` + `getDirections`.
+
+### Architecture (✅)
+
+- `UserPreviewProvider` в `AppProviders` (после auth hydrate) — imperative `openUserPreview(User | id)`.
+- `UserPreviewModal` — Modal + React Query (`['user-preview', id]`, shared `['directions']`); seed user для мгновенного UI.
+- `UserPreviewTrigger` — `button` или `span` (вложенность в chat list row); `stopPropagation`.
+- Helpers: `formatUserDirectionLabels` / `resolveUserDirections` (порядок = `directionIds`).
+- Privacy: телефон в превью не показываем.
+
+### Integration (✅)
+
+- Chat: MessageBubble, ChatHeader (личный), ConversationItem avatar, ConversationSettings members.
+- Lessons: LessonDetailPage teacher/student, BookLessonPage avatar (карточка выбора не ломается).
+- Admin: AdminUsersPage (кнопки роли снаружи).
+- Assignments: group members, AssignmentDetail teacher link.
+
+### Tests
+
+`userPreview.test.tsx` +4 → suite **607** (47 files). typecheck ✅.
+
+**Graphify stats:** 2532 nodes, 2705 edges, 382 communities.
+
+---
+
+## 130. Multi-device security sessions (2026-09-12)
+
+**Scope:** вход с разных устройств на один аккаунт — в «Безопасность» видны обе сессии; «Текущая» привязана к JWT этого устройства.
+
+**Graphify:** `recordSecuritySession()` → `tokenFingerprint` → `resolveSecuritySessions()` → `SecurityPage` / `fingerprintAuthToken()`.
+
+### Root cause (✅)
+
+- Upsert по грубому `deviceLabel` (Chrome·Windows) схлопывал разные устройства в одну запись.
+- `resolveSecuritySessions` дополнительно дедупил по `deviceLabel`.
+
+### Fix (✅)
+
+- Каждый password-login → **новая** `security_sessions` (+ trim до 20).
+- PB: `tokenFingerprint` = `$security.sha256(JWT)`; клиент `fingerprintAuthToken` для `isCurrent`.
+- Mock: идентичность по `token`, не по label.
+- `resolveSecuritySessions`: без dedupe по label; ровно один `isCurrent`.
+- UA label: `Chrome · Windows` / `Safari · iOS` (browser + OS).
+
+### Deploy
+
+Миграция `1790668800_kvartira_security_session_fingerprint.js` + `pb_hooks` (`kvartiraSecurity.js`, `kvartiraAuth.js`) + фронт; перезапуск PocketBase.
+
+### Tests
+
+`security.test.ts` 21; schema + adapter + auth hooks; suite **603** (booking cancel flake вне scope). typecheck ✅.
+
+**Graphify stats:** 2514 nodes, 2688 edges, 379 communities.
+
+---
+
+## 129. Notifications auto-read on leave (2026-09-12)
+
+**Scope:** на `/notifications` непрочитанные выделены; при уходе (маршрут / visibility / pagehide) пассивные → `read`; `urgent` (требуют действия) остаются непрочитанными.
+
+**Graphify:** `NotificationsPage()` → `useMarkPassiveNotificationsOnLeave()` → `markAllAsRead` → `notificationRequiresAction()`.
+
+### Domain (✅)
+
+- `notificationRequiresAction` / `isPassiveUnreadNotification` / `markPassiveNotificationsReadInList`.
+- `markAllAsRead` (mock + PB) пропускает `urgent`.
+
+### UI (✅)
+
+- Unread: brand inset + fade-in stagger + pulse dot; urgent — danger.
+- Leave: optimistic cache + API; кнопка «Прочитать все» — только пассивные.
+- Маршрут (не unmount) — без ложного mark в React Strict Mode.
+
+### Tests
+
+`notificationPreferences.test.ts` +4 → **11** в файле; suite **600 passed** (booking cancel flake по past-slot — вне scope). typecheck ✅.
+
+**Graphify stats:** 2504 nodes, 2676 edges, 377 communities.
+
+---
+
+## 128. Telegram multi-pin bar (2026-09-12)
+
+**Scope:** панель закрепов как в Telegram — счётчик, клик → сообщение, повторный клик → следующее; порядок по позиции в чате (новые → старые).
+
+**Graphify:** `PinnedMessageBar` → `orderPinnedMessagesNewestFirst()` → `ChatPage` cycle index.
+
+### UI (✅)
+
+- `PinnedMessageBar`: `currentIndex/pinnedCount`, стек маркеров.
+- Клик: scroll к текущему → индекс `(i+1) % n`.
+- X открепляет текущее (без изменений по правам).
+
+### Domain (✅)
+
+- `orderPinnedMessagesNewestFirst` — sort by `createdAt` desc, dedupe.
+- Загрузка пинов через `getMessage` (и старые страницы).
+
+### Tests
+
+`chat.test.ts` +1 order helper → **580** (46 files). typecheck ✅.
+
+---
+
+## 127. Delete account → Account settings (2026-09-11)
+
+**Scope:** кнопка «Удалить аккаунт» перенесена из «Документы и согласия» в «Настройки → Аккаунт» (вниз страницы).
+
+**Graphify:** `AccountSettingsPage()` → `UsersApi.deleteOwnAccount()` → logout; `LegalConsentsPage()` — только export.
+
+### UI (✅)
+
+- `AccountSettingsPage`: блок «Удаление аккаунта» внизу + `ConfirmDialog` (тот же copy/flow).
+- `LegalConsentsPage`: удалена кнопка delete; остались согласия + «Скачать мои данные».
+- `documentTexts.ts`: права субъекта — delete указан в «Настройки → Аккаунт».
+
+### Не тронуто
+
+- `deleteOwnAccount` API (mock/PB), audit, cascade hooks.
+
+**Graphify stats:** 2473 nodes, 2635 edges, 372 communities (topology unchanged).
+
+---
+
+## 124. Security · 152-ФЗ · Cleanup · UI (2026-09-09)
+
+**Scope:** закрыть утечки ПДн и дыры доступа; согласия по целям (152-ФЗ); удалить модуль «Прогресс»; единые UI-примитивы с лёгкими анимациями.
+
+**Graphify:** `users.pb.js` hide email; `kvartiraLessons.js`; `ConsentCheckbox` → `RegisterPage`; `ConfirmDialog`/`Sheet`/`SegmentedControl`; `kvartiraAudit.js`.
+
+### Security (✅)
+
+- Phone leak via synthetic email: `hide('email')` + `mapUserRecord({ ownRecord })`.
+- Lessons field-lock hooks + `teacherNotes` enrich hide.
+- Narrowed `users` directory + availability read rules.
+- Event roster redaction; teacher notification scope; login throttle; seed invite fail-closed; `demoLogin` prod guard; push-relay secret; CSP + `deploy/security-headers.conf`; QR via `<img>`.
+
+### 152-ФЗ (✅)
+
+- `ConsentPurpose`, per-purpose documents, revoke, self-delete, data export JSON.
+- Register: separate unchecked checkboxes + minor guardian block.
+- Audit: `consent.accepted|revoked`, `account.deleted|data_exported`.
+- Template legal texts + `docs/ROSKOMNADZOR_CHECKLIST.md`.
+
+### Cleanup (✅)
+
+- Dead files; Progress module FE/BE/tests removed; drop migration `1790227200_*`.
+
+### UI (✅)
+
+- `cva` + `tailwind-merge`; animation tokens + z-index ladder.
+- Primitives: Button, IconButton, Modal, Sheet, DropdownMenu, ConfirmDialog, SegmentedControl, SelectableTile, Toast.
+- Migrated chat/profile/lessons/admin/assignments/events/shell hotspots.
+
+### Tests
+
+**579 passed** (46 files). typecheck + lint (0 errors) + build ✅.
+
+**Deploy:** миграции `1790227200_*`, `1790313600_*`, `1790400000_*` + `pb_hooks` + фронт; перезапуск PB; rotate registration QR; set `WEB_PUSH_RELAY_SECRET`.
+
+---
+
+## 125. Chat messenger-ready (2026-09-11)
+
+**Scope:** чат как современный мессенджер (план «Чат мессенджер»): вид/жесты, реакции, пересылка, голос, галочки/закрепы, правила модерации, пуш + чат из занятия.
+
+**Graphify:** `MessageBubble` / `MessageComposer` / `VoiceRecorder` / `ForwardMessageModal` → `ChatApi` → mock/PB; `canEditMessage` 15м; hard delete; `pinConversation`.
+
+### UI (✅)
+
+- Пузыри own/other, фон переписки, long-press → Sheet (Telegram).
+- Composer: скрепка / камера / микрофон; голос hold-to-record + замочек.
+- Галерея фото: свайп + скачать; листание по всем фото чата.
+- Реакции (быстрый ряд + «ещё»), пересылка без автора, закреп сообщения/чата в своём списке.
+- Галочки доставлено/прочитано (две синие = все участники прочитали).
+
+### Rules (✅)
+
+- Править своё — 15 мин; удалять своё всегда (hard delete — исчезает).
+- Чужие: admin везде; teacher — только group/school-wide.
+- Ученик не выходит из групп; создавать чаты — только staff (без изменений).
+- Чат из занятия: открыть/создать личный с `metadata.lessonId`.
+
+### Tests
+
+`chat.test.ts` hard-delete / reactions / forward / pin / leave policy; typecheck ✅.
+
+---
+
+## 126. Figma → selective adoption (2026-09-11)
+
+**Scope:** выборочное внедрение из [Figma proto](https://www.figma.com/proto/XQtEVVUCCk93be6a6T9Pf2/Untitled?node-id=2-7) в текущий PWA. Код **не трогаем** до явного согласия Laptop.
+
+**Graphify:** `HomePage()` / `BottomNav()` / `BookLessonPage()` / public teachers·directions · `LessonCard`.
+
+### Протокол (обязательный)
+
+1. Laptop пишет, **что нравится** (экран / блок / паттерн).
+2. Агент задаёт **сопутствующие уточнения только по этому разделу — строго по одному вопросу за сообщение**.
+3. После всех ответов агент пишет **полный список изменений** (что трогаем / что не трогаем).
+4. Код — **только после** «можно внедрять» / «подтверждаю». Новый scope без подтверждения не начинать.
+
+### Figma inventory (свежий просмотр 2026-09-11)
+
+| Экран | Содержимое |
+|-------|------------|
+| Главная | Greeting + «Твоя Квартира» + аватар; terracotta-карточка ближайшего урока (направление, время, преподаватель, кабинет/адрес, стрелка); карусель «Твои мастера»; блок-цитата «атмосфера» |
+| Каталог | Заголовок «Выбери свой класс»; чипы направлений; карточки: фото, уровень, длительность, название, преподаватель, цена ₽, кнопка «Запись» |
+| Профиль преподавателя | Hero-фото, теги направлений, имя, KPI (рейтинг / ученики / отзывы), «О себе», последний отзыв |
+| Запись | Summary урок+цена; горизонтальные даты; сетка слотов; primary «Подтвердить» |
+| Bottom nav (Figma) | **Главная · Каталог · Преподаватели · Запись** (4) |
+| Visual | Cream фон, terracotta accent (~#C15F3E), крупные радиусы, мягкие тени, photo-led |
+
+### Сейчас у нас
+
+`Главная · Занятия · Чат · События · Профиль` (+ ДЗ/уведомления в header). Brand `#00796b`, тёмная тема. Wizard booking. Нет: цен, рейтингов/отзывов, избранного, tab «Каталог/Преподаватели», atmosphere-блока, кабинета на карточке урока.
+
+### Зафиксированные решения
+
+| # | Вопрос | Решение |
+|---|--------|---------|
+| 1 | Нижняя навигация | **Оставить 5** (Главная · Занятия · Чат · События · Профиль) |
+| 2 | Чат / События | Остаются в shell (tabs не меняем) |
+| BN1 | BottomNav active | **Без контура и без заливки** — активный иконка+текст цветом brand (как Figma, наши токены) |
+| BN2 | Размер иконок | **Оставить 20px** (не 24) |
+| BN3 | Высота панели | **Оставить 56px** + safe-area |
+| BN4 | SidebarNav (desktop) | **Без изменений** (как сейчас, с заливкой) |
+
+**В работе:** — (BottomNav ✅). Ждём следующий блок от Laptop.
+
+### Статус
+
+- Inventory Figma: ✅
+- Протокол: ✅ (вопросы по одному)
+- BottomNav active (brand color, no fill): ✅ 1.124
+- Финальный план изменений: выполнен для BottomNav
+- Код следующего scope: запрещён до согласия
+
+**Сделано (BottomNav):**
+
+1. `BottomNav.tsx` — active: `font-medium text-brand`, без `bg-brand-muted`.
+2. `nav.test.tsx` — active = `text-brand`, без `bg-brand-muted`.
+3. SidebarNav / размеры / токены — без изменений.
+
+**Graphify stats:** 2473 nodes, 2635 edges, 372 communities (graphify update 2026-09-11; topology unchanged).
+
+---
+
+## 121. Chat Create Policy (2026-09-07)
+
+**Scope:** чаты только teacher|admin ↔ student; ученики не создают чаты; группы сохраняются; кнопка «Общий чат для всех»; create/edit/delete — teacher и admin; число чатов не ограничено.
+
+**Graphify:** `canManageChats()` → `CreateChatModal()` → `createConversation(allUsers?)` → mock/PB; `isValidTeacherStudentPersonalPair()`.
+
+### Domain + RBAC (✅)
+
+- Student: без `chat:create` / `chat:delete`; teacher: +`chat:delete`.
+- `canManageChats` / `canCreatePersonalChat` / `canCreateGroupChat` / `canCreateSchoolWideChat` — только teacher|admin.
+- Personal: ровно пара staff↔student; teacher↔teacher запрещён.
+- `CreateConversationInput.allUsers` — группа со всеми пользователями школы; без dedupe (unlimited).
+- Manage/delete по-прежнему через `chat:manage_members` / `chat:delete` + owner|admin membership.
+
+### UI (✅)
+
+- `CreateChatModal`: личный (только ученики), группа, кнопка «Общий чат для всех».
+- `ChatPage` Plus — только `canManageChats`.
+
+### Tests
+
+`chat.test.ts` +8; `permissions.test.ts` chat create/delete → **582 passed | 4 skipped** (46 files).
+
+**Graphify stats:** 2433 nodes, 2590 edges, 375 communities (graphify update 2026-09-07 post-§121).
+
+---
+
+## 122. Chat Setup Modal (2026-09-07)
+
+**Scope:** при создании группы/общего чата — модалка настройки (название, иконка); выбор учеников как в группах ДЗ (фильтр направлений); личный чат — тот же список учеников.
+
+**Graphify:** `CreateChatModal()` → `StudentPickerList()` → `filterStudentsByDirection()`; `createConversation(avatarUrl?)`.
+
+### UI (✅)
+
+- Группа / общий чат: название + загрузка иконки (preview/replace/remove) → create.
+- Группа: multi-select учеников с direction pills + «Выбрать всех».
+- Личный: single-select учеников тем же пикером.
+- `StudentPickerList` reused в `AddGroupMembersModal` (ДЗ).
+- Список/хедер чата показывают `conversation.avatarUrl`.
+
+### API (✅)
+
+- `CreateConversationInput.avatarUrl` в mock + PocketBase.
+
+### Tests
+
+`chat.test.ts` +1 (avatar on create) → **583 passed | 4 skipped** (46 files).
+
+**Graphify stats:** 2439 nodes, 2596 edges, 376 communities (graphify update 2026-09-07 post-§122).
+
+---
+
+## 123. Chat Avatar Fix + Role Labels (2026-09-07)
+
+**Scope:** фикс создания чата с фото; иконка только через кружок; смена иконки в настройках; роли ученик/преподаватель/админ вместо owner/member.
+
+**Graphify:** `prepareChatAvatarFromFile()` → `ChatAvatarEditor()` → `persistConversationAvatar()` → `kvartira_files`; `getRoleLabel()` в `ConversationSettings`.
+
+### Fix (✅)
+
+- Сжатие иконки до 256 JPEG перед create (большие data URL ломали UI/PB `url`).
+- PB: миграция `1790140800_*` — `conversations.avatarUrl` → text; upload через `purpose=chat` + `pbfile:`.
+- Убрана надпись «Добавить иконку»; только `ChatAvatarEditor` (камера).
+- Настройки чата: смена/удаление иконки + название.
+- Участники: `getRoleLabel(user.role)`.
+
+### Tests
+
+`chat.test.ts` +1; `pocketbaseSchema.test.ts` +1 → **585 passed | 4 skipped**.
+
+**Deploy:** миграция `1790140800_kvartira_conversation_avatar_text.js` + фронт; перезапуск PocketBase.
+
+---
+
+## 120. QR Registration Invite (2026-09-07)
+
+**Scope:** закрыть публичную саморегистрацию; вход в `/register` только по invite из QR на стене школы; админ печатает/ротирует QR.
+
+**Graphify:** `RegisterPage()` → `AuthApi.validateRegistrationInvite|register(inviteToken)` → mock/PB; `AdminRegistrationQrPage()` → `SchoolSettingsApi.getRegistrationInvite|rotateRegistrationInvite`; PB `kvartiraInvite.js` + `invite.pb.js`.
+
+### Domain + security (✅)
+
+- Invite token (64 hex) в `school_settings.contacts.registrationInvite` (не в `PublicSchoolInfo`).
+- `onRecordEnrich` strips secret для non-admin; validate через `POST /api/kvartira/registration-invite/validate`.
+- User create (guest): header `X-Registration-Invite` обязателен; superuser/admin seed без invite.
+- Mock: `db.registrationInvite` + те же коды ошибок `INVITE_REQUIRED` / `INVITE_INVALID`.
+
+### UI (✅)
+
+- `/register?invite=…` — validate → форма; без invite — gate «только QR в школе».
+- `/admin/registration-qr` — SVG QR, PNG download, print, copy link, rotate (confirm).
+- Landing/Login CTA → «QR-регистрация» (ведёт на gate без токена).
+
+### Tests
+
+`registrationInvite.test.ts` +12; directions register + invite; routes `/admin/registration-qr` → **574 passed | 4 skipped** (46 files).
+
+**Deploy:** выложить `pb_hooks` (`invite.pb.js`, `kvartiraInvite.js`, `auth.pb.js`) + фронт; перезапуск PocketBase; админ открывает QR и печатает (seed token после `pb:seed`).
+
+**Graphify stats:** 2429 nodes, 2583 edges, 375 communities (graphify update 2026-09-07 post-§120).
+
+---
+
+## 119. Directions Admin + Onboarding (2026-09-07)
+
+**Scope:** админ CRUD направлений; выбор при регистрации ученика; срочная настройка у преподавателя после назначения; правка в настройках аккаунта.
+
+**Graphify:** `AdminDirectionsPage()` → `LessonsApi.createDirection|updateDirection|deleteDirection` → mock/PB; `RegisterPage()` / `AccountSettingsPage()` → `directionIds`; `TeacherDirectionsSetupModal()` → `needsTeacherDirectionSetup()`.
+
+### API + domain (✅)
+
+- `LessonsApi`: `createDirection` / `updateDirection` / `deleteDirection`; permission `admin:directions`.
+- `AuthApi.register(..., directionIds)` — минимум одно направление.
+- `UpdateProfileInput.directionIds` — ученик и преподаватель могут менять набор.
+- `AppNotification.urgent`; PB миграция `1790054400_kvartira_notification_urgent.js`.
+- Promote student→teacher: `directionIds = []` + urgent notification; при каждом входе без направлений — ensure urgent + блокирующая модалка.
+
+### UI (✅)
+
+- `/admin/directions` в хабе администрирования.
+- Регистрация: `DirectionPicker` multi-select.
+- Профиль → «Направления» (`/profile/directions`) — ученик и преподаватель (не в настройках аккаунта).
+- `TeacherDirectionsSetupModal` (не dismissible) + badge «Срочно» в `/notifications` (link → `/profile/directions`).
+
+### Tests
+
+`directions.test.ts` +9; permissions + routes + schema + adapter → **561 passed | 4 skipped** (45 files).
+
+**Deploy:** миграция `1790054400_*` + фронт; перезапуск PocketBase.
+
+**Graphify stats:** 2368 nodes, 2516 edges, 366 communities (graphify update 2026-09-07 post-§119 profile tab).
+
+---
+
+## 118. Assignment Group Members Phone Match (2026-09-07)
+
+**Scope:** после добавления участника в группу кнопка «Добавить участников» отключалась при наличии свободных учеников.
+
+**Graphify:** `isUserAmongMembers()` → `AssignmentGroupDetailPage()` → `sanitizeUserPhoneForViewer()`.
+
+### Root cause (✅)
+
+- `isUserAmongMembers` сравнивал `member.phone === user.phone`; после sanitize пустые телефоны совпадали у всех учеников → `availableStudents.length === 0`.
+
+### Fix (✅)
+
+- Сравнение по `id`; phone fallback только если оба телефона непустые.
+- Тесты: empty/`undefined`/whitespace phone не дают false-positive.
+
+### Verify (✅)
+
+- `assignments.test.ts` → **30 passed**; suite → **551 passed | 4 skipped** (44 files).
+
+**Graphify stats:** 2319 nodes, 2465 edges, 358 communities (graphify update 2026-09-07 post-§118).
+
+---
+
+## 117. Assignment Group Delete (2026-09-07)
+
+**Scope:** удаление кастомных групп ДЗ с cascade заданий; общая группа защищена.
+
+**Graphify:** `AssignmentGroupsPage()` / `AssignmentGroupDetailPage()` → `AssignmentGroupsApi.deleteGroup()` → mock/PB.
+
+### API + UI (✅)
+
+- Mock/PB `deleteGroup`: cascade assignments; forbid `grp-general`; IDOR via manage access.
+- UI: confirm Modal «Удалить группу?» на списке и детали; offline guard.
+
+### Tests
+
+`assignments.test.ts` +3 (cascade, general forbid, student IDOR).
 
 ---
 

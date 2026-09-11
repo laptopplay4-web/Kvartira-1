@@ -24,12 +24,6 @@ const SEEDED_COLLECTIONS = [
   'event_registrations',
   'assignments',
   'assignment_groups',
-  'skills',
-  'student_skill_progress',
-  'progress_goals',
-  'progress_history',
-  'achievement_definitions',
-  'user_achievements',
   'help_articles',
   'support_tickets',
   'legal_documents',
@@ -52,11 +46,10 @@ describe('PocketBase seed (ROADMAP 1.5)', () => {
     expect(runSource).toContain('DEMO_ACCOUNTS');
   });
 
-  it('helpers map demo phones and scale skill levels for PB schema', () => {
+  it('helpers map demo phones for PB schema', () => {
     const source = readFileSync(SEED_HELPERS, 'utf8');
     expect(source).toContain('phoneToEmail');
     expect(source).toContain('passwordForPhone');
-    expect(source).toContain('toPbSkillLevel');
     expect(source).toContain('user-teacher-1');
   });
 

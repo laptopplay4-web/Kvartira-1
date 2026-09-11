@@ -35,6 +35,7 @@ describe('router', () => {
     expect(paths).toContain('/profile/help');
     expect(paths).toContain('/profile/help/:id');
     expect(paths).toContain('/profile/settings/account');
+    expect(paths).toContain('/profile/directions');
     expect(paths).toContain('/profile/settings/system');
     expect(paths).toContain('/profile/settings/security');
     expect(paths).toContain('/profile/security');
@@ -53,6 +54,8 @@ describe('router', () => {
     expect(paths).toContain('/admin/legal');
     expect(paths).toContain('/admin/events');
     expect(paths).toContain('/admin/school');
+    expect(paths).toContain('/admin/registration-qr');
+    expect(paths).toContain('/admin/directions');
     expect(paths).toContain('/forgot-password');
     expect(paths).toContain('/reset-password');
   });

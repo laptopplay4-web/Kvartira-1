@@ -1,9 +1,9 @@
-import type { AuthSession, EventRegistration, Lesson, SchoolEvent, User, PublicSchoolInfo } from '@/types';
+import type { AuthSession, Direction, EventRegistration, Lesson, SchoolEvent, User, PublicSchoolInfo } from '@/types';
 import {
   DEMO_ACCOUNTS,
   conversationMembers as seedConversationMembers,
   conversations as seedConversations,
-  directions,
+  directions as seedDirections,
   events as seedEvents,
   publicSchoolInfo as seedSchoolInfo,
   getDayOfWeekFromDate,
@@ -11,11 +11,6 @@ import {
   initialLessons,
   initialAssignments,
   initialAssignmentGroups,
-  achievementDefinitions,
-  initialProgressGoals,
-  initialProgressHistory,
-  initialSkillProgress,
-  initialUserAchievements,
   helpArticles as seedHelpArticles,
   initialSupportTickets,
   initialLoginHistory,
@@ -23,11 +18,9 @@ import {
   initialSecuritySessions,
   initialLegalDocuments,
   initialUserConsents,
-  skills,
   messages as seedMessages,
   notifications as seedNotifications,
   teacherAvailabilities as seedTeacherAvailabilities,
-  teacherDirections,
   users,
 } from '@/mocks/seed';
 import { calculateAvailableSlots, slotsConflict } from '@/services/slots/calculateSlots';
@@ -41,25 +34,35 @@ import type {
   AvailabilityApi,
   ChatApi,
   CompletePasswordResetInput,
+  CreateDirectionInput,
   CreateEventInput,
   EventsApi,
   LessonsApi,
+  UpdateDirectionInput,
   UpdateTeacherAvailabilityInput,
   UploadAvatarInput,
   UsersApi,
 } from '@/services/api/types';
 import { createMockChatApi } from './chat';
+import { ensureSchoolWideMembership } from '@/services/chat/schoolWide';
 import { createMockAssignmentsApi } from './assignments';
 import { createMockAssignmentGroupsApi } from './groups';
-import { createMockProgressApi } from './progress';
 import { createMockSupportApi } from './support';
 import { createMockPublicApi } from './public';
 import { buildPasswordMap, createMockSecurityApi, pushAlert, recordAuthLogin } from './security';
 import { createMockLegalApi } from './legal';
 import { createMockSchoolSettingsApi } from './schoolSettings';
 import { createMockNotificationsApi, tryPushNotification } from './notifications';
-import { evaluateAndUnlockAchievements } from '@/services/progress/achievements';
 import { canManageEvents } from '@/services/events/access';
+import {
+  createSeedRegistrationInvite,
+  inviteTokensEqual,
+  normalizeRegistrationInviteToken,
+} from '@/services/registration/invite';
+import {
+  INVALID_REGISTRATION_INVITE_MESSAGE,
+  MISSING_REGISTRATION_INVITE_MESSAGE,
+} from '@/services/registration/constants';
 import {
   normalizeCompetitionApplication,
   normalizeEventInput,
@@ -78,9 +81,26 @@ import {
 } from '@/services/auth/validation';
 import { validateUpdateProfileInput } from '@/services/profile/validation';
 import { validateAvatarUpload } from '@/services/profile/avatar';
+import { buildPersonalDataExport } from '@/services/profile/dataExport';
 import { getUserRoleChangeError } from '@/services/users/access';
 import { sanitizeUserPhoneForViewer, sanitizeUsersPhoneForViewer, preserveOwnPhone } from '@/services/users/helpers';
 import { readPersistedLoginPhone, resolveOwnPhoneNumber } from '@/services/auth/ownPhone';
+import { canManageDirections } from '@/services/directions/access';
+import {
+  normalizeDirectionIds,
+  normalizeDirectionInput,
+  validateDirectionIdsSelection,
+  validateDirectionInput,
+} from '@/services/directions/validation';
+import {
+  TEACHER_DIRECTIONS_SETUP_BODY,
+  TEACHER_DIRECTIONS_SETUP_LINK,
+  TEACHER_DIRECTIONS_SETUP_TITLE,
+} from '@/services/directions/constants';
+import {
+  ensureTeacherDirectionsSetupNotification,
+  markTeacherDirectionsSetupNotificationsRead,
+} from '@/services/directions/notifications';
 
 interface PasswordResetRequest {
   id: string;
@@ -99,6 +119,7 @@ function uid(prefix: string) {
 
 class MockDatabase {
   users = structuredClone(users);
+  directions: Direction[] = structuredClone(seedDirections);
   lessons = structuredClone(initialLessons);
   history = structuredClone(initialHistory);
   conversations = structuredClone(seedConversations);
@@ -106,6 +127,7 @@ class MockDatabase {
   messages = structuredClone(seedMessages);
   events = structuredClone(seedEvents);
   schoolInfo: PublicSchoolInfo = structuredClone(seedSchoolInfo);
+  registrationInvite = createSeedRegistrationInvite('2026-09-01T00:00:00.000Z');
   eventRegistrations: EventRegistration[] = [];
   notifications = structuredClone(seedNotifications);
   notificationPreferences = new Map();
@@ -114,12 +136,6 @@ class MockDatabase {
   teacherAvailabilities = structuredClone(seedTeacherAvailabilities);
   assignments = structuredClone(initialAssignments);
   assignmentGroups = structuredClone(initialAssignmentGroups);
-  skills = structuredClone(skills);
-  skillProgress = structuredClone(initialSkillProgress);
-  progressGoals = structuredClone(initialProgressGoals);
-  progressHistory = structuredClone(initialProgressHistory);
-  achievementDefinitions = structuredClone(achievementDefinitions);
-  userAchievements = structuredClone(initialUserAchievements);
   helpArticles = structuredClone(seedHelpArticles);
   supportTickets = structuredClone(initialSupportTickets);
   loginHistory = structuredClone(initialLoginHistory);
@@ -178,8 +194,13 @@ function pushNotification(
   title: string,
   body: string,
   link?: string,
+  urgent?: boolean,
 ) {
-  tryPushNotification(db, userId, type, title, body, link);
+  tryPushNotification(db, userId, type, title, body, link, urgent);
+}
+
+function afterAuthSession(user: User): void {
+  ensureTeacherDirectionsSetupNotification(user, db.notifications, pushNotification);
 }
 
 async function withBookingLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
@@ -215,6 +236,7 @@ export const mockAuthApi: AuthApi = {
     const session: AuthSession = { user, token: uid('token') };
     db.sessions.set(session.token, session);
     recordAuthLogin(db, user.id, session.token, true);
+    afterAuthSession(user);
     return session;
   },
 
@@ -226,13 +248,32 @@ export const mockAuthApi: AuthApi = {
     const session: AuthSession = { user, token: uid('token') };
     db.sessions.set(session.token, session);
     recordAuthLogin(db, user.id, session.token, true);
+    afterAuthSession(user);
     return session;
   },
 
-  async register(phone, password, firstName, lastName) {
+  async validateRegistrationInvite(token) {
+    await delay(40);
+    const normalized = normalizeRegistrationInviteToken(token);
+    const stored = db.registrationInvite?.token ?? '';
+    return { valid: !!normalized && inviteTokensEqual(normalized, stored) };
+  },
+
+  async register(phone, password, firstName, lastName, directionIds, inviteToken) {
     await delay();
+    const normalizedInvite = normalizeRegistrationInviteToken(inviteToken);
+    if (!normalizedInvite) {
+      throw new ApiError(MISSING_REGISTRATION_INVITE_MESSAGE, 'INVITE_REQUIRED', 403);
+    }
+    if (!inviteTokensEqual(normalizedInvite, db.registrationInvite.token)) {
+      throw new ApiError(INVALID_REGISTRATION_INVITE_MESSAGE, 'INVITE_INVALID', 403);
+    }
     if (db.users.some((u) => u.phone === phone)) {
       throw new ApiError('Пользователь с таким телефоном уже существует', 'DUPLICATE', 409);
+    }
+    const idsError = validateDirectionIdsSelection(directionIds, db.directions, { required: true });
+    if (idsError) {
+      throw new ApiError(idsError, 'VALIDATION_ERROR', 400);
     }
     const user: User = {
       id: uid('user'),
@@ -240,9 +281,11 @@ export const mockAuthApi: AuthApi = {
       role: 'student',
       firstName,
       lastName,
+      directionIds: normalizeDirectionIds(directionIds),
     };
     db.users.push(user);
     db.passwords.set(user.id, password);
+    ensureSchoolWideMembership(db, user.id);
     const session: AuthSession = { user, token: uid('token') };
     db.sessions.set(session.token, session);
     recordAuthLogin(db, user.id, session.token, true);
@@ -339,7 +382,92 @@ export const mockAuthApi: AuthApi = {
 export const mockLessonsApi: LessonsApi = {
   async getDirections() {
     await delay();
-    return directions;
+    return structuredClone(db.directions);
+  },
+
+  async createDirection(input: CreateDirectionInput, adminId) {
+    await delay();
+    const admin = getUserById(adminId);
+    if (!canManageDirections(admin)) {
+      throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+    }
+    const validationError = validateDirectionInput(input);
+    if (validationError) {
+      throw new ApiError(validationError, 'VALIDATION_ERROR', 400);
+    }
+    const normalized = normalizeDirectionInput(input);
+    const duplicate = db.directions.some(
+      (d) => d.name.toLowerCase() === normalized.name.toLowerCase(),
+    );
+    if (duplicate) {
+      throw new ApiError('Направление с таким названием уже есть', 'DUPLICATE', 409);
+    }
+    const direction: Direction = {
+      id: uid('dir'),
+      ...normalized,
+    };
+    db.directions.push(direction);
+    return structuredClone(direction);
+  },
+
+  async updateDirection(id: string, input: UpdateDirectionInput, adminId) {
+    await delay();
+    const admin = getUserById(adminId);
+    if (!canManageDirections(admin)) {
+      throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+    }
+    const direction = db.directions.find((d) => d.id === id);
+    if (!direction) {
+      throw new ApiError('Направление не найдено', 'NOT_FOUND', 404);
+    }
+    const nextName = input.name !== undefined ? input.name : direction.name;
+    const nextDescription =
+      input.description !== undefined ? input.description : direction.description;
+    const nextIcon = input.icon !== undefined ? input.icon : direction.icon;
+    const validationError = validateDirectionInput({
+      name: nextName,
+      description: nextDescription,
+      icon: nextIcon,
+    });
+    if (validationError) {
+      throw new ApiError(validationError, 'VALIDATION_ERROR', 400);
+    }
+    const normalized = normalizeDirectionInput({
+      name: nextName,
+      description: nextDescription,
+      icon: nextIcon,
+    });
+    const duplicate = db.directions.some(
+      (d) => d.id !== id && d.name.toLowerCase() === normalized.name.toLowerCase(),
+    );
+    if (duplicate) {
+      throw new ApiError('Направление с таким названием уже есть', 'DUPLICATE', 409);
+    }
+    direction.name = normalized.name;
+    if (normalized.description) direction.description = normalized.description;
+    else delete direction.description;
+    if (normalized.icon) direction.icon = normalized.icon;
+    else delete direction.icon;
+    return structuredClone(direction);
+  },
+
+  async deleteDirection(id: string, adminId) {
+    await delay();
+    const admin = getUserById(adminId);
+    if (!canManageDirections(admin)) {
+      throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+    }
+    const index = db.directions.findIndex((d) => d.id === id);
+    if (index < 0) {
+      throw new ApiError('Направление не найдено', 'NOT_FOUND', 404);
+    }
+    if (db.lessons.some((l) => l.directionId === id)) {
+      throw new ApiError('Нельзя удалить направление: есть занятия', 'CONFLICT', 409);
+    }
+    if (db.users.some((u) => u.directionIds?.includes(id))) {
+      throw new ApiError('Нельзя удалить направление: оно назначено пользователям', 'CONFLICT', 409);
+    }
+    db.directions.splice(index, 1);
   },
 
   async getTeachers(directionId) {
@@ -348,7 +476,7 @@ export const mockLessonsApi: LessonsApi = {
       .filter((u) => {
         if (u.role !== 'teacher') return false;
         if (!directionId) return true;
-        return teacherDirections[u.id]?.includes(directionId);
+        return u.directionIds?.includes(directionId);
       })
       .map((u) => ({ ...u, phone: '' }));
   },
@@ -636,12 +764,12 @@ export const mockLessonsApi: LessonsApi = {
 export const mockChatApi: ChatApi = createMockChatApi(db, delay);
 export const mockAssignmentsApi = createMockAssignmentsApi(db, delay);
 export const mockAssignmentGroupsApi = createMockAssignmentGroupsApi(db, delay);
-export const mockProgressApi = createMockProgressApi(db, delay);
 export const mockSupportApi = createMockSupportApi(db, delay);
 export const mockPublicApi = createMockPublicApi(db, delay);
 export const mockSecurityApi = createMockSecurityApi(db, delay);
 export const mockLegalApi = createMockLegalApi(db, delay);
 export const mockSchoolSettingsApi = createMockSchoolSettingsApi(db, delay, getUserById);
+
 
 function assertEventsAdminAccess(requesterId: string) {
   const user = getUserById(requesterId);
@@ -694,10 +822,6 @@ export const mockEventsApi: EventsApi = {
 
     if (!event.registeredUserIds.includes(userId)) {
       event.registeredUserIds.push(userId);
-      const user = getUserById(userId);
-      if (user.role === 'student') {
-        evaluateAndUnlockAchievements(db, userId, uid);
-      }
     }
 
     if (event.type === 'competition' && application) {
@@ -848,6 +972,18 @@ export const mockUsersApi: UsersApi = {
 
     if (data.firstName !== undefined) user.firstName = data.firstName.trim();
     if (data.lastName !== undefined) user.lastName = data.lastName.trim();
+    if (data.directionIds !== undefined) {
+      const idsError = validateDirectionIdsSelection(data.directionIds, db.directions, {
+        required: true,
+      });
+      if (idsError) {
+        throw new ApiError(idsError, 'VALIDATION_ERROR', 400);
+      }
+      user.directionIds = normalizeDirectionIds(data.directionIds);
+      if (user.role === 'teacher') {
+        markTeacherDirectionsSetupNotificationsRead(db.notifications, user.id);
+      }
+    }
 
     syncUserInSessions(user);
     return user;
@@ -864,6 +1000,18 @@ export const mockUsersApi: UsersApi = {
     }
 
     user.role = role;
+    if (role === 'teacher') {
+      user.directionIds = [];
+      tryPushNotification(
+        db,
+        user.id,
+        'system',
+        TEACHER_DIRECTIONS_SETUP_TITLE,
+        TEACHER_DIRECTIONS_SETUP_BODY,
+        TEACHER_DIRECTIONS_SETUP_LINK,
+        true,
+      );
+    }
     syncUserInSessions(user);
     tryPushNotification(
       db,
@@ -903,7 +1051,78 @@ export const mockUsersApi: UsersApi = {
     syncUserInSessions(user);
     return user;
   },
+
+  async deleteOwnAccount(requesterId) {
+    await delay(150);
+    const user = getUserById(requesterId);
+    purgeUserFromMockDb(user.id);
+  },
+
+  async exportOwnData(requesterId) {
+    await delay(150);
+    getUserById(requesterId);
+    // Always use the mock client: the singleton `api` may be pocketbase in local .env.
+    return buildPersonalDataExport(
+      {
+        users: mockUsersApi,
+        legal: mockLegalApi,
+        lessons: mockLessonsApi,
+        assignments: mockAssignmentsApi,
+        notifications: mockNotificationsApi,
+        support: mockSupportApi,
+        security: mockSecurityApi,
+      } as Parameters<typeof buildPersonalDataExport>[0],
+      requesterId,
+    );
+  },
 };
+
+/**
+ * Erase a person from the in-memory database.
+ *
+ * Mirrors `purgeUserDependents` in pb_hooks/lib/kvartiraUsers.js: rows that
+ * cannot exist without the user are removed, references from shared rows are
+ * dropped, and the consent journal goes with the account.
+ */
+function purgeUserFromMockDb(userId: string): void {
+  db.lessons = db.lessons.filter((l) => l.studentId !== userId && l.teacherId !== userId);
+  // Keep messages; clear sender so personal chats retain history for the other party
+  for (const message of db.messages) {
+    if (message.senderId === userId) {
+      message.senderId = '';
+    }
+  }
+  db.conversationMembers = db.conversationMembers.filter((m) => m.userId !== userId);
+  db.conversations = db.conversations.map((c) => ({
+    ...c,
+    participantIds: c.participantIds.filter((id) => id !== userId),
+  }));
+  db.assignments = db.assignments.filter((a) => a.teacherId !== userId);
+  db.assignmentGroups = db.assignmentGroups
+    .filter((g) => g.teacherId !== userId)
+    .map((g) => ({ ...g, memberIds: g.memberIds.filter((id) => id !== userId) }));
+  db.teacherAvailabilities = db.teacherAvailabilities.filter((a) => a.teacherId !== userId);
+  db.events = db.events.map((e) => ({
+    ...e,
+    registeredUserIds: e.registeredUserIds.filter((id) => id !== userId),
+    invitedUserIds: e.invitedUserIds?.filter((id) => id !== userId),
+  }));
+  db.eventRegistrations = db.eventRegistrations.filter((r) => r.userId !== userId);
+  db.notifications = db.notifications.filter((n) => n.userId !== userId);
+  db.supportTickets = db.supportTickets.filter((t) => t.userId !== userId);
+  db.userConsents = db.userConsents.filter((c) => c.userId !== userId);
+  db.securitySessions = db.securitySessions.filter((s) => s.userId !== userId);
+  db.loginHistory = db.loginHistory.filter((h) => h.userId !== userId);
+  db.securityAlerts = db.securityAlerts.filter((a) => a.userId !== userId);
+  db.users = db.users.filter((u) => u.id !== userId);
+
+  for (const [token, session] of db.sessions) {
+    if (session.user.id === userId) db.sessions.delete(token);
+  }
+  db.passwords.delete(userId);
+  db.passwordChangedAt.delete(userId);
+  db.notificationPreferences.delete(userId);
+}
 
 export const mockAvailabilityApi: AvailabilityApi = {
   async getTeacherAvailability(teacherId, requesterId) {
@@ -947,6 +1166,7 @@ export const mockNotificationsApi = createMockNotificationsApi(db, delay, getUse
 
 export function resetMockDatabase() {
   db.users = structuredClone(users);
+  db.directions = structuredClone(seedDirections);
   db.lessons = structuredClone(initialLessons);
   db.history = structuredClone(initialHistory);
   db.conversations = structuredClone(seedConversations);
@@ -954,6 +1174,7 @@ export function resetMockDatabase() {
   db.messages = structuredClone(seedMessages);
   db.events = structuredClone(seedEvents);
   db.schoolInfo = structuredClone(seedSchoolInfo);
+  db.registrationInvite = createSeedRegistrationInvite('2026-09-01T00:00:00.000Z');
   db.eventRegistrations = [];
   db.notifications = structuredClone(seedNotifications);
   db.notificationPreferences = new Map();
@@ -962,12 +1183,6 @@ export function resetMockDatabase() {
   db.teacherAvailabilities = structuredClone(seedTeacherAvailabilities);
   db.assignments = structuredClone(initialAssignments);
   db.assignmentGroups = structuredClone(initialAssignmentGroups);
-  db.skills = structuredClone(skills);
-  db.skillProgress = structuredClone(initialSkillProgress);
-  db.progressGoals = structuredClone(initialProgressGoals);
-  db.progressHistory = structuredClone(initialProgressHistory);
-  db.achievementDefinitions = structuredClone(achievementDefinitions);
-  db.userAchievements = structuredClone(initialUserAchievements);
   db.helpArticles = structuredClone(seedHelpArticles);
   db.supportTickets = structuredClone(initialSupportTickets);
   db.loginHistory = structuredClone(initialLoginHistory);

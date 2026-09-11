@@ -1,23 +1,36 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, FileCheck, FileWarning } from 'lucide-react';
-import { BackLink } from '@/components/ui/BackLink';
+import { ChevronRight, Download, FileCheck, FileWarning } from 'lucide-react';
 import { format } from 'date-fns';
-import { useCurrentUser } from '@/stores/authStore';
-import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
-import { can } from '@/permissions';
-import { api } from '@/services/api';
+import { BackLink } from '@/components/ui/BackLink';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
+import { can } from '@/permissions';
+import { api } from '@/services/api';
+import { ApiError } from '@/services/api/types';
+import { REVOKE_SERVICE_CONSENT_MESSAGE } from '@/services/legal/constants';
+import { isConsentActive } from '@/services/legal/helpers';
+import {
+  downloadPersonalDataExport,
+  personalDataExportFilename,
+} from '@/services/profile/dataExport';
+import { useCurrentUser } from '@/stores/authStore';
+import type { UserConsent } from '@/types';
 
 export default function LegalConsentsPage() {
   const user = useCurrentUser()!;
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const enabled = can(user, 'legal:view-own');
+
+  const [revokeTarget, setRevokeTarget] = useState<UserConsent | null>(null);
+  const [actionError, setActionError] = useState('');
 
   const {
     data: pending,
@@ -55,6 +68,29 @@ export default function LegalConsentsPage() {
     },
   });
 
+  const revokeMutation = useMutation({
+    mutationFn: (consentId: string) => api.legal.revokeConsent(consentId, user.id),
+    onSuccess: () => {
+      setRevokeTarget(null);
+      setActionError('');
+      queryClient.invalidateQueries({ queryKey: ['legal'] });
+    },
+    onError: (e) => {
+      setActionError(e instanceof ApiError ? e.message : 'Не удалось отозвать согласие');
+    },
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: () => api.users.exportOwnData(user.id),
+    onSuccess: (data) => {
+      downloadPersonalDataExport(data, personalDataExportFilename());
+      setActionError('');
+    },
+    onError: (e) => {
+      setActionError(e instanceof ApiError ? e.message : 'Не удалось выгрузить данные');
+    },
+  });
+
   const handleAccept = (documentId: string) => {
     if (!isOnline) return;
     acceptMutation.mutate(documentId);
@@ -65,12 +101,21 @@ export default function LegalConsentsPage() {
     acceptAllMutation.mutate();
   };
 
+  const openRevoke = (consent: UserConsent) => {
+    setActionError('');
+    if (consent.purpose === 'service') {
+      setActionError(REVOKE_SERVICE_CONSENT_MESSAGE);
+      return;
+    }
+    setRevokeTarget(consent);
+  };
+
   return (
     <div className="page-container max-w-lg">
       <BackLink label="Профиль" fallbackTo="/profile" />
       <h1 className="text-h1">Документы и согласия</h1>
       <p className="mt-2 text-body-sm text-text-secondary">
-        Актуальные согласия и история принятых версий.
+        Отдельные согласия по целям обработки, история и право отозвать.
       </p>
 
       <Link to="/legal" className="mt-4 inline-flex items-center gap-1 text-sm text-brand hover:underline">
@@ -81,6 +126,12 @@ export default function LegalConsentsPage() {
       {!isOnline && (
         <p className="mt-4 rounded-lg bg-warning/10 px-4 py-3 text-sm text-warning" role="status">
           {OFFLINE_NETWORK_MESSAGE}
+        </p>
+      )}
+
+      {actionError && (
+        <p className="mt-4 rounded-lg bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
+          {actionError}
         </p>
       )}
 
@@ -155,21 +206,84 @@ export default function LegalConsentsPage() {
           <ErrorState className="mt-3" message="Не удалось загрузить историю" onRetry={() => refetchConsents()} />
         )}
         {!consentsLoading && !consentsError && consents?.length === 0 && (
-          <EmptyState className="mt-3 py-6" title="История пуста" description="Согласия появятся после принятия документов." />
+          <EmptyState
+            className="mt-3 py-6"
+            title="История пуста"
+            description="Согласия появятся после принятия документов."
+          />
         )}
         {consents && consents.length > 0 && (
           <div className="mt-3 space-y-2">
-            {consents.map((consent) => (
-              <Card key={consent.id} className="p-4">
-                <p className="font-medium">{consent.documentTitle}</p>
-                <p className="text-caption text-text-muted">
-                  v{consent.version} · {format(new Date(consent.acceptedAt), 'dd.MM.yyyy HH:mm')}
-                </p>
-              </Card>
-            ))}
+            {consents.map((consent) => {
+              const active = isConsentActive(consent);
+              const isService = consent.purpose === 'service';
+              return (
+                <Card key={consent.id} className="p-4">
+                  <p className="font-medium">{consent.documentTitle}</p>
+                  <p className="text-caption text-text-muted">
+                    v{consent.version} · {format(new Date(consent.acceptedAt), 'dd.MM.yyyy HH:mm')}
+                    {!active && consent.revokedAt
+                      ? ` · отозвано ${format(new Date(consent.revokedAt), 'dd.MM.yyyy')}`
+                      : ''}
+                  </p>
+                  {active && (
+                    <Button
+                      className="mt-3"
+                      size="sm"
+                      variant="secondary"
+                      disabled={!isOnline || revokeMutation.isPending}
+                      onClick={() => openRevoke(consent)}
+                    >
+                      {isService ? 'Как отозвать' : 'Отозвать'}
+                    </Button>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
+
+      <section className="mt-8 space-y-3">
+        <h2 className="text-h2">Персональные данные</h2>
+        <p className="text-body-sm text-text-secondary">
+          Право на доступ к своим данным (152-ФЗ). Удаление аккаунта — в настройках аккаунта.
+        </p>
+        <Button
+          variant="secondary"
+          fullWidth
+          disabled={!isOnline}
+          loading={exportMutation.isPending}
+          onClick={() => {
+            if (!isOnline) return;
+            setActionError('');
+            exportMutation.mutate();
+          }}
+        >
+          <Download className="h-4 w-4" aria-hidden />
+          Скачать мои данные
+        </Button>
+      </section>
+
+      <ConfirmDialog
+        open={!!revokeTarget}
+        onClose={() => setRevokeTarget(null)}
+        title="Отозвать согласие?"
+        description={
+          <>
+            Вы отзываете согласие на «{revokeTarget?.documentTitle}». Школа перестанет обрабатывать
+            данные по этой цели. Запись об отзыве сохранится в журнале.
+          </>
+        }
+        confirmLabel="Отозвать"
+        tone="destructive"
+        loading={revokeMutation.isPending}
+        disabled={!isOnline}
+        onConfirm={() => {
+          if (!revokeTarget || !isOnline) return;
+          revokeMutation.mutate(revokeTarget.id);
+        }}
+      />
     </div>
   );
 }

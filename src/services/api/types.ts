@@ -7,6 +7,7 @@ import type {
   AssignmentGroupDetail,
   AuthSession,
   BookLessonInput,
+  ConsentPurpose,
   Conversation,
   ConversationMember,
   ConversationType,
@@ -28,13 +29,6 @@ import type {
   PlanningPeriod,
   User,
   UserRole,
-  AchievementWithStatus,
-  ProgressGoal,
-  ProgressGoalStatus,
-  ProgressHistoryEntry,
-  SkillWithProgress,
-  StudentProgressSummary,
-  StudentSkillProgress,
   HelpArticle,
   SupportTicket,
   SupportTicketAttachment,
@@ -50,6 +44,7 @@ import type {
   SecurityOverview,
   LegalDocument,
   UserConsent,
+  GuardianDetails,
   NotificationPreferences,
   PushSubscriptionInput,
   UpdateNotificationPreferencesInput,
@@ -78,10 +73,23 @@ export interface CompletePasswordResetInput {
   newPassword: string;
 }
 
+export interface ValidateRegistrationInviteResult {
+  valid: boolean;
+}
+
 export interface AuthApi {
   login(phone: string, password: string): Promise<AuthSession>;
   demoLogin(role: 'student' | 'teacher' | 'admin'): Promise<AuthSession>;
-  register(phone: string, password: string, firstName: string, lastName: string): Promise<AuthSession>;
+  /** Guest: check invite from QR without revealing the stored secret. */
+  validateRegistrationInvite(token: string): Promise<ValidateRegistrationInviteResult>;
+  register(
+    phone: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    directionIds: string[],
+    inviteToken: string,
+  ): Promise<AuthSession>;
   requestPasswordReset(phone: string): Promise<PasswordResetRequestResult>;
   completePasswordReset(input: CompletePasswordResetInput): Promise<void>;
   logout(): Promise<void>;
@@ -90,8 +98,23 @@ export interface AuthApi {
   refreshSession(): Promise<AuthSession | null>;
 }
 
+export interface CreateDirectionInput {
+  name: string;
+  description?: string;
+  icon?: string;
+}
+
+export interface UpdateDirectionInput {
+  name?: string;
+  description?: string;
+  icon?: string;
+}
+
 export interface LessonsApi {
   getDirections(): Promise<Direction[]>;
+  createDirection(input: CreateDirectionInput, adminId: string): Promise<Direction>;
+  updateDirection(id: string, input: UpdateDirectionInput, adminId: string): Promise<Direction>;
+  deleteDirection(id: string, adminId: string): Promise<void>;
   getTeachers(directionId?: string): Promise<User[]>;
   getLessons(filters?: {
     studentId?: string;
@@ -134,6 +157,10 @@ export interface CreateConversationInput {
   title?: string;
   participantIds: string[];
   metadata?: Conversation['metadata'];
+  /** Teacher/admin: include every school user as a participant (group only). */
+  allUsers?: boolean;
+  /** Optional group/school chat icon (data URL or stored URL). */
+  avatarUrl?: string;
 }
 
 export interface SendMessageOptions {
@@ -203,6 +230,19 @@ export interface ChatApi {
   ): Promise<ConversationMember>;
   pinMessage(conversationId: string, messageId: string, userId: string): Promise<Conversation>;
   unpinMessage(conversationId: string, messageId: string, userId: string): Promise<Conversation>;
+  pinConversation(conversationId: string, userId: string, pinned: boolean): Promise<ConversationMember>;
+  setMessageReaction(
+    conversationId: string,
+    messageId: string,
+    userId: string,
+    emoji: string,
+  ): Promise<Message>;
+  forwardMessage(
+    sourceConversationId: string,
+    messageId: string,
+    userId: string,
+    targetConversationIds: string[],
+  ): Promise<Message[]>;
   deleteConversation(conversationId: string, userId: string): Promise<void>;
   getConversationForLesson(lessonId: string, userId: string): Promise<Conversation | null>;
   uploadAttachment(
@@ -261,6 +301,12 @@ export interface UploadSchoolDirectionsVideoInput {
   dataUrl: string;
 }
 
+export interface RegistrationInviteInfoDto {
+  token: string;
+  registerUrl: string;
+  rotatedAt: string;
+}
+
 export interface SchoolSettingsApi {
   getSchoolSettings(requesterId: string): Promise<PublicSchoolInfo>;
   updateSchoolSettings(
@@ -272,11 +318,20 @@ export interface SchoolSettingsApi {
     requesterId: string,
   ): Promise<NonNullable<PublicSchoolInfo['directionsVideo']>>;
   removeDirectionsVideo(requesterId: string): Promise<PublicSchoolInfo>;
+  /** Admin: current wall QR invite (secret token + deep link). */
+  getRegistrationInvite(requesterId: string, origin?: string): Promise<RegistrationInviteInfoDto>;
+  /** Admin: rotate token — старый QR перестаёт работать. */
+  rotateRegistrationInvite(
+    requesterId: string,
+    origin?: string,
+  ): Promise<RegistrationInviteInfoDto>;
 }
 
 export interface UpdateProfileInput {
   firstName?: string;
   lastName?: string;
+  /** Направления обучения (ученик) или преподавания (teacher/admin). */
+  directionIds?: string[];
 }
 
 export interface UploadAvatarInput {
@@ -291,6 +346,18 @@ export interface UploadAvatarInput {
   updateThumbnailOnly?: boolean;
 }
 
+/** Everything the app holds about one person — 152-ФЗ ст. 14 (право на доступ). */
+export interface PersonalDataExport {
+  exportedAt: string;
+  profile: User;
+  consents: UserConsent[];
+  lessons: Lesson[];
+  assignments: Assignment[];
+  notifications: AppNotification[];
+  supportTickets: SupportTicket[];
+  loginHistory: LoginHistoryEntry[];
+}
+
 export interface UsersApi {
   getUser(id: string, requesterId: string): Promise<User>;
   getAllUsers(requesterId: string): Promise<User[]>;
@@ -298,11 +365,15 @@ export interface UsersApi {
   updateUserRole(requesterId: string, userId: string, role: Extract<UserRole, 'student' | 'teacher'>): Promise<User>;
   uploadAvatar(requesterId: string, input: UploadAvatarInput): Promise<User>;
   removeAvatar(requesterId: string): Promise<User>;
+  /** Self-service erasure (152-ФЗ, ст. 21). Irreversible. */
+  deleteOwnAccount(requesterId: string): Promise<void>;
+  exportOwnData(requesterId: string): Promise<PersonalDataExport>;
 }
 
 export interface NotificationsApi {
   getNotifications(userId: string): Promise<AppNotification[]>;
   markAsRead(id: string, userId: string): Promise<void>;
+  /** Помечает прочитанными все пассивные; urgent (требуют действия) не трогает. */
   markAllAsRead(userId: string): Promise<void>;
   getPreferences(requesterId: string): Promise<NotificationPreferences>;
   updatePreferences(
@@ -377,39 +448,6 @@ export interface AssignmentGroupsApi {
   addMember(groupId: string, studentId: string, requesterId: string): Promise<AssignmentGroup>;
   removeMember(groupId: string, studentId: string, requesterId: string): Promise<AssignmentGroup>;
   deleteGroup(id: string, requesterId: string): Promise<void>;
-}
-
-export interface ProgressApi {
-  getAccessibleStudentIds(requesterId: string): Promise<string[]>;
-  getSummary(studentId: string, requesterId: string): Promise<StudentProgressSummary>;
-  getSkills(studentId: string, requesterId: string): Promise<SkillWithProgress[]>;
-  getGoals(studentId: string, requesterId: string): Promise<ProgressGoal[]>;
-  getHistory(studentId: string, requesterId: string, limit?: number): Promise<ProgressHistoryEntry[]>;
-  getAchievements(studentId: string, requesterId: string): Promise<AchievementWithStatus[]>;
-  createGoal(input: CreateProgressGoalInput, requesterId: string): Promise<ProgressGoal>;
-  updateGoal(goalId: string, input: UpdateProgressGoalInput, requesterId: string): Promise<ProgressGoal>;
-  updateSkillProgress(input: UpdateSkillProgressInput, requesterId: string): Promise<StudentSkillProgress>;
-}
-
-export interface CreateProgressGoalInput {
-  studentId: string;
-  title: string;
-  description?: string;
-  targetDate?: string;
-}
-
-export interface UpdateProgressGoalInput {
-  title?: string;
-  description?: string;
-  targetDate?: string;
-  status?: ProgressGoalStatus;
-}
-
-export interface UpdateSkillProgressInput {
-  studentId: string;
-  skillId: string;
-  level: number;
-  note?: string;
 }
 
 export interface CreateSupportTicketInput {
@@ -491,6 +529,8 @@ export interface UpdateLegalDocumentInput {
   title?: string;
   content?: string;
   requiresConsent?: boolean;
+  purpose?: ConsentPurpose | null;
+  required?: boolean;
 }
 
 export interface PublishLegalVersionInput {
@@ -500,13 +540,31 @@ export interface PublishLegalVersionInput {
   version?: string;
 }
 
+export interface AcceptConsentOptions {
+  /** Required when accepting a `minor_guardian` document. */
+  guardian?: GuardianDetails;
+}
+
 export interface LegalApi {
   getDocuments(): Promise<LegalDocument[]>;
   getDocument(id: string): Promise<LegalDocument>;
   getUserConsents(requesterId: string): Promise<UserConsent[]>;
   getPendingConsents(requesterId: string): Promise<LegalDocument[]>;
-  acceptDocument(documentId: string, requesterId: string): Promise<UserConsent>;
-  acceptDocuments(documentIds: string[], requesterId: string): Promise<UserConsent[]>;
+  acceptDocument(
+    documentId: string,
+    requesterId: string,
+    options?: AcceptConsentOptions,
+  ): Promise<UserConsent>;
+  acceptDocuments(
+    documentIds: string[],
+    requesterId: string,
+    options?: AcceptConsentOptions,
+  ): Promise<UserConsent[]>;
+  /**
+   * Withdraw consent (152-ФЗ, ст. 9 ч. 2). Consents for the `service` purpose
+   * cannot be withdrawn on their own — the account must be deleted instead.
+   */
+  revokeConsent(consentId: string, requesterId: string): Promise<UserConsent>;
   canManageDocuments(requesterId: string): Promise<boolean>;
   updateDocument(
     id: string,
@@ -530,7 +588,6 @@ export interface ApiClient {
   availability: AvailabilityApi;
   assignments: AssignmentsApi;
   assignmentGroups: AssignmentGroupsApi;
-  progress: ProgressApi;
   support: SupportApi;
   public: PublicApi;
   security: SecurityApi;

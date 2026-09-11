@@ -1,6 +1,5 @@
 import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { isProgressFeatureEnabled } from '@/config/features';
 import { AppLayout, AdminRoute, GuestRoute, ProtectedRoute } from './layouts';
 import { RouteErrorPage } from './RouteErrorPage';
 
@@ -20,7 +19,7 @@ const SettingsLayout = lazy(() => import('@/pages/profile/settings/SettingsLayou
 const AccountSettingsPage = lazy(() => import('@/pages/profile/settings/AccountSettingsPage'));
 const SystemSettingsPage = lazy(() => import('@/pages/profile/settings/SystemSettingsPage'));
 const AvailabilityPage = lazy(() => import('@/pages/profile/AvailabilityPage'));
-const ProgressPage = lazy(() => import('@/pages/profile/ProgressPage'));
+const ProfileDirectionsPage = lazy(() => import('@/pages/profile/ProfileDirectionsPage'));
 const HelpPage = lazy(() => import('@/pages/profile/HelpPage'));
 const HelpTicketDetailPage = lazy(() => import('@/pages/profile/HelpTicketDetailPage'));
 const SecurityPage = lazy(() => import('@/pages/profile/SecurityPage'));
@@ -35,6 +34,8 @@ const AdminSchedulePage = lazy(() => import('@/pages/admin/AdminSchedulePage'));
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
 const AdminLegalPage = lazy(() => import('@/pages/admin/AdminLegalPage'));
 const AdminSchoolSettingsPage = lazy(() => import('@/pages/admin/AdminSchoolSettingsPage'));
+const AdminRegistrationQrPage = lazy(() => import('@/pages/admin/AdminRegistrationQrPage'));
+const AdminDirectionsPage = lazy(() => import('@/pages/admin/AdminDirectionsPage'));
 const LandingPage = lazy(() => import('@/pages/public/LandingPage'));
 const DirectionDetailPage = lazy(() => import('@/pages/public/DirectionDetailPage'));
 const TeacherDetailPage = lazy(() => import('@/pages/public/TeacherDetailPage'));
@@ -87,16 +88,10 @@ export const appRoutes = [
             ],
           },
           { path: '/profile/security', element: <Navigate to="/profile/settings/security" replace /> },
+          { path: '/profile/directions', element: <ProfileDirectionsPage /> },
           { path: '/profile/legal', element: <LegalConsentsPage /> },
           { path: '/profile/availability', element: <Navigate to="/lessons/availability" replace /> },
-          {
-            path: '/profile/progress',
-            element: isProgressFeatureEnabled() ? (
-              <ProgressPage />
-            ) : (
-              <Navigate to="/profile" replace />
-            ),
-          },
+          { path: '/profile/progress', element: <Navigate to="/profile" replace /> },
           { path: '/profile/help', element: <HelpPage /> },
           { path: '/profile/help/:id', element: <HelpTicketDetailPage /> },
           { path: '/assignments', element: <AssignmentsPage /> },
@@ -127,7 +122,14 @@ export const appRoutes = [
           },
           {
             element: <AdminRoute permission="admin:school-settings" />,
-            children: [{ path: '/admin/school', element: <AdminSchoolSettingsPage /> }],
+            children: [
+              { path: '/admin/school', element: <AdminSchoolSettingsPage /> },
+              { path: '/admin/registration-qr', element: <AdminRegistrationQrPage /> },
+            ],
+          },
+          {
+            element: <AdminRoute permission="admin:directions" />,
+            children: [{ path: '/admin/directions', element: <AdminDirectionsPage /> }],
           },
         ],
       },

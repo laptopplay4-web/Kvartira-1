@@ -1,12 +1,12 @@
-# Graph Report - Kvartira 1  (2026-09-03)
+# Graph Report - Kvartira 1  (2026-09-12)
 
 ## Corpus Check
-- 371 files · ~151,417 words
+- 410 files · ~176,463 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2317 nodes · 2461 edges · 358 communities (231 shown, 127 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 89 edges (avg confidence: 0.58)
+- 2533 nodes · 2706 edges · 382 communities (250 shown, 132 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 101 edges (avg confidence: 0.55)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -22,7 +22,7 @@
 - compilerOptions
 - run.ts
 - mock/index.ts
-- Button.tsx
+- Toast.tsx
 - LessonCard.tsx
 - calculateSlots.ts
 - 6. Занятия
@@ -39,6 +39,7 @@
 - permissions.test.ts
 - EmptyState.tsx
 - Input.tsx
+- kvartiraLessons.js
 - MobileHeader.tsx
 - AdminUsersPage.tsx
 - EventDetailPage.tsx
@@ -49,10 +50,10 @@
 - slots.test.ts
 - vite-env.d.ts
 - tsconfig.json
-- clean-rules.mjs
+- documentTexts.ts
 - LessonsApi
 - chat/helpers.ts
-- chat/validation.ts
+- chat/constants.ts
 - HomePage.tsx
 - lessonStatus.ts
 - LessonCalendar.tsx
@@ -60,6 +61,7 @@
 - validateAvailability.ts
 - formHelpers.ts
 - AvailabilityPage.tsx
+- availability.test.ts
 - calendar/helpers.ts
 - 16. Профили
 - useCalendarLessons.ts
@@ -69,7 +71,7 @@
 - 8. Чат
 - ChatApi
 - chat/access.ts
-- ConversationList.tsx
+- ConversationItem.tsx
 - useSendMessage.ts
 - ChatRealtimeService
 - ChatFilters.tsx
@@ -79,6 +81,7 @@
 - PinnedMessageBar.tsx
 - ChatHeader.tsx
 - MessageComposer.tsx
+- useChatMessages.ts
 - TypingIndicator.tsx
 - assignments/validation.ts
 - home.test.tsx
@@ -95,22 +98,23 @@
 - AssignmentsApi
 - assignments.test.ts
 - assignments/helpers.ts
-- PbClient
+- kvartiraAudit.js
 - CreateAssignmentPage.tsx
 - AssignmentFilePicker.tsx
 - assignments/constants.ts
-- ProgressApi
-- progress/helpers.ts
-- progress.test.ts
-- AchievementBadge.tsx
-- SkillProgressBar.tsx
-- AchievementDefinition
-- Skill
-- achievements.ts
-- HomeProgressBlock.tsx
+- Чек-лист организационных мер (Роскомнадзор / 152-ФЗ)
+- DropdownMenu.tsx
+- SegmentedControl.tsx
+- ConsentCheckbox.tsx
+- SelectableTile.tsx
+- Sheet.tsx
+- parseSchoolContacts
+- securityHardening.test.ts
+- 1790227200_kvartira_drop_progress.js
+- 1790313600_kvartira_narrow_user_directory.js
 - SupportApi
 - support/helpers.ts
-- TeacherProgressControls.tsx
+- 1790400000_kvartira_consent_purposes.js
 - SupportTicketStatusBadge.tsx
 - HelpPage.tsx
 - support.test.ts
@@ -130,12 +134,11 @@
 - security/helpers.ts
 - chat.ts
 - assignments.ts
-- runSeed
 - support.ts
 - SecurityPage.tsx
 - public.ts
 - legal/access.ts
-- legal.ts
+- mock/legal.ts
 - LegalPublishVersionModal.tsx
 - legal/constants.ts
 - LegalDocumentEditModal.tsx
@@ -199,10 +202,11 @@
 - pocketbase/public.ts
 - kvartiraAssignments.js
 - pocketbase/chat.ts
-- pocketbase/progress.ts
+- Готовность к выкладке на сервер
 - lessons.ts
-- loadEvaluationData
-- kvartiraProgress.js
+- ForwardMessageModal.tsx
+- listPins.ts
+- fix-school-wide-chats.mjs
 - pocketbase/support.ts
 - kvartiraSupport.js
 - pocketbase/legal.ts
@@ -218,9 +222,7 @@
 - push-relay.mjs
 - useWebPush.ts
 - webPush.test.ts
-- test-pb-progress.mjs
 - BackLink.tsx
-- features.ts
 - phone.ts
 - PhoneInput.tsx
 - authSessionSync.test.ts
@@ -229,7 +231,6 @@
 - AssignmentContentView.tsx
 - mock/groups.ts
 - groups/access.ts
-- notifications/helpers.ts
 - groups/helpers.ts
 - pocketbase/groups.ts
 - pocketbase/schoolSettings.ts
@@ -245,7 +246,6 @@
 - contrast.ts
 - HomeEventCard.tsx
 - authStoreSync.test.ts
-- mock/progress.ts
 - bootstrapSession.test.ts
 - users/access.ts
 - PromoteToTeacherModal.tsx
@@ -258,35 +258,48 @@
 - school/helpers.ts
 - 1789968000_kvartira_school_social_video.js
 - SchoolAboutContent.tsx
+- directions/constants.ts
+- directions/notifications.ts
+- DirectionFormModal.tsx
+- DirectionPicker.tsx
+- invite.ts
+- registration/constants.ts
+- DirectionIconPicker.tsx
+- StudentPickerList.tsx
+- chat/avatar.ts
+- ChatAvatarEditor.tsx
+- UserPreviewProvider.tsx
+- UserPreviewModal.tsx
+- UserPreviewTrigger.tsx
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
 2. `КВАРТИРА — DEVELOPMENT RULES FOR CURSOR` - 31 edges
-3. `КВАРТИРА — DESIGN SYSTEM` - 26 edges
-4. `ChatApi` - 25 edges
+3. `ChatApi` - 28 edges
+4. `КВАРТИРА — DESIGN SYSTEM` - 26 edges
 5. `compilerOptions` - 20 edges
-6. `runSeed()` - 16 edges
-7. `compilerOptions` - 16 edges
+6. `compilerOptions` - 16 edges
+7. `runSeed()` - 15 edges
 8. `PocketBase schema — «Квартира»` - 15 edges
-9. `scripts` - 13 edges
-10. `LessonsApi` - 11 edges
+9. `LessonsApi` - 14 edges
+10. `scripts` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `runSeed()` --calls--> `createDefaultNotificationPreferences()`  [EXTRACTED]
   pocketbase/seed/run.ts → src/services/notifications/helpers.ts
-- `runSeed()` --calls--> `toPbSkillLevel()`  [EXTRACTED]
-  pocketbase/seed/run.ts → src/services/progress/skillLevel.ts
-- `getAssignedIdsForRequester()` --indirect_call--> `mapLessonRecord()`  [INFERRED]
-  src/services/api/pocketbase/progress.ts → src/services/api/pocketbase/mappers.ts
-- `loadEvaluationData()` --indirect_call--> `mapLessonRecord()`  [INFERRED]
-  src/services/api/pocketbase/progress.ts → src/services/api/pocketbase/mappers.ts
-- `loadEvaluationData()` --indirect_call--> `mapEventRecord()`  [INFERRED]
-  src/services/api/pocketbase/progress.ts → src/services/api/pocketbase/mappers.ts
+- `MessageList` --indirect_call--> `formatChatDateSeparator()`  [INFERRED]
+  src/components/chat/MessageList.tsx → src/utils/dates.ts
+- `usePwaInstall()` --indirect_call--> `isPwaInstalled()`  [INFERRED]
+  src/hooks/usePwaInstall.ts → src/services/pwa/helpers.ts
+- `AssignmentGroupsPage()` --indirect_call--> `isCustomAssignmentGroup()`  [INFERRED]
+  src/pages/assignments/AssignmentGroupsPage.tsx → src/services/assignments/groups/helpers.ts
+- `NotificationsPage()` --indirect_call--> `isPassiveUnreadNotification()`  [INFERRED]
+  src/pages/notifications/NotificationsPage.tsx → src/services/notifications/helpers.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (358 total, 127 thin omitted)
+## Communities (382 total, 132 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -294,15 +307,15 @@ Nodes (30): 10. Аудио, 11. Домашние задания, 12. Обрат�
 
 ### Community 1 - "devDependencies"
 Cohesion: 0.04
-Nodes (47): eslint, @eslint/js, eslint-plugin-react-hooks, eslint-plugin-react-refresh, globals, jsdom, devDependencies, eslint (+39 more)
+Nodes (49): eslint, @eslint/js, eslint-plugin-react-hooks, eslint-plugin-react-refresh, globals, jsdom, devDependencies, eslint (+41 more)
 
 ### Community 2 - "types.ts"
-Cohesion: 0.06
-Nodes (34): ApiClient, ApiError, ChangePasswordInput, CompletePasswordResetInput, CreateAssignmentGroupInput, CreateAssignmentInput, CreateConversationInput, CreateEventInput (+26 more)
+Cohesion: 0.05
+Nodes (37): AcceptConsentOptions, ApiClient, ApiError, ChangePasswordInput, CompletePasswordResetInput, CreateAssignmentGroupInput, CreateAssignmentInput, CreateConversationInput (+29 more)
 
 ### Community 3 - "dependencies"
-Cohesion: 0.05
-Nodes (42): clsx, date-fns, @hookform/resolvers, lucide-react, dependencies, clsx, date-fns, @hookform/resolvers (+34 more)
+Cohesion: 0.04
+Nodes (48): class-variance-authority, clsx, date-fns, @hookform/resolvers, lucide-react, dependencies, class-variance-authority, clsx (+40 more)
 
 ### Community 4 - "КВАРТИРА — DEVELOPMENT RULES FOR CURSOR"
 Cohesion: 0.06
@@ -310,7 +323,7 @@ Nodes (31): 10. Validation, 11. Forms, 12. Authentication, 13. Files, 14. PWA, 1
 
 ### Community 5 - "router.tsx"
 Cohesion: 0.05
-Nodes (38): AccountSettingsPage, AdminHubPage, AdminLegalPage, AdminSchedulePage, AdminSchoolSettingsPage, AdminUsersPage, appRoutes, AssignmentDetailPage (+30 more)
+Nodes (40): AccountSettingsPage, AdminDirectionsPage, AdminHubPage, AdminLegalPage, AdminRegistrationQrPage, AdminSchedulePage, AdminSchoolSettingsPage, AdminUsersPage (+32 more)
 
 ### Community 6 - "КВАРТИРА — DESIGN SYSTEM"
 Cohesion: 0.07
@@ -322,23 +335,23 @@ Nodes (25): DOM, DOM.Iterable, ES2022, src, compilerOptions, allowImportingTsExt
 
 ### Community 8 - "types/index.ts"
 Cohesion: 0.03
-Nodes (75): AppNotification, Assignment, AssignmentContentBlock, AssignmentContentType, AttachmentType, AuthSession, AvailabilityException, BookLessonInput (+67 more)
+Nodes (71): AppNotification, Assignment, AssignmentContentBlock, AssignmentContentType, AttachmentType, AuthSession, AvailabilityException, BookLessonInput (+63 more)
 
 ### Community 9 - "compilerOptions"
 Cohesion: 0.10
 Nodes (19): ES2023, vite.config.ts, compilerOptions, allowImportingTsExtensions, lib, module, moduleDetection, moduleResolution (+11 more)
 
 ### Community 10 - "run.ts"
-Cohesion: 0.08
-Nodes (40): SeedOptions, SeedResult, achievementDefinitions, conversationMembers, conversations, dayAgo, defaultSchedule, directions (+32 more)
+Cohesion: 0.05
+Nodes (52): ID_ALIASES, IdMap, passwordForPhone(), patchRecordTimestamps(), phoneToEmail(), remapLink(), remapMetadata(), env() (+44 more)
 
 ### Community 11 - "mock/index.ts"
-Cohesion: 0.08
-Nodes (22): assertAvailabilityAccess(), assertEventsAdminAccess(), assertLessonAccess(), db, getUserById(), mockAssignmentGroupsApi, mockAssignmentsApi, mockAuthApi (+14 more)
+Cohesion: 0.07
+Nodes (23): assertAvailabilityAccess(), assertEventsAdminAccess(), assertLessonAccess(), db, getUserById(), mockAssignmentGroupsApi, mockAssignmentsApi, mockAuthApi (+15 more)
 
-### Community 12 - "Button.tsx"
-Cohesion: 0.13
-Nodes (10): BookLessonLinkProps, Button, ButtonProps, Size, sizes, Variant, variants, ErrorStateProps (+2 more)
+### Community 12 - "Toast.tsx"
+Cohesion: 0.08
+Nodes (19): BookLessonLinkProps, Button, ButtonProps, buttonVariants, ConfirmDialogProps, ErrorStateProps, IconButton, IconButtonProps (+11 more)
 
 ### Community 13 - "LessonCard.tsx"
 Cohesion: 0.20
@@ -357,8 +370,8 @@ Cohesion: 0.40
 Nodes (3): LogoProps, LogoSize, sizeClasses
 
 ### Community 19 - "dates.ts"
-Cohesion: 0.08
-Nodes (19): AttachmentList(), AttachmentListProps, MessageActions(), MessageActionsProps, MessageBubble(), MessageBubbleProps, cnSkeleton(), MessageList (+11 more)
+Cohesion: 0.07
+Nodes (20): AttachmentList(), AttachmentListProps, MessageActions(), MessageActionsProps, MORE_EMOJIS, MessageBubble(), MessageBubbleProps, cnSkeleton() (+12 more)
 
 ### Community 23 - "useOnlineStatus.ts"
 Cohesion: 0.60
@@ -372,17 +385,29 @@ Nodes (7): AuthState, hasAuthenticatedUser(), mergeRefreshedSession(), partializ
 Cohesion: 0.50
 Nodes (3): admin, student, teacher
 
+### Community 30 - "kvartiraLessons.js"
+Cohesion: 0.33
+Nodes (9): assertLessonCreate(), assertLessonUpdate(), isUsersAuth(), originalOf(), relId(), restoreFields(), STUDENT_ALLOWED_STATUSES, STUDENT_LOCKED_FIELDS (+1 more)
+
 ### Community 36 - "LessonsPage.tsx"
+Cohesion: 0.33
+Nodes (4): HISTORY_FILTERS, HISTORY_SEGMENT_OPTIONS, HistoryFilter, PageView
+
+### Community 40 - "slots.test.ts"
 Cohesion: 0.40
-Nodes (3): HISTORY_FILTERS, HistoryFilter, PageView
+Nodes (3): availability, baseLesson, MONDAY
+
+### Community 43 - "documentTexts.ts"
+Cohesion: 0.22
+Nodes (8): LEGAL_COMMUNICATION_CONSENT_TEXT, LEGAL_GUARDIAN_CONSENT_TEXT, LEGAL_PERSONAL_DATA_CONSENT_TEXT, LEGAL_PRIVACY_POLICY_TEXT, LEGAL_PUBLICATION_CONSENT_TEXT, LEGAL_SCHOOL_RULES_TEXT, LEGAL_TERMS_OF_SERVICE_TEXT, LEGAL_TEXT_DISCLAIMER
 
 ### Community 46 - "chat/helpers.ts"
-Cohesion: 0.12
-Nodes (17): LAST_MESSAGE_PREVIEW_LENGTH, MESSAGE_SEARCH_MIN_LENGTH, buildMessageListWithSeparators(), ChatFilter, ChatListEntry, DateSeparator, filterConversations(), getConversationDisplayTitle() (+9 more)
+Cohesion: 0.10
+Nodes (20): LAST_MESSAGE_PREVIEW_LENGTH, MESSAGE_SEARCH_MIN_LENGTH, buildMessageListWithSeparators(), ChatFilter, ChatListEntry, DateSeparator, filterConversations(), getConversationDisplayTitle() (+12 more)
 
-### Community 47 - "chat/validation.ts"
-Cohesion: 0.13
-Nodes (20): ALLOWED_AUDIO_MIMES, ALLOWED_DOCUMENT_MIMES, ALLOWED_IMAGE_MIMES, ALLOWED_VIDEO_MIMES, DRAFT_STORAGE_PREFIX, MAX_ATTACHMENTS_PER_MESSAGE, MAX_AUDIO_SIZE, MAX_DOCUMENT_SIZE (+12 more)
+### Community 47 - "chat/constants.ts"
+Cohesion: 0.09
+Nodes (29): ALLOWED_AUDIO_MIMES, ALLOWED_CHAT_AVATAR_MIMES, ALLOWED_DOCUMENT_MIMES, ALLOWED_IMAGE_MIMES, ALLOWED_VIDEO_MIMES, CHAT_AVATAR_JPEG_QUALITY, CHAT_AVATAR_OUTPUT_SIZE, DRAFT_STORAGE_PREFIX (+21 more)
 
 ### Community 48 - "HomePage.tsx"
 Cohesion: 0.60
@@ -425,12 +450,12 @@ Cohesion: 0.50
 Nodes (4): 3. Роли, Администратор, Преподаватель, Ученик
 
 ### Community 74 - "chat/access.ts"
-Cohesion: 0.22
-Nodes (10): canAccessConversation(), canAddMember(), canDeleteConversation(), canLeaveConversation(), canManageMembers(), canRemoveMember(), canSendToConversation(), canUpdateConversation() (+2 more)
+Cohesion: 0.21
+Nodes (14): canAccessConversation(), canAddMember(), canCreateGroupChat(), canCreatePersonalChat(), canCreateSchoolWideChat(), canDeleteConversation(), canLeaveConversation(), canManageChats() (+6 more)
 
-### Community 75 - "ConversationList.tsx"
-Cohesion: 0.40
-Nodes (3): ConversationItem(), ConversationItemProps, ConversationListProps
+### Community 75 - "ConversationItem.tsx"
+Cohesion: 0.28
+Nodes (5): ConversationActions(), ConversationActionsProps, ConversationItem(), ConversationItemProps, ConversationListProps
 
 ### Community 76 - "useSendMessage.ts"
 Cohesion: 0.40
@@ -445,12 +470,12 @@ Cohesion: 0.40
 Nodes (3): ChatHeaderProps, ConversationSettings(), ConversationSettingsProps
 
 ### Community 85 - "MessageComposer.tsx"
-Cohesion: 0.21
-Nodes (8): AttachmentPreview(), AttachmentPreviewProps, MessageComposerProps, PendingAttachment, SendPayload, ComposerReplyPreview(), ComposerReplyPreviewProps, ReplyPreviewProps
+Cohesion: 0.15
+Nodes (11): AttachmentPreview(), AttachmentPreviewProps, MessageComposerProps, PendingAttachment, SendPayload, ComposerReplyPreview(), ComposerReplyPreviewProps, ReplyPreviewProps (+3 more)
 
 ### Community 98 - "home.test.tsx"
-Cohesion: 0.11
-Nodes (15): adminUser, lesson, mockGetAllUsers, mockGetAssignments, mockGetConversations, mockGetDirections, mockGetEvents, mockGetLessons (+7 more)
+Cohesion: 0.13
+Nodes (12): adminUser, lesson, mockGetAllUsers, mockGetAssignments, mockGetConversations, mockGetDirections, mockGetEvents, mockGetLessons (+4 more)
 
 ### Community 100 - "routes.test.tsx"
 Cohesion: 0.14
@@ -461,16 +486,16 @@ Cohesion: 0.29
 Nodes (4): mockGetTeacherAvailability, mockUpdateTeacherAvailability, mockUseOnlineStatus, teacherUser
 
 ### Community 112 - "assignments.test.ts"
-Cohesion: 0.18
+Cohesion: 0.14
 Nodes (7): admin, baseAssignment, guitarGroup, otherStudent, student, teacher, vocalGroup
 
 ### Community 113 - "assignments/helpers.ts"
 Cohesion: 0.67
 Nodes (3): getRecentAssignmentsForHome(), HOME_ASSIGNMENTS_LIMIT, sortAssignmentsByDate()
 
-### Community 116 - "PbClient"
-Cohesion: 0.21
-Nodes (4): env(), main(), PbClient, PbRecord
+### Community 116 - "kvartiraAudit.js"
+Cohesion: 0.46
+Nodes (7): logAccountDeletion(), logConsentEvent(), logDataExport(), relId(), requestContext(), requestInfoSafe(), writeAuditLog()
 
 ### Community 117 - "CreateAssignmentPage.tsx"
 Cohesion: 0.50
@@ -480,37 +505,33 @@ Nodes (4): CreateAssignmentPage(), FormData, schema, uid()
 Cohesion: 0.50
 Nodes (3): ASSIGNMENT_CONTENT_ACCEPT, ASSIGNMENT_CONTENT_LABELS, MAX_CONTENT_BLOCKS_PER_ASSIGNMENT
 
-### Community 123 - "progress/helpers.ts"
-Cohesion: 0.31
-Nodes (5): computeAttendanceStats(), computeProgressSummary(), isLessonAttended(), isLessonMissed(), MISSED_LESSON_STATUSES
+### Community 121 - "Чек-лист организационных мер (Роскомнадзор / 152-ФЗ)"
+Cohesion: 0.40
+Nodes (4): Обязательно до запуска с реальными пользователями, После выкладки приложения, Рекомендуется, Чек-лист организационных мер (Роскомнадзор / 152-ФЗ)
 
-### Community 124 - "progress.test.ts"
-Cohesion: 0.29
-Nodes (4): admin, otherStudent, student, teacher
-
-### Community 130 - "achievements.ts"
-Cohesion: 0.27
-Nodes (12): AchievementEvaluationData, countCompletedLessons(), evaluateAndUnlockAchievements(), hasLessonRegularity(), hasPerformanceParticipation(), hasSkillMasterLevel(), isAchievementUnlocked(), isLessonCompleted() (+4 more)
-
-### Community 134 - "TeacherProgressControls.tsx"
-Cohesion: 0.22
-Nodes (4): AddGoalButtonProps, CreateGoalModalProps, GoalManageActionsProps, SkillManageRowProps
+### Community 128 - "parseSchoolContacts"
+Cohesion: 0.67
+Nodes (3): coerceJsonObjectFromContacts(), mapSchoolSettingsRecord(), parseSchoolContacts()
 
 ### Community 142 - "SupportTicketFilters.tsx"
 Cohesion: 0.33
 Nodes (4): STATUS_FILTERS, SupportCategoryFilter, SupportStatusFilter, SupportTicketFiltersProps
 
+### Community 143 - "SupportAttachmentList.tsx"
+Cohesion: 0.67
+Nodes (3): SupportAttachmentList(), SupportAttachmentListProps, toMessageAttachment()
+
 ### Community 147 - "legal/helpers.ts"
-Cohesion: 0.36
-Nodes (4): countPendingConsents(), getPendingConsents(), getUserConsentForDocument(), hasCurrentConsent()
+Cohesion: 0.20
+Nodes (10): calculateAge(), countPendingConsents(), getActiveConsentForDocument(), getOptionalConsentDocuments(), getPendingConsents(), getRequiredConsentDocuments(), hasCurrentConsent(), isConsentActive() (+2 more)
 
 ### Community 150 - "mock/security.ts"
-Cohesion: 0.20
-Nodes (11): resetMockDatabase(), MockNotificationsDb, assertViewAccess(), buildPasswordMap(), createMockSecurityApi(), getUserById(), MockSecurityDb, pushAlert() (+3 more)
+Cohesion: 0.24
+Nodes (9): MockNotificationsDb, assertViewAccess(), createMockSecurityApi(), getUserById(), MockSecurityDb, pushAlert(), pushSecurityNotification(), recordAuthLogin() (+1 more)
 
 ### Community 155 - "security/constants.ts"
-Cohesion: 0.33
-Nodes (4): LOGIN_HISTORY_UI_LIMIT, MAX_LOGIN_HISTORY_ENTRIES, MIN_PASSWORD_LENGTH, ChangePasswordInput
+Cohesion: 0.29
+Nodes (5): LOGIN_HISTORY_UI_LIMIT, MAX_LOGIN_HISTORY_ENTRIES, MAX_SECURITY_SESSIONS, MIN_PASSWORD_LENGTH, ChangePasswordInput
 
 ### Community 156 - "security/helpers.ts"
 Cohesion: 0.40
@@ -524,21 +545,25 @@ Nodes (4): createMockChatApi(), createSystemMessage(), MockChatDb, uid()
 Cohesion: 0.67
 Nodes (3): createMockAssignmentsApi(), MockAssignmentsDb, uid()
 
-### Community 159 - "runSeed"
-Cohesion: 0.21
-Nodes (10): ID_ALIASES, IdMap, passwordForPhone(), patchRecordTimestamps(), phoneToEmail(), remapLink(), remapMetadata(), runSeed() (+2 more)
-
 ### Community 160 - "support.ts"
 Cohesion: 0.67
 Nodes (3): createMockSupportApi(), MockSupportDb, uid()
+
+### Community 166 - "mock/legal.ts"
+Cohesion: 0.50
+Nodes (4): createMockLegalApi(), MockLegalDb, recordConsent(), uid()
 
 ### Community 170 - "LegalPublishVersionModal.tsx"
 Cohesion: 0.67
 Nodes (3): LegalPublishVersionModal(), LegalPublishVersionModalProps, todayISO()
 
+### Community 171 - "legal/constants.ts"
+Cohesion: 0.22
+Nodes (7): CONSENT_ADULT_AGE, CONSENT_PURPOSE_DESCRIPTIONS, CONSENT_PURPOSE_LABELS, LEGAL_DOCUMENT_TYPE_LABELS, OPTIONAL_CONSENT_PURPOSES, REQUIRED_CONSENT_PURPOSES, REVOKE_SERVICE_CONSENT_MESSAGE
+
 ### Community 176 - "Квартира — Production Roadmap"
 Cohesion: 0.11
-Nodes (18): 10. Changelog roadmap, 1. Критерий «приложение закончено», 2. Текущий статус (2026-09-02), 3. Принятые решения, 4. Протокол сессии (кратко), 5. Архитектура пути к production, 6. Фазы, 7. Вне scope (явно отложено) (+10 more)
+Nodes (18): 10. Changelog roadmap, 1. Критерий «приложение закончено», 2. Текущий статус (2026-09-09), 3. Принятые решения, 4. Протокол сессии (кратко), 5. Архитектура пути к production, 6. Фазы, 7. Вне scope (явно отложено) (+10 more)
 
 ### Community 177 - "theme/constants.ts"
 Cohesion: 0.38
@@ -557,8 +582,8 @@ Cohesion: 0.23
 Nodes (8): BeforeInstallPromptEvent, usePwaInstall(), PWA_INSTALL_DISMISS_COOLDOWN_MS, PWA_INSTALL_DISMISS_KEY, PWA_INSTALL_SHOW_DELAY_MS, canShowInstallBanner(), isPwaInstalled(), wasInstallPromptDismissedRecently()
 
 ### Community 187 - "mock/notifications.ts"
-Cohesion: 0.32
-Nodes (7): pushNotification(), createMockNotificationsApi(), getPreferencesForUser(), MockPushDelivery, MockPushSubscriptionRecord, tryPushNotification(), uid()
+Cohesion: 0.28
+Nodes (8): afterAuthSession(), pushNotification(), createMockNotificationsApi(), getPreferencesForUser(), MockPushDelivery, MockPushSubscriptionRecord, tryPushNotification(), uid()
 
 ### Community 199 - "pocketbaseSeed.test.ts"
 Cohesion: 0.22
@@ -577,16 +602,16 @@ Cohesion: 0.10
 Nodes (21): AVATAR_EXT_TO_MIME, AvatarCropState, AvatarCropZoomBounds, AvatarUploadInput, clampCropState(), getCoverScale(), getCropZoomBounds(), getInitialCropState() (+13 more)
 
 ### Community 210 - "messages.ts"
-Cohesion: 0.27
-Nodes (7): getReplyPreviewText(), canDeleteMessage(), canEditMessage(), DELETED_MESSAGE_TEXT, getMessageDisplayText(), isMessageDeleted(), isSystemMessage()
+Cohesion: 0.16
+Nodes (12): isGroupConversation(), MESSAGE_EDIT_WINDOW_MS, getReplyPreviewText(), canDeleteMessage(), canEditMessage(), DELETED_MESSAGE_TEXT, getMessageDisplayText(), isMessageDeleted() (+4 more)
 
 ### Community 211 - "attachments.ts"
-Cohesion: 0.22
-Nodes (6): createAttachmentFromFile(), detectAttachmentType(), getExtension(), maxSizeForType(), validateAttachment(), validateAttachments()
+Cohesion: 0.33
+Nodes (3): createAttachmentFromFile(), detectAttachmentType(), getExtension()
 
 ### Community 212 - "AvatarCropModal.tsx"
-Cohesion: 0.43
-Nodes (6): AvatarCropModal(), AvatarCropModalProps, getCenter(), getDistance(), getViewportSize(), PointerPoint
+Cohesion: 0.36
+Nodes (7): AvatarCropModal(), AvatarCropModalProps, AvatarCropMode, getCenter(), getDistance(), getViewportSize(), PointerPoint
 
 ### Community 219 - "PocketBase — локальный backend «Квартира»"
 Cohesion: 0.22
@@ -594,15 +619,15 @@ Nodes (8): Auth (фаза 1.3), PocketBase — локальный backend «Кв
 
 ### Community 223 - "PocketBase schema — «Квартира»"
 Cohesion: 0.12
-Nodes (15): Assignments adapter (ROADMAP 2.5 ✅), Auth (ROADMAP 1.3 ✅), Chat adapter (ROADMAP 2.4 ✅), Events adapter (ROADMAP 2.3 ✅), File storage (ROADMAP 3.1 ✅), PocketBase schema — «Квартира», Progress adapter (ROADMAP 2.6 ✅), RBAC (ROADMAP 1.4 ✅) (+7 more)
+Nodes (16): Assignments adapter (ROADMAP 2.5 ✅), Auth (ROADMAP 1.3 ✅), Chat adapter (ROADMAP 2.4 ✅), Events adapter (ROADMAP 2.3 ✅), File storage (ROADMAP 3.1 ✅), PocketBase schema — «Квартира», Progress adapter — удалён, RBAC (ROADMAP 1.4 ✅) (+8 more)
 
 ### Community 224 - "pocketbaseSchema.test.ts"
 Cohesion: 0.18
 Nodes (10): AVATAR_TEXT_MAX_MIGRATION, AVATAR_TEXT_MIGRATION, MIGRATION, REQUIRED_COLLECTIONS, ROOT, SCHEMA_DOC, USER_CASCADE_FIX_MIGRATION, USER_CASCADE_MIGRATION (+2 more)
 
 ### Community 226 - "kvartiraAuth.js"
-Cohesion: 0.07
-Nodes (21): getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone(), phoneToEmail(), recordLoginAttempt(), trimLoginHistory() (+13 more)
+Cohesion: 0.06
+Nodes (35): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+27 more)
 
 ### Community 227 - "pocketbaseAuth.test.ts"
 Cohesion: 0.18
@@ -625,8 +650,8 @@ Cohesion: 0.29
 Nodes (6): IDOR на фазе 2, PocketBase RBAC — API rules, Коллекции, Паттерны правил, Применение, Роли
 
 ### Community 236 - "pocketbaseRbac.test.ts"
-Cohesion: 0.25
-Nodes (7): RBAC_DOC, RBAC_LIB, RBAC_LIB_COLLECTIONS, RBAC_MIGRATION, RBAC_MIGRATION_COLLECTIONS, ROOT, SCHEMA_DOC
+Cohesion: 0.22
+Nodes (8): NARROW_USERS_MIGRATION, RBAC_DOC, RBAC_LIB, RBAC_LIB_COLLECTIONS, RBAC_MIGRATION, RBAC_MIGRATION_COLLECTIONS, ROOT, SCHEMA_DOC
 
 ### Community 240 - "client.ts"
 Cohesion: 0.53
@@ -637,8 +662,8 @@ Cohesion: 0.47
 Nodes (5): extractPbFieldError(), mapPocketBaseError(), PB_FIELD_MESSAGE_MAP, PB_MESSAGE_MAP, withPbError()
 
 ### Community 242 - "mappers.ts"
-Cohesion: 0.04
-Nodes (32): coerceJsonObjectFromContacts(), mapSchoolSettingsRecord(), parseSchoolContacts(), PbAchievementDefinitionRecord, PbAssignmentGroupRecord, PbAssignmentRecord, PbAvailabilityRecord, PbConversationMemberRecord (+24 more)
+Cohesion: 0.05
+Nodes (24): MapUserRecordOptions, PbAssignmentGroupRecord, PbAssignmentRecord, PbAvailabilityRecord, PbConversationMemberRecord, PbConversationRecord, PbDirectionRecord, PbEventRecord (+16 more)
 
 ### Community 249 - "pocketbase/helpers.ts"
 Cohesion: 0.17
@@ -653,47 +678,43 @@ Cohesion: 0.83
 Nodes (3): assertRegistrationCapacity(), relId(), syncRegisteredUserIds()
 
 ### Community 254 - "kvartiraChat.js"
-Cohesion: 0.70
-Nodes (4): isDeletedMessage(), relId(), syncConversationLastMessage(), syncReadReceipts()
+Cohesion: 0.33
+Nodes (9): assertConversationPinUpdate(), isDeletedMessage(), isSchoolWideMetadata(), isUsersAuth(), joinUserToSchoolWideChats(), normalizePinnedIds(), relId(), syncConversationLastMessage() (+1 more)
 
 ### Community 257 - "pocketbase/public.ts"
-Cohesion: 0.29
-Nodes (5): mapDirectionRecord(), mapUserRecord(), loadDirections(), loadTeachers(), pocketbasePublicApi
+Cohesion: 0.33
+Nodes (3): mapDirectionRecord(), loadDirections(), pocketbasePublicApi
 
 ### Community 258 - "kvartiraAssignments.js"
-Cohesion: 0.53
-Nodes (8): assertAssignmentCreate(), assertAssignmentGroupCreate(), assertAssignmentGroupDelete(), assertAssignmentGroupUpdate(), assertAssignmentUpdate(), assertMembersAreStudents(), isUsersAuth(), relId()
+Cohesion: 0.47
+Nodes (9): assertAssignmentCreate(), assertAssignmentGroupCreate(), assertAssignmentGroupDelete(), assertAssignmentGroupUpdate(), assertAssignmentUpdate(), assertMembersAreStudents(), isUsersAuth(), purgeAssignmentsForGroup() (+1 more)
 
 ### Community 260 - "pocketbase/chat.ts"
-Cohesion: 0.19
-Nodes (8): assertConversationAccess(), getRequesterUser(), loadConversationOrThrow(), loadMembers(), loadUserMembers(), openConversations, pocketbaseChatApi, mapConversationMemberRecord()
+Cohesion: 0.14
+Nodes (13): assertConversationAccess(), createConversationWithAvatar(), ensureSchoolWideMembershipPb(), getRequesterUser(), isPbUrlFieldError(), loadConversationOrThrow(), loadMembers(), loadUserMembers() (+5 more)
 
-### Community 261 - "pocketbase/progress.ts"
-Cohesion: 0.33
-Nodes (9): assertManageGoalsAccess(), assertManageSkillsAccess(), assertViewAccess(), getAssignedIdsForRequester(), getRequesterUser(), persistUnlocks(), pocketbaseProgressApi, syncAchievements() (+1 more)
+### Community 261 - "Готовность к выкладке на сервер"
+Cohesion: 0.25
+Nodes (7): Готовность к выкладке на сервер, Критерий «можно пускать учеников», Нужно сделать вам перед запуском, Что добавить, Что исправить / досмотреть, Что убрать / не трогать, Что уже готово
 
 ### Community 262 - "lessons.ts"
 Cohesion: 0.25
 Nodes (5): assertLessonAccess(), getRequesterUser(), loadTeacherLessons(), pocketbaseLessonsApi, mapLessonRecord()
 
-### Community 263 - "loadEvaluationData"
-Cohesion: 0.29
-Nodes (7): mapAchievementDefinitionRecord(), mapAssignmentRecord(), mapProgressHistoryRecord(), mapSkillProgressRecord(), mapUserAchievementRecord(), loadEvaluationData(), studentFilter()
-
-### Community 265 - "kvartiraProgress.js"
-Cohesion: 0.73
-Nodes (5): assertProgressCreate(), assertProgressUpdate(), isUsersAuth(), relId(), teacherHasStudent()
+### Community 266 - "fix-school-wide-chats.mjs"
+Cohesion: 0.60
+Nodes (5): api(), auth(), base, listAll(), main()
 
 ### Community 268 - "pocketbase/support.ts"
 Cohesion: 0.32
 Nodes (4): assertViewAccess(), getRequesterUser(), loadTicketOrThrow(), pocketbaseSupportApi
 
 ### Community 272 - "kvartiraLegal.js"
-Cohesion: 0.60
-Nodes (3): assertConsentCreate(), isUsersAuth(), relId()
+Cohesion: 0.38
+Nodes (9): assertConsentCreate(), clientIp(), guardianOf(), isUsersAuth(), relId(), requestInfoSafe(), revokeConsentRecord(), safeParse() (+1 more)
 
 ### Community 274 - "pocketbase/security.ts"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (3): getPasswordChangedAt(), pocketbaseSecurityApi, userFilter()
 
 ### Community 277 - "pocketbase/notifications.ts"
@@ -711,6 +732,10 @@ Nodes (11): PUSH_PERMISSION_DENIED_MESSAGE, PUSH_UNSUPPORTED_MESSAGE, VAPID_PUBL
 ### Community 286 - "kvartiraPush.js"
 Cohesion: 0.52
 Nodes (6): dispatchPushForNotification(), getSubscriptionsForUser(), isPushEnabledForUser(), relId(), removeSubscription(), sendViaRelay()
+
+### Community 288 - "push-relay.mjs"
+Cohesion: 0.67
+Nodes (3): port, secretMatches(), server
 
 ### Community 296 - "BackLink.tsx"
 Cohesion: 0.33
@@ -730,10 +755,10 @@ Nodes (3): canEditAssignmentGroup(), canManageAssignmentGroups(), canViewAssignm
 
 ### Community 315 - "groups/helpers.ts"
 Cohesion: 0.19
-Nodes (8): AssignmentGroupsPage(), GENERAL_ASSIGNMENT_GROUP_ID, GENERAL_ASSIGNMENT_GROUP_LABEL, getAssignmentGroupLabel(), GroupMemberDirectionFilter, isCustomAssignmentGroup(), isGeneralAssignmentGroup(), sortRecipientGroups()
+Nodes (10): AssignmentGroupsPage(), GENERAL_ASSIGNMENT_GROUP_ID, GENERAL_ASSIGNMENT_GROUP_LABEL, getAssignmentGroupLabel(), GroupMemberDirectionFilter, hasComparablePhone(), isCustomAssignmentGroup(), isGeneralAssignmentGroup() (+2 more)
 
 ### Community 317 - "pocketbase/schoolSettings.ts"
-Cohesion: 0.28
+Cohesion: 0.24
 Nodes (5): assertSchoolSettingsManage(), findSchoolSettingsRecord(), getRequesterUser(), loadOrCreateSchoolSettingsRecord(), pocketbaseSchoolSettingsApi
 
 ### Community 318 - "asIdList"
@@ -757,8 +782,8 @@ Cohesion: 0.43
 Nodes (5): canChangeUserRole(), canToggleUserStaffRole(), getUserRoleChangeError(), isStaffRole(), StaffRole
 
 ### Community 348 - "users/helpers.ts"
-Cohesion: 0.47
-Nodes (4): filterUsersBySearchQuery(), normalizeUserSearchQuery(), sanitizeUserPhoneForViewer(), sanitizeUsersPhoneForViewer()
+Cohesion: 0.36
+Nodes (6): filterUsersBySearchQuery(), formatUserDirectionLabels(), normalizeUserSearchQuery(), resolveUserDirections(), sanitizeUserPhoneForViewer(), sanitizeUsersPhoneForViewer()
 
 ### Community 349 - "ownPhone.ts"
 Cohesion: 0.39
@@ -772,25 +797,45 @@ Nodes (6): ALLOWED_DIRECTIONS_VIDEO_MIMES, EMPTY_SCHOOL_SOCIAL_LINKS, MAX_DIRECT
 Cohesion: 0.35
 Nodes (8): buildSchoolContactsPayload(), coerceJsonObject(), extractSchoolExtrasFromContacts(), mergeSchoolSocialLinks(), normalizeSchoolLinkUrl(), normalizeSchoolSocialLinks(), parseSchoolDirectionsVideo(), validateSchoolSocialLinks()
 
+### Community 358 - "directions/constants.ts"
+Cohesion: 0.13
+Nodes (13): needsTeacherDirectionSetup(), DIRECTION_DESCRIPTION_MAX, DIRECTION_ICON_MAX, DIRECTION_ICON_OPTIONS, DIRECTION_NAME_MAX, DIRECTION_NAME_MIN, TEACHER_DIRECTIONS_SETUP_BODY, TEACHER_DIRECTIONS_SETUP_LINK (+5 more)
+
+### Community 366 - "invite.ts"
+Cohesion: 0.15
+Nodes (15): asObject(), buildRegistrationInviteUrl(), createRotatedRegistrationInvite(), extractRegistrationInviteFromContacts(), generateRegistrationInviteToken(), loadPersistedRegistrationInviteToken(), normalizeRegistrationInviteToken(), parseRegistrationInvite() (+7 more)
+
+### Community 367 - "registration/constants.ts"
+Cohesion: 0.25
+Nodes (7): INVALID_REGISTRATION_INVITE_MESSAGE, MISSING_REGISTRATION_INVITE_MESSAGE, REGISTRATION_INVITE_HEADER, REGISTRATION_INVITE_QUERY_PARAM, REGISTRATION_INVITE_STORAGE_KEY, REGISTRATION_INVITE_TOKEN_HEX_LENGTH, SEED_REGISTRATION_INVITE_TOKEN
+
+### Community 376 - "chat/avatar.ts"
+Cohesion: 0.60
+Nodes (4): EXT_TO_MIME, inferChatAvatarMimeType(), isLikelyImageMime(), prepareChatAvatarFromFile()
+
+### Community 379 - "UserPreviewProvider.tsx"
+Cohesion: 0.33
+Nodes (5): resolveTarget(), UserPreviewContext, UserPreviewContextValue, UserPreviewProvider(), UserPreviewTarget
+
 ## Knowledge Gaps
-- **831 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+826 more)
+- **886 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+881 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **127 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **132 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
-  _High betweenness centrality (0.003) - this node is a cross-community bridge._
-- **Why does `SupportApi` connect `SupportApi` to `types.ts`?**
-  _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **Why does `mapAssignmentGroupRecord()` connect `pocketbase/helpers.ts` to `mappers.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
+- **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
+- **Why does `SupportApi` connect `SupportApi` to `types.ts`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _831 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _886 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.0425531914893617 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04081632653061224 - nodes in this community are weakly interconnected._
 - **Should `types.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.05555555555555555 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05128205128205128 - nodes in this community are weakly interconnected._

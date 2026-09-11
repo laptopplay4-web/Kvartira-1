@@ -112,9 +112,139 @@ function syncReadReceipts(app, memberRecord) {
   }
 }
 
+/**
+ * @param {unknown} raw
+ * @returns {boolean}
+ */
+function isSchoolWideMetadata(raw) {
+  if (!raw) return false;
+  let meta = raw;
+  if (typeof raw === 'string') {
+    try {
+      meta = JSON.parse(raw);
+    } catch (_) {
+      return false;
+    }
+  }
+  if (!meta || typeof meta !== 'object') return false;
+  const flag = /** @type {{ schoolWide?: unknown }} */ (meta).schoolWide;
+  return flag === true || flag === 1 || flag === 'true';
+}
+
+/**
+ * Add a newly registered user to every school-wide conversation.
+ *
+ * @param {core.App} app
+ * @param {string} userId
+ */
+function joinUserToSchoolWideChats(app, userId) {
+  if (!userId) return;
+
+  try {
+    /** @type {core.Record[]} */
+    let convs = [];
+    try {
+      convs = app.findRecordsByFilter('conversations', '', '-id', 500, 0) || [];
+    } catch (_) {
+      convs = [];
+    }
+    if (!Array.isArray(convs)) convs = [];
+
+    for (const conv of convs) {
+      if (!isSchoolWideMetadata(conv.get('metadata'))) continue;
+
+      const convId = String(conv.id);
+      try {
+        app.findFirstRecordByFilter(
+          'conversation_members',
+          `conversation = "${convId}" && user = "${userId}"`,
+        );
+        continue;
+      } catch (_) {
+        /* not found — add */
+      }
+
+      const membersCol = app.findCollectionByNameOrId('conversation_members');
+      const member = new Record(membersCol);
+      member.set('conversation', convId);
+      member.set('user', userId);
+      member.set('role', 'member');
+      member.set('muted', null);
+      app.save(member);
+
+      let participantIds = [];
+      try {
+        const rawIds = conv.get('participantIds');
+        if (Array.isArray(rawIds)) participantIds = rawIds.map(String);
+      } catch (_) {
+        participantIds = [];
+      }
+      if (!participantIds.includes(userId)) {
+        participantIds.push(userId);
+        conv.set('participantIds', participantIds);
+        app.save(conv);
+      }
+    }
+  } catch (err) {
+    console.error('joinUserToSchoolWideChats', err);
+  }
+}
+
+function isUsersAuth(auth) {
+  if (!auth) return false;
+  try {
+    return auth.collection().name === 'users';
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function normalizePinnedIds(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * pinnedMessageIds may only change for teacher|admin (students are conversation
+ * members and would otherwise pass updateRule).
+ *
+ * @param {core.RecordRequestEvent} e
+ */
+function assertConversationPinUpdate(e) {
+  const auth = e.auth;
+  if (!isUsersAuth(auth)) return;
+
+  const original = typeof e.record.original === 'function' ? e.record.original() : e.record;
+  const oldPins = normalizePinnedIds(original.get('pinnedMessageIds'));
+  const newPins = normalizePinnedIds(e.record.get('pinnedMessageIds'));
+  if (oldPins.length === newPins.length && oldPins.every((id, i) => id === newPins[i])) {
+    return;
+  }
+
+  const role = auth.getString('role');
+  if (role !== 'teacher' && role !== 'admin') {
+    throw new ApiError(403, 'Закреплять сообщения могут только преподаватель и администратор');
+  }
+}
+
 module.exports = {
   relId,
   isDeletedMessage,
   syncConversationLastMessage,
   syncReadReceipts,
+  joinUserToSchoolWideChats,
+  assertConversationPinUpdate,
 };

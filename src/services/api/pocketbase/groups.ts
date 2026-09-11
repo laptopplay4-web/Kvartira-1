@@ -10,12 +10,13 @@ import { getPocketBase } from '@/services/api/pocketbase/client';
 import { withPbError } from '@/services/api/pocketbase/errors';
 import { mapAssignmentGroupRecord, mapUserRecord } from '@/services/api/pocketbase/mappers';
 import { resolveUsersAvatars } from '@/services/api/pocketbase/files';
-import { pbEqOr } from '@/services/api/pocketbase/helpers';
+import { pbEqOr, escapePbFilter } from '@/services/api/pocketbase/helpers';
 import {
   canEditAssignmentGroup,
   canManageAssignmentGroups,
   canViewAssignmentGroup,
 } from '@/services/assignments/groups/access';
+import { isGeneralAssignmentGroup } from '@/services/assignments/groups/helpers';
 import { validateGroupName } from '@/services/assignments/validation';
 
 async function getRequesterUser(userId: string): Promise<User> {
@@ -165,12 +166,21 @@ export const pocketbaseAssignmentGroupsApi: AssignmentGroupsApi = {
   async deleteGroup(id, requesterId) {
     const user = await getRequesterUser(requesterId);
     const group = await loadGroupOrThrow(id);
+    if (isGeneralAssignmentGroup(group)) {
+      throw new ApiError('Общую группу нельзя удалить', 'FORBIDDEN', 403);
+    }
     if (!canEditAssignmentGroup(user, group)) {
       throw new ApiError('Нет прав на управление группой', 'FORBIDDEN', 403);
     }
 
     return withPbError(async () => {
       const pb = getPocketBase();
+      // Cascade before group delete — assignments.group is required without cascadeDelete.
+      const linked = await pb.collection('assignments').getFullList({
+        filter: `group = "${escapePbFilter(id)}"`,
+        fields: 'id',
+      });
+      await Promise.all(linked.map((row) => pb.collection('assignments').delete(row.id)));
       await pb.collection('assignment_groups').delete(id);
     });
   },

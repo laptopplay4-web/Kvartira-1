@@ -20,7 +20,11 @@ import {
   resolveSecuritySessions,
   sortLoginHistoryByDate,
 } from '@/services/security/helpers';
-import { MAX_LOGIN_HISTORY_ENTRIES, MIN_PASSWORD_LENGTH } from '@/services/security/constants';
+import {
+  MAX_LOGIN_HISTORY_ENTRIES,
+  MAX_SECURITY_SESSIONS,
+  MIN_PASSWORD_LENGTH,
+} from '@/services/security/constants';
 import { ApiError } from '@/services/api/types';
 import type { ChangePasswordInput, SecurityApi } from '@/services/api/types';
 import { tryPushNotification, type MockNotificationsDb } from './notifications';
@@ -149,37 +153,41 @@ export function recordAuthLogin(
     return;
   }
 
-  const existingByDevice = db.securitySessions.find(
-    (s) => s.userId === userId && s.deviceLabel === deviceLabel,
-  );
-  if (existingByDevice) {
-    existingByDevice.token = token;
-    existingByDevice.lastActiveAt = new Date().toISOString();
-    existingByDevice.ipAddress = ipAddress;
+  const existingByToken = db.securitySessions.find((s) => s.token === token);
+  if (existingByToken) {
+    existingByToken.lastActiveAt = new Date().toISOString();
+    existingByToken.ipAddress = ipAddress;
+    existingByToken.deviceLabel = deviceLabel;
     return;
   }
 
-  const existing = db.securitySessions.find((s) => s.token === token);
-  if (!existing) {
-    db.securitySessions.push({
-      id: uid('sess'),
-      userId,
-      token,
-      deviceLabel,
-      platform: 'web',
-      ipAddress,
-      lastActiveAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    });
-    pushSecurityNotification(
-      db,
-      userId,
-      'Вход в аккаунт',
-      `Обнаружен вход с ${deviceLabel}.`,
+  db.securitySessions.push({
+    id: uid('sess'),
+    userId,
+    token,
+    deviceLabel,
+    platform: 'web',
+    ipAddress,
+    lastActiveAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  });
+
+  const userSessions = db.securitySessions
+    .filter((s) => s.userId === userId)
+    .sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+  if (userSessions.length > MAX_SECURITY_SESSIONS) {
+    const keep = new Set(userSessions.slice(0, MAX_SECURITY_SESSIONS).map((s) => s.id));
+    db.securitySessions = db.securitySessions.filter(
+      (s) => s.userId !== userId || keep.has(s.id),
     );
-  } else {
-    existing.lastActiveAt = new Date().toISOString();
   }
+
+  pushSecurityNotification(
+    db,
+    userId,
+    'Вход в аккаунт',
+    `Обнаружен вход с ${deviceLabel}.`,
+  );
 }
 
 export function createMockSecurityApi(

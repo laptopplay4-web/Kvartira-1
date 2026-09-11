@@ -4,7 +4,6 @@
  */
 
 import {
-  achievementDefinitions,
   conversationMembers,
   conversations,
   DEMO_ACCOUNTS,
@@ -17,19 +16,14 @@ import {
   initialLegalDocuments,
   initialLessons,
   initialLoginHistory,
-  initialProgressGoals,
-  initialProgressHistory,
   initialSecurityAlerts,
   initialSecuritySessions,
-  initialSkillProgress,
   initialSupportTickets,
-  initialUserAchievements,
   initialUserConsents,
   messages,
   notifications,
   publicNews,
   publicSchoolInfo,
-  skills,
   studentDirections,
   teacherAvailabilities,
   teacherDirections,
@@ -44,7 +38,6 @@ import {
   remapLink,
   remapMetadata,
   patchRecordTimestamps,
-  toPbSkillLevel,
 } from './helpers';
 
 export interface SeedOptions {
@@ -284,74 +277,6 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
   }
   counts.assignments = initialAssignments.length;
 
-  // ── Progress ───────────────────────────────────────────────────────────
-  for (const skill of skills) {
-    const rec = await client.createRecord('skills', {
-      name: skill.name,
-      description: skill.description ?? '',
-      direction: skill.directionId ? ids.get(skill.directionId) : '',
-      maxLevel: toPbSkillLevel(skill.maxLevel),
-    });
-    ids.set(skill.id, rec.id);
-  }
-  counts.skills = skills.length;
-
-  for (const prog of initialSkillProgress) {
-    const rec = await client.createRecord('student_skill_progress', {
-      student: ids.get(prog.studentId),
-      skill: ids.get(prog.skillId),
-      level: toPbSkillLevel(prog.level),
-      note: prog.note ?? '',
-    });
-    await patchRecordTimestamps(client, 'student_skill_progress', rec.id, prog.updatedAt, prog.updatedAt);
-  }
-  counts.student_skill_progress = initialSkillProgress.length;
-
-  for (const goal of initialProgressGoals) {
-    const rec = await client.createRecord('progress_goals', {
-      student: ids.get(goal.studentId),
-      teacher: goal.teacherId ? ids.get(goal.teacherId) : '',
-      title: goal.title,
-      description: goal.description ?? '',
-      targetDate: goal.targetDate ?? '',
-      status: goal.status,
-      completedAt: goal.completedAt ?? '',
-    });
-    await patchRecordTimestamps(client, 'progress_goals', rec.id, goal.createdAt);
-  }
-  counts.progress_goals = initialProgressGoals.length;
-
-  for (const hist of initialProgressHistory) {
-    const rec = await client.createRecord('progress_history', {
-      student: ids.get(hist.studentId),
-      type: hist.type,
-      title: hist.title,
-      description: hist.description ?? '',
-    });
-    await patchRecordTimestamps(client, 'progress_history', rec.id, hist.createdAt);
-  }
-  counts.progress_history = initialProgressHistory.length;
-
-  for (const ach of achievementDefinitions) {
-    const rec = await client.createRecord('achievement_definitions', {
-      code: ach.code,
-      title: ach.title,
-      description: ach.description,
-      icon: ach.icon,
-    });
-    ids.set(ach.id, rec.id);
-  }
-  counts.achievement_definitions = achievementDefinitions.length;
-
-  for (const ua of initialUserAchievements) {
-    await client.createRecord('user_achievements', {
-      student: ids.get(ua.studentId),
-      achievement: ids.get(ua.achievementId),
-      unlockedAt: ua.unlockedAt,
-    });
-  }
-  counts.user_achievements = initialUserAchievements.length;
-
   // ── Support ────────────────────────────────────────────────────────────
   for (const article of helpArticles) {
     await client.createRecord('help_articles', {
@@ -386,6 +311,8 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
       currentVersion: doc.currentVersion,
       effectiveAt: doc.effectiveAt,
       requiresConsent: doc.requiresConsent,
+      purpose: doc.purpose ?? '',
+      required: doc.required ?? false,
       versionHistory: doc.versionHistory ?? [],
     });
     ids.set(doc.id, rec.id);
@@ -399,6 +326,8 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
       documentType: consent.documentType,
       documentTitle: consent.documentTitle,
       version: consent.version,
+      purpose: consent.purpose ?? '',
+      consentTextVersion: consent.consentTextVersion ?? consent.version,
       acceptedAt: consent.acceptedAt,
     });
   }
@@ -475,6 +404,12 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
       ...publicSchoolInfo.contacts,
       socialLinks: publicSchoolInfo.socialLinks ?? {},
       directionsVideo: publicSchoolInfo.directionsVideo ?? null,
+      // Public, committed token — PocketBase refuses it unless KVARTIRA_DEV=1.
+      // Rotate via /admin/registration-qr before opening registration.
+      registrationInvite: {
+        token: 'kvartira-school-invite-7f3a9c2e1b8d4e6f0a5c9d2e8b1f4a7c',
+        rotatedAt: new Date().toISOString(),
+      },
     },
   });
   counts.school_settings = 1;

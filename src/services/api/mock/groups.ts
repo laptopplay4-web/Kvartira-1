@@ -1,9 +1,10 @@
-import type { AssignmentGroup, AssignmentGroupDetail, User } from '@/types';
+import type { Assignment, AssignmentGroup, AssignmentGroupDetail, User } from '@/types';
 import {
   canEditAssignmentGroup,
   canManageAssignmentGroups,
   canViewAssignmentGroup,
 } from '@/services/assignments/groups/access';
+import { isGeneralAssignmentGroup } from '@/services/assignments/groups/helpers';
 import { validateGroupName } from '@/services/assignments/validation';
 import { ApiError } from '@/services/api/types';
 import type {
@@ -15,6 +16,7 @@ import { createLocalUserResolver, toMockUserId, type MockUserResolver } from '@/
 
 export interface MockAssignmentGroupsDb {
   assignmentGroups: AssignmentGroup[];
+  assignments: Assignment[];
   users: User[];
 }
 
@@ -148,7 +150,12 @@ export function createMockAssignmentGroupsApi(
     async deleteGroup(id, requesterId) {
       await delay(150);
       const group = getGroupById(id);
+      if (isGeneralAssignmentGroup(group)) {
+        throw new ApiError('Общую группу нельзя удалить', 'FORBIDDEN', 403);
+      }
       await assertEditAccess(group, requesterId);
+      // Mirror PB cascadeDelete on assignments.group
+      db.assignments = db.assignments.filter((a) => a.groupId !== id);
       db.assignmentGroups = db.assignmentGroups.filter((g) => g.id !== id);
     },
   };

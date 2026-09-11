@@ -118,10 +118,14 @@ export interface ConversationMember {
   lastReadAt?: string;
   muted: boolean;
   mutedUntil?: string | null;
+  /** When set, conversation is pinned at top of this user's list. */
+  pinnedAt?: string | null;
 }
 
 export interface ConversationMetadata {
   lessonId?: string;
+  /** School-wide chat: all users (incl. future registrants) are members. */
+  schoolWide?: boolean;
 }
 
 export interface ConversationLastMessage {
@@ -144,6 +148,10 @@ export interface Conversation {
   unreadCount?: number;
   metadata?: ConversationMetadata;
   pinnedMessageIds?: string[];
+  /** Set by API for current viewer — pin in own chat list. */
+  viewerPinnedAt?: string | null;
+  /** Set by API for current viewer — muted notifications. */
+  viewerMuted?: boolean;
 }
 
 export type MessageStatus = 'sending' | 'sent' | 'read' | 'failed';
@@ -178,8 +186,14 @@ export interface MessageSystemMetadata {
   newTitle?: string;
 }
 
+export interface MessageReaction {
+  emoji: string;
+  userIds: string[];
+}
+
 export interface MessageMetadata {
   system?: MessageSystemMetadata;
+  reactions?: MessageReaction[];
 }
 
 export interface Message {
@@ -198,6 +212,7 @@ export interface Message {
   replyToMessageId?: string;
   messageType?: MessageType;
   metadata?: MessageMetadata;
+  reactions?: MessageReaction[];
 }
 
 export interface TypingUser {
@@ -264,6 +279,8 @@ export interface AppNotification {
   read: boolean;
   createdAt: string;
   link?: string;
+  /** Срочное — выделяется в UI (напр. настройка направлений преподавателя). */
+  urgent?: boolean;
 }
 
 export interface NotificationPreferences {
@@ -351,100 +368,6 @@ export interface Assignment {
   contentBlocks: AssignmentContentBlock[];
   createdAt: string;
   updatedAt: string;
-}
-
-// Stage 2 — Progress & Achievements
-export interface Skill {
-  id: string;
-  name: string;
-  description?: string;
-  directionId?: string;
-  maxLevel: number;
-}
-
-export interface StudentSkillProgress {
-  id: string;
-  studentId: string;
-  skillId: string;
-  level: number;
-  note?: string;
-  updatedAt: string;
-}
-
-export type ProgressGoalStatus = 'active' | 'completed';
-
-export interface ProgressGoal {
-  id: string;
-  studentId: string;
-  teacherId?: string;
-  title: string;
-  description?: string;
-  targetDate?: string;
-  status: ProgressGoalStatus;
-  createdAt: string;
-  completedAt?: string;
-}
-
-export type ProgressHistoryType =
-  | 'lesson'
-  | 'assignment'
-  | 'skill'
-  | 'goal'
-  | 'achievement'
-  | 'event';
-
-export interface ProgressHistoryEntry {
-  id: string;
-  studentId: string;
-  type: ProgressHistoryType;
-  title: string;
-  description?: string;
-  createdAt: string;
-}
-
-export interface AchievementDefinition {
-  id: string;
-  code: string;
-  title: string;
-  description: string;
-  icon: string;
-}
-
-export interface UserAchievement {
-  id: string;
-  studentId: string;
-  achievementId: string;
-  unlockedAt: string;
-}
-
-export interface StudentProgressSummary {
-  studentId: string;
-  lessonsCompleted: number;
-  lessonsUpcoming: number;
-  lessonsTotal: number;
-  lessonsAttended: number;
-  lessonsMissed: number;
-  lessonsCancelled: number;
-  /** 0–100; null when no past lessons to measure */
-  attendanceRate: number | null;
-    assignmentsTotal: number;
-  activeGoals: number;
-  completedGoals: number;
-  achievementsUnlocked: number;
-  achievementsTotal: number;
-  averageSkillLevel: number;
-}
-
-export interface SkillWithProgress extends Skill {
-  level: number;
-  progressId?: string;
-  note?: string;
-  updatedAt?: string;
-}
-
-export interface AchievementWithStatus extends AchievementDefinition {
-  unlocked: boolean;
-  unlockedAt?: string;
 }
 
 // Stage 2 — Support / Help
@@ -608,6 +531,19 @@ export type LegalDocumentType =
   | 'terms_of_service'
   | 'school_rules';
 
+/**
+ * Purpose of processing (152-ФЗ, ст. 9 ч. 4 п. 4).
+ *
+ * Since 01.09.2025 consent must be collected separately for each purpose, so a
+ * document is bound to exactly one purpose and a consent record carries it.
+ *
+ * - `service` — оказание услуг: запись на занятия, расписание, домашние задания
+ * - `communication` — уведомления и рассылки
+ * - `publication` — размещение фото/видео и имени на ресурсах школы
+ * - `minor_guardian` — согласие законного представителя (ученик младше 18)
+ */
+export type ConsentPurpose = 'service' | 'communication' | 'publication' | 'minor_guardian';
+
 export interface LegalDocumentVersionHistory {
   version: string;
   effectiveAt: string;
@@ -622,6 +558,10 @@ export interface LegalDocument {
   currentVersion: string;
   effectiveAt: string;
   requiresConsent: boolean;
+  /** Purpose this document asks consent for. Absent = informational document. */
+  purpose?: ConsentPurpose;
+  /** Registration cannot proceed without it (service purposes). */
+  required?: boolean;
   versionHistory: LegalDocumentVersionHistory[];
 }
 
@@ -633,4 +573,21 @@ export interface UserConsent {
   documentTitle: string;
   version: string;
   acceptedAt: string;
+  purpose?: ConsentPurpose;
+  /** Set when the subject withdrew consent (152-ФЗ, ст. 9 ч. 2). */
+  revokedAt?: string;
+  /** Proof of consent — captured server-side, never from the client. */
+  ipAddress?: string;
+  userAgent?: string;
+  /** Version of the consent wording shown at the moment of acceptance. */
+  consentTextVersion?: string;
+  /** Who signed, when the subject is a minor (purpose `minor_guardian`). */
+  guardian?: GuardianDetails;
+}
+
+/** Legal representative of a student under 18 (152-ФЗ, ст. 9 ч. 6). */
+export interface GuardianDetails {
+  fullName: string;
+  phone: string;
+  relation: string;
 }

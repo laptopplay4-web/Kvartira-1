@@ -1,4 +1,4 @@
-import { ClientResponseError } from 'pocketbase';
+import { ClientResponseError, type RecordModel } from 'pocketbase';
 import type {
   ChatApi,
   CreateConversationInput,
@@ -20,10 +20,16 @@ import {
   mapUserRecord,
 } from '@/services/api/pocketbase/mappers';
 import { escapePbFilter, pbEqOr, relId } from '@/services/api/pocketbase/helpers';
+import { isSchoolWideConversation } from '@/services/chat/schoolWide';
 import { compareIsoDates } from '@/utils/dates';
 import {
+  deleteStoredFiles,
+  isStoredFileRef,
+  linkStoredFilesToContext,
+  parseStoredFileRef,
   resolveMessage,
   resolveMessages,
+  resolveStoredFileUrl,
   uploadStoredFile,
 } from '@/services/api/pocketbase/files';
 import { can } from '@/permissions';
@@ -33,12 +39,15 @@ import {
   canAddMember,
   canCreateGroupChat,
   canCreatePersonalChat,
+  canCreateSchoolWideChat,
   canDeleteConversation,
   canLeaveConversation,
   canRemoveMember,
   canSendToConversation,
   canUpdateConversation,
   getConversationMember,
+  isMemberMuted,
+  isValidTeacherStudentPersonalPair,
 } from '@/services/chat/access';
 import {
   computeUnreadCount,
@@ -46,9 +55,19 @@ import {
   isValidMessageText,
   matchesMessageSearch,
   normalizeMessageText,
+  sortConversationsWithPins,
 } from '@/services/chat/helpers';
-import { canDeleteMessage, canEditMessage, canPinMessage } from '@/services/chat/messages';
-import { MESSAGE_MAX_LENGTH, MESSAGE_PAGE_SIZE, MESSAGE_SEARCH_MIN_LENGTH } from '@/services/chat/constants';
+import { canDeleteMessage, canEditMessage, canPinMessage, toggleReactionList } from '@/services/chat/messages';
+import {
+  getLocalPinnedConversationIds,
+  setLocalConversationPinned,
+} from '@/services/chat/listPins';
+import {
+  MESSAGE_MAX_LENGTH,
+  MESSAGE_PAGE_SIZE,
+  MESSAGE_SEARCH_MIN_LENGTH,
+  SCHOOL_WIDE_CHAT_DEFAULT_TITLE,
+} from '@/services/chat/constants';
 import { detectAttachmentType, validateAttachment, validateMessageContent } from '@/services/chat/validation';
 import { chatRealtimeService } from '@/services/chat/realtime';
 import { findConversationForLesson } from '@/services/lessons/helpers';
@@ -112,6 +131,31 @@ async function loadUserMembers(userId: string): Promise<ConversationMember[]> {
   return records.map(mapConversationMemberRecord);
 }
 
+/** Join current user into school-wide chats they are not yet in (idempotent). */
+async function ensureSchoolWideMembershipPb(userId: string, conversations: Conversation[]): Promise<void> {
+  const pb = getPocketBase();
+  const members = await loadUserMembers(userId);
+  for (const conv of conversations) {
+    if (!isSchoolWideConversation(conv)) continue;
+    if (members.some((m) => m.conversationId === conv.id && m.userId === userId)) continue;
+    try {
+      await pb.collection('conversation_members').create({
+        conversation: conv.id,
+        user: userId,
+        role: 'member',
+        muted: false,
+      });
+      if (!conv.participantIds.includes(userId)) {
+        const nextIds = [...conv.participantIds, userId];
+        await pb.collection('conversations').update(conv.id, { participantIds: nextIds });
+        conv.participantIds = nextIds;
+      }
+    } catch {
+      /* race / already member — ignore */
+    }
+  }
+}
+
 async function loadMessagesForConversations(conversationIds: string[]): Promise<Message[]> {
   if (conversationIds.length === 0) return [];
   const pb = getPocketBase();
@@ -157,27 +201,128 @@ function enrichConversation(
   members: ConversationMember[],
 ): Conversation {
   const member = getConversationMember(conv.id, userId, members);
-  const convMessages = messages.filter((m) => m.conversationId === conv.id);
+  const convMessages = messages.filter((m) => m.conversationId === conv.id && !m.deletedAt);
   const unreadCount = computeUnreadCount(conv.id, userId, convMessages, member);
-  const visible = convMessages.filter((m) => !m.deletedAt || m.senderId === userId);
-  const lastMessage = [...visible]
+  const lastMessage = [...convMessages]
     .sort((a, b) => compareIsoDates(a.createdAt, b.createdAt))
     .at(-1);
+  const localPins = getLocalPinnedConversationIds(userId);
+  const viewerPinnedAt =
+    member?.pinnedAt ?? (localPins.includes(conv.id) ? new Date(0).toISOString() : null);
 
   return {
     ...conv,
     unreadCount,
+    viewerPinnedAt,
+    viewerMuted: member ? isMemberMuted(member) : false,
     lastMessage: lastMessage
       ? {
           id: lastMessage.id,
-          text: lastMessage.deletedAt ? 'Сообщение удалено' : lastMessage.text,
+          text: lastMessage.text || lastMessage.attachments?.[0]?.filename || 'Вложение',
           senderId: lastMessage.senderId,
           createdAt: lastMessage.createdAt,
         }
-      : conv.lastMessage,
+      : undefined,
     lastMessageAt: lastMessage?.createdAt ?? conv.lastMessageAt,
     updatedAt: lastMessage?.createdAt ?? conv.updatedAt,
   };
+}
+
+async function resolveConversationAvatar(conv: Conversation): Promise<Conversation> {
+  if (!conv.avatarUrl) return conv;
+  const resolved = await resolveStoredFileUrl(conv.avatarUrl);
+  if (!resolved) {
+    if (isStoredFileRef(conv.avatarUrl)) {
+      const { avatarUrl: _drop, ...rest } = conv;
+      return rest;
+    }
+    return conv;
+  }
+  if (resolved === conv.avatarUrl) return conv;
+  return { ...conv, avatarUrl: resolved };
+}
+
+function isPbUrlFieldError(error: unknown): boolean {
+  if (!(error instanceof ClientResponseError)) return false;
+  const data = error.response?.data;
+  if (!data || typeof data !== 'object') return false;
+  const avatar = (data as Record<string, unknown>).avatarUrl;
+  if (!avatar || typeof avatar !== 'object') return false;
+  const message = String((avatar as { message?: string }).message ?? '');
+  return /valid url/i.test(message);
+}
+
+async function persistConversationAvatar(
+  userId: string,
+  dataUrlOrEmpty: string,
+  previousUrl?: string,
+  contextId?: string,
+): Promise<string | undefined> {
+  const trimmed = dataUrlOrEmpty.trim();
+  if (!trimmed) {
+    await deleteStoredFiles(previousUrl);
+    return '';
+  }
+  if (!trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+  const uploaded = await uploadStoredFile({
+    userId,
+    purpose: 'chat',
+    contextId,
+    filename: 'chat-avatar.jpg',
+    mimeType: 'image/jpeg',
+    size: Math.ceil((trimmed.length * 3) / 4),
+    dataUrl: trimmed,
+  });
+  if (previousUrl && previousUrl !== uploaded.url) {
+    await deleteStoredFiles(previousUrl);
+  }
+  return uploaded.url;
+}
+
+/** Prefer pbfile: ref; fall back to signed URL when schema still has avatarUrl type=url. */
+async function resolveAvatarValueForPbWrite(avatarRef: string): Promise<{ primary: string; fallback?: string }> {
+  if (!isStoredFileRef(avatarRef)) {
+    return { primary: avatarRef };
+  }
+  const signed = await resolveStoredFileUrl(avatarRef);
+  return { primary: avatarRef, fallback: signed && signed !== avatarRef ? signed : undefined };
+}
+
+async function createConversationWithAvatar(
+  base: Record<string, unknown>,
+  avatarRef?: string,
+): Promise<RecordModel> {
+  const pb = getPocketBase();
+  if (!avatarRef) {
+    return pb.collection('conversations').create(base);
+  }
+  const { primary, fallback } = await resolveAvatarValueForPbWrite(avatarRef);
+  try {
+    return await pb.collection('conversations').create({ ...base, avatarUrl: primary });
+  } catch (error) {
+    if (!fallback || !isPbUrlFieldError(error)) throw error;
+    return pb.collection('conversations').create({ ...base, avatarUrl: fallback });
+  }
+}
+
+async function updateConversationWithAvatar(
+  conversationId: string,
+  body: Record<string, unknown>,
+): Promise<RecordModel> {
+  const pb = getPocketBase();
+  if (body.avatarUrl === undefined || body.avatarUrl === '' || typeof body.avatarUrl !== 'string') {
+    return pb.collection('conversations').update(conversationId, body);
+  }
+  const avatarRef = body.avatarUrl;
+  const { primary, fallback } = await resolveAvatarValueForPbWrite(avatarRef);
+  try {
+    return await pb.collection('conversations').update(conversationId, { ...body, avatarUrl: primary });
+  } catch (error) {
+    if (!fallback || !isPbUrlFieldError(error)) throw error;
+    return pb.collection('conversations').update(conversationId, { ...body, avatarUrl: fallback });
+  }
 }
 
 async function createSystemMessage(
@@ -196,7 +341,7 @@ async function createSystemMessage(
     messageType: 'system',
     metadata: { system: event },
   });
-        return resolveMessage(mapMessageRecord(record));
+  return resolveMessage(mapMessageRecord(record));
 }
 
 async function updateParticipantIds(conversationId: string, participantIds: string[]): Promise<void> {
@@ -215,13 +360,14 @@ export const pocketbaseChatApi: ChatApi = {
         sort: '-lastMessageAt,-id',
       });
       const conversations = records.map(mapConversationRecord);
+      await ensureSchoolWideMembershipPb(userId, conversations);
       const userMembers = await loadUserMembers(userId);
       const accessible = conversations.filter((c) => canAccessConversation(user, c, userMembers));
       const messages = await loadMessagesForConversations(accessible.map((c) => c.id));
 
-      return accessible
-        .map((c) => enrichConversation(c, userId, messages, userMembers))
-        .sort((a, b) => (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt));
+      const enriched = accessible.map((c) => enrichConversation(c, userId, messages, userMembers));
+      const sorted = sortConversationsWithPins(enriched, userMembers, userId);
+      return Promise.all(sorted.map((c) => resolveConversationAvatar(c)));
     });
   },
 
@@ -229,7 +375,7 @@ export const pocketbaseChatApi: ChatApi = {
     return withPbError(async () => {
       const { conversation, members } = await assertConversationAccess(conversationId, userId);
       const messages = await loadMessagesForConversations([conversationId]);
-      return enrichConversation(conversation, userId, messages, members);
+      return resolveConversationAvatar(enrichConversation(conversation, userId, messages, members));
     });
   },
 
@@ -279,14 +425,17 @@ export const pocketbaseChatApi: ChatApi = {
         }
       }
 
+      // Newest-first by created (not id — PB ids are random). Reverse → chrono ASC for UI.
       const result = await pb.collection('messages').getList(1, limit + 1, {
         filter: `conversation = "${escapePbFilter(conversationId)}"${createdFilter}`,
-        sort: '-id',
+        sort: '-created,-id',
       });
 
       const hasMore = result.items.length > limit;
       const page = hasMore ? result.items.slice(0, limit) : result.items;
-      const messages = await resolveMessages(page.map(mapMessageRecord).reverse());
+      const messages = (await resolveMessages(page.map(mapMessageRecord).reverse()))
+        .filter((m) => !m.deletedAt)
+        .sort((a, b) => compareIsoDates(a.createdAt, b.createdAt) || a.id.localeCompare(b.id));
       const nextCursor = hasMore ? messages[0]?.id : undefined;
       return { messages, nextCursor, hasMore };
     });
@@ -374,15 +523,25 @@ export const pocketbaseChatApi: ChatApi = {
       const record = await pb.collection('messages').create(body);
       const msg = await resolveMessage(mapMessageRecord(record));
 
-      const memberRecord = await findMemberRecord(conversationId, userId);
-      if (memberRecord) {
-        await pb.collection('conversation_members').update(memberRecord.id, {
-          lastReadMessageId: msg.id,
-          lastReadAt: new Date().toISOString(),
-        });
+      // Side-effects must not fail the send — otherwise the client marks the
+      // already-created message as failed until the next refetch.
+      try {
+        const memberRecord = await findMemberRecord(conversationId, userId);
+        if (memberRecord) {
+          await pb.collection('conversation_members').update(memberRecord.id, {
+            lastReadMessageId: msg.id,
+            lastReadAt: new Date().toISOString(),
+          });
+        }
+      } catch {
+        /* best-effort read cursor */
       }
 
-      chatRealtimeService.emit({ type: 'message.created', conversationId, message: msg });
+      try {
+        chatRealtimeService.emit({ type: 'message.created', conversationId, message: msg });
+      } catch {
+        /* local UI emit only */
+      }
       return msg;
     });
   },
@@ -415,19 +574,18 @@ export const pocketbaseChatApi: ChatApi = {
 
   async deleteMessage(conversationId, messageId, userId) {
     return withPbError(async () => {
-      const { user } = await assertConversationAccess(conversationId, userId);
+      const { user, conversation } = await assertConversationAccess(conversationId, userId);
       const msg = await pocketbaseChatApi.getMessage(conversationId, messageId, userId);
 
-      if (!canDeleteMessage(user, msg)) {
+      if (!canDeleteMessage(user, msg, conversation)) {
         throw new ApiError('Нет прав на удаление', 'FORBIDDEN', 403);
       }
 
       const pb = getPocketBase();
-      const now = new Date().toISOString();
-      const record = await pb.collection('messages').update(messageId, { deletedAt: now });
-      const updated = await resolveMessage(mapMessageRecord(record));
-      chatRealtimeService.emit({ type: 'message.deleted', conversationId, message: updated });
-      return updated;
+      const snapshot = { ...msg, deletedAt: new Date().toISOString() };
+      await pb.collection('messages').delete(messageId);
+      chatRealtimeService.emit({ type: 'message.deleted', conversationId, message: snapshot });
+      return snapshot;
     });
   },
 
@@ -462,12 +620,33 @@ export const pocketbaseChatApi: ChatApi = {
   async createConversation(userId, input: CreateConversationInput) {
     return withPbError(async () => {
       const user = await getRequesterUser(userId);
-      const uniqueParticipants = [...new Set([userId, ...input.participantIds])];
-      if (uniqueParticipants.length < 2) {
-        throw new ApiError('Укажите участников', 'VALIDATION', 400);
-      }
-
       const pb = getPocketBase();
+
+      let uniqueParticipants: string[];
+      if (input.allUsers) {
+        if (input.type === 'personal') {
+          throw new ApiError('Общий чат не может быть личным', 'VALIDATION', 400);
+        }
+        if (!canCreateSchoolWideChat(user)) {
+          throw new ApiError('Нет прав на создание общего чата', 'FORBIDDEN', 403);
+        }
+        // Prefer client-provided ids (avoids directory RBAC gaps); fall back to PB list
+        const fromClient = input.participantIds ?? [];
+        if (fromClient.length > 0) {
+          uniqueParticipants = [...new Set([userId, ...fromClient])];
+        } else {
+          const allUsers = await pb.collection('users').getFullList({ fields: 'id' });
+          uniqueParticipants = [...new Set(allUsers.map((r) => r.id))];
+          if (!uniqueParticipants.includes(userId)) {
+            uniqueParticipants.push(userId);
+          }
+        }
+      } else {
+        uniqueParticipants = [...new Set([userId, ...input.participantIds])];
+        if (uniqueParticipants.length < 2) {
+          throw new ApiError('Укажите участников', 'VALIDATION', 400);
+        }
+      }
 
       if (input.type === 'personal') {
         if (!canCreatePersonalChat(user)) {
@@ -475,6 +654,10 @@ export const pocketbaseChatApi: ChatApi = {
         }
         if (uniqueParticipants.length !== 2) {
           throw new ApiError('Личный чат — только два участника', 'VALIDATION', 400);
+        }
+        const pair = await Promise.all(uniqueParticipants.map((id) => getRequesterUser(id)));
+        if (!isValidTeacherStudentPersonalPair(pair)) {
+          throw new ApiError('Личный чат только между преподавателем и учеником', 'VALIDATION', 400);
         }
         const existingRecords = await pb.collection('conversations').getFullList({
           filter: 'type = "personal"',
@@ -489,44 +672,81 @@ export const pocketbaseChatApi: ChatApi = {
           return enrichConversation(existing, userId, messages, members);
         }
       } else {
-        if (!canCreateGroupChat(user)) {
+        if (!input.allUsers && !canCreateGroupChat(user)) {
           throw new ApiError('Нет прав на создание группы', 'FORBIDDEN', 403);
         }
-        const title = input.title?.trim();
-        if (!title) throw new ApiError('Укажите название группы', 'VALIDATION', 400);
+        if (!input.allUsers) {
+          const title = input.title?.trim();
+          if (!title) throw new ApiError('Укажите название группы', 'VALIDATION', 400);
+        }
       }
 
-      for (const participantId of uniqueParticipants) {
-        await getRequesterUser(participantId);
+      // School-wide: skip per-user getOne (directory RBAC can 403 on some roles and
+      // N serial requests hang the create modal). IDs already come from list/client.
+      if (!input.allUsers) {
+        for (const participantId of uniqueParticipants) {
+          await getRequesterUser(participantId);
+        }
       }
 
       const otherId = uniqueParticipants.find((id) => id !== userId);
-      const otherUser = otherId ? await getRequesterUser(otherId) : undefined;
+      const otherUser =
+        input.type === 'personal' && otherId ? await getRequesterUser(otherId) : undefined;
       const title =
         input.type === 'personal'
           ? otherUser
             ? formatUserName(otherUser)
             : 'Личный чат'
-          : input.title!.trim();
+          : input.allUsers
+            ? input.title?.trim() || SCHOOL_WIDE_CHAT_DEFAULT_TITLE
+            : input.title!.trim();
 
-      const convRecord = await pb.collection('conversations').create({
-        type: input.type,
-        title,
-        participantIds: uniqueParticipants,
-        metadata: input.metadata ?? {},
-        pinnedMessageIds: [],
+      const avatarRef =
+        input.type !== 'personal' && input.avatarUrl?.trim()
+          ? await persistConversationAvatar(userId, input.avatarUrl)
+          : undefined;
+
+      const convRecord = await createConversationWithAvatar(
+        {
+          type: input.type,
+          title,
+          participantIds: uniqueParticipants,
+          metadata: {
+            ...(input.metadata ?? {}),
+            ...(input.allUsers ? { schoolWide: true } : {}),
+          },
+          pinnedMessageIds: [],
+        },
+        avatarRef,
+      );
+
+      // Owner first (access), then the rest in parallel — omit muted (PB bool blank issues)
+      await pb.collection('conversation_members').create({
+        conversation: convRecord.id,
+        user: userId,
+        role: 'owner',
       });
-
-      for (const participantId of uniqueParticipants) {
-        await pb.collection('conversation_members').create({
-          conversation: convRecord.id,
-          user: participantId,
-          role: participantId === userId ? 'owner' : 'member',
-          muted: false,
-        });
+      const others = uniqueParticipants.filter((id) => id !== userId);
+      const memberResults = await Promise.allSettled(
+        others.map((participantId) =>
+          pb.collection('conversation_members').create({
+            conversation: convRecord.id,
+            user: participantId,
+            role: 'member',
+          }),
+        ),
+      );
+      const memberFailures = memberResults.filter((r) => r.status === 'rejected');
+      if (memberFailures.length > 0 && memberFailures.length === others.length) {
+        throw new ApiError('Не удалось добавить участников', 'INTERNAL', 500);
       }
 
-      const conv = mapConversationRecord(convRecord);
+      if (avatarRef) {
+        const fileId = parseStoredFileRef(avatarRef);
+        if (fileId) await linkStoredFilesToContext([fileId], convRecord.id);
+      }
+
+      const conv = await resolveConversationAvatar(mapConversationRecord(convRecord));
       const members = await loadMembers(conv.id);
       chatRealtimeService.emit({ type: 'conversation.updated', conversationId: conv.id, conversation: conv });
       return enrichConversation(conv, userId, [], members);
@@ -590,11 +810,14 @@ export const pocketbaseChatApi: ChatApi = {
   async addMember(conversationId, userId, targetUserId) {
     return withPbError(async () => {
       const { user, conversation, members } = await assertConversationAccess(conversationId, userId);
-      if (!canAddMember(user, conversationId, members)) {
+      if (!canAddMember(user, conversationId, members, conversation)) {
         throw new ApiError('Нет прав на управление участниками', 'FORBIDDEN', 403);
       }
       if (conversation.type === 'personal') {
         throw new ApiError('Нельзя добавить участника в личный чат', 'VALIDATION', 400);
+      }
+      if (isSchoolWideConversation(conversation)) {
+        throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
       await getRequesterUser(targetUserId);
@@ -626,8 +849,11 @@ export const pocketbaseChatApi: ChatApi = {
   async removeMember(conversationId, userId, targetUserId) {
     return withPbError(async () => {
       const { user, conversation, members } = await assertConversationAccess(conversationId, userId);
-      if (!canRemoveMember(user, conversationId, targetUserId, members)) {
+      if (!canRemoveMember(user, conversationId, targetUserId, members, conversation)) {
         throw new ApiError('Нет прав на удаление участника', 'FORBIDDEN', 403);
+      }
+      if (isSchoolWideConversation(conversation)) {
+        throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
       const pb = getPocketBase();
@@ -683,14 +909,22 @@ export const pocketbaseChatApi: ChatApi = {
       const previousTitle = conversation.title;
       const body: Record<string, unknown> = {};
       if (input.title?.trim()) body.title = input.title.trim();
-      if (input.avatarUrl !== undefined) body.avatarUrl = input.avatarUrl;
+      if (input.avatarUrl !== undefined) {
+        const nextAvatar = await persistConversationAvatar(
+          userId,
+          input.avatarUrl ?? '',
+          conversation.avatarUrl,
+          conversationId,
+        );
+        body.avatarUrl = nextAvatar ?? '';
+      }
 
       const pb = getPocketBase();
       const record =
         Object.keys(body).length > 0
-          ? await pb.collection('conversations').update(conversationId, body)
+          ? await updateConversationWithAvatar(conversationId, body)
           : await pb.collection('conversations').getOne(conversationId);
-      const updated = mapConversationRecord(record);
+      const updated = await resolveConversationAvatar(mapConversationRecord(record));
 
       if (input.title && input.title.trim() !== previousTitle) {
         await createSystemMessage(conversationId, userId, `Название группы изменено на «${updated.title}»`, {
@@ -715,10 +949,12 @@ export const pocketbaseChatApi: ChatApi = {
 
       const pb = getPocketBase();
       const record = await pb.collection('conversation_members').update(memberRecord.id, {
-        muted: input.muted,
-        mutedUntil: input.mutedUntil ?? '',
+        // PB bool: false often stored as blank — use null to clear mute
+        muted: input.muted ? true : null,
+        mutedUntil: input.mutedUntil ?? null,
       });
       const member = mapConversationMemberRecord(record);
+      member.muted = input.muted;
       member.mutedUntil = input.mutedUntil ?? null;
       return member;
     });
@@ -766,6 +1002,60 @@ export const pocketbaseChatApi: ChatApi = {
       const messages = await loadMessagesForConversations([conversationId]);
       chatRealtimeService.emit({ type: 'conversation.updated', conversationId, conversation: updated });
       return enrichConversation(updated, userId, messages, members);
+    });
+  },
+
+  async pinConversation(conversationId, userId, pinned) {
+    return withPbError(async () => {
+      await assertConversationAccess(conversationId, userId);
+      setLocalConversationPinned(userId, conversationId, pinned);
+      const memberRecord = await findMemberRecord(conversationId, userId);
+      if (!memberRecord) throw new ApiError('Участник не найден', 'NOT_FOUND', 404);
+      const pb = getPocketBase();
+      try {
+        const record = await pb.collection('conversation_members').update(memberRecord.id, {
+          pinnedAt: pinned ? new Date().toISOString() : '',
+        });
+        const member = mapConversationMemberRecord(record);
+        member.pinnedAt = pinned ? member.pinnedAt ?? new Date().toISOString() : null;
+        return member;
+      } catch {
+        const member = mapConversationMemberRecord(memberRecord);
+        member.pinnedAt = pinned ? new Date().toISOString() : null;
+        return member;
+      }
+    });
+  },
+
+  async setMessageReaction(conversationId, messageId, userId, emoji) {
+    return withPbError(async () => {
+      await assertConversationAccess(conversationId, userId);
+      const msg = await pocketbaseChatApi.getMessage(conversationId, messageId, userId);
+      if (msg.deletedAt) throw new ApiError('Сообщение удалено', 'NOT_FOUND', 404);
+      const next = toggleReactionList(msg.reactions ?? msg.metadata?.reactions ?? [], emoji, userId);
+      const metadata = { ...msg.metadata, reactions: next };
+      const pb = getPocketBase();
+      const record = await pb.collection('messages').update(messageId, { metadata });
+      const updated = await resolveMessage(mapMessageRecord(record));
+      updated.reactions = next;
+      chatRealtimeService.emit({ type: 'message.updated', conversationId, message: updated });
+      return updated;
+    });
+  },
+
+  async forwardMessage(sourceConversationId, messageId, userId, targetConversationIds) {
+    return withPbError(async () => {
+      await assertConversationAccess(sourceConversationId, userId);
+      const source = await pocketbaseChatApi.getMessage(sourceConversationId, messageId, userId);
+      if (source.deletedAt) throw new ApiError('Сообщение удалено', 'NOT_FOUND', 404);
+      const created: Message[] = [];
+      for (const targetId of targetConversationIds) {
+        const forwarded = await pocketbaseChatApi.sendMessage(targetId, userId, source.text, {
+          attachments: source.attachments,
+        });
+        created.push(forwarded);
+      }
+      return created;
     });
   },
 

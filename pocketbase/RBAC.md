@@ -24,34 +24,36 @@ ROADMAP **1.4** · миграция `pb_migrations/1788326400_kvartira_rbac_rule
 | Lesson participant | `canViewLesson` | `student/teacher = @request.auth.id` |
 | Assignment participant | `canViewAssignment` | `student/teacher = @request.auth.id` |
 | Chat member | `canAccessConversation` | `@collection.conversation_members…` |
+| School-wide chat | `metadata.schoolWide` | list/view without prior membership; auto-join on register |
 | Own message edit | `chat:delete_message` | `sender = @request.auth.id` |
+| User directory | `getAllUsers`, `admin:users` | `USER_DIRECTORY_ACCESS` — admin · self · `role = "teacher"` · staff→student · общая группа ДЗ · общий чат |
+
+Правило `USER_DIRECTORY_ACCESS` (`kvartiraRbac.js` + миграция
+`1790313600_kvartira_narrow_user_directory.js`) заменило прежнее
+`@request.auth.id != ""`: раньше любой ученик мог выгрузить весь справочник
+школы одним запросом. Телефон и email скрыты в `pb_hooks/users.pb.js`
+независимо от правила.
 
 ## Коллекции
 
 | Collection | list/view | create | update | delete |
 |------------|-----------|--------|--------|--------|
-| `users` | auth (`lessons/chat UI`) | public (register hook) | self · admin; **роль** только admin, student↔teacher | superuser |
+| `users` | admin · self · teacher (public) · staff→students · со-участники группы ДЗ / чата | public (register hook) | self · admin; **роль** только admin, student↔teacher | self (152-ФЗ ст. 21) · superuser |
 | `directions` | public | admin | admin | admin |
 | `teacher_availability` | auth (booking) · owner · admin | teacher own · admin | teacher own · admin | teacher own · admin |
 | `lessons` | participant · admin | student own · admin | participant · admin | participant · admin |
 | `lesson_history` | lesson participant · admin | auth | admin | admin |
-| `conversations` | member · admin | auth | member · admin | owner · admin |
+| `conversations` | member · admin · **schoolWide** | auth | member · admin | owner · admin |
 | `conversation_members` | member · self · admin | auth | self · admin | self · owner/admin of conv · admin |
 | `messages` | conv member · admin | member | sender · admin | sender · admin |
 | `events` | public (adapter hides `invited`) | teacher · admin | teacher · admin | teacher · admin |
 | `event_registrations` | own · admin | own · admin | own · admin | own · admin |
 | `assignments` | group members · general · teacher · admin | teacher · admin | teacher · admin | teacher · admin |
 | `assignment_groups` | members · general · teacher · admin | teacher · admin | owner teacher · admin | owner teacher · admin |
-| `skills` | auth | teacher · admin | teacher · admin | admin |
-| `student_skill_progress` | student · teacher · admin | teacher · admin | teacher · admin | admin |
-| `progress_goals` | student · teacher · admin | teacher · admin | teacher · admin | teacher · admin |
-| `progress_history` | student · teacher · admin | own · teacher · admin | admin | admin |
-| `achievement_definitions` | auth | admin | admin | admin |
-| `user_achievements` | student · teacher · admin | own · teacher · admin | admin | admin |
 | `help_articles` | public (`support:view-faq`) | admin (`support:manage-faq`) | admin | admin |
 | `support_tickets` | own · admin | auth own | own · admin | admin |
 | `legal_documents` | public | admin (`legal:manage`) | admin | admin |
-| `user_consents` | own · admin | own · admin | admin | admin |
+| `user_consents` | own · admin | own · admin | **никто** (только `POST /api/kvartira/consents/revoke`) | admin |
 | `security_sessions` | own · admin | auth | own · admin | own · admin |
 | `login_history` | own · admin | auth (hooks) | admin | admin |
 | `security_alerts` | own · admin | auth (hooks) | own · admin | admin |

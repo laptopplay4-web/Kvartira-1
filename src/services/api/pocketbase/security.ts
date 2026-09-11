@@ -8,6 +8,7 @@ import {
   mapLoginHistoryRecord,
   mapSecurityAlertRecord,
   mapSecuritySessionRecord,
+  getSecuritySessionTokenFingerprint,
   mapUserRecord,
 } from '@/services/api/pocketbase/mappers';
 import {
@@ -20,8 +21,9 @@ import {
   resolveSecuritySessions,
   sortLoginHistoryByDate,
 } from '@/services/security/helpers';
+import { fingerprintAuthToken } from '@/services/security/sessionFingerprint';
 import { MIN_PASSWORD_LENGTH } from '@/services/security/constants';
-import type { SecurityOverview, User } from '@/types';
+import type { SecurityOverview, SecuritySession, User } from '@/types';
 
 async function getRequesterUser(userId: string): Promise<User> {
   const pb = getPocketBase();
@@ -74,6 +76,24 @@ async function createSecurityNotification(
   });
 }
 
+async function mapSessionsForViewer(
+  records: Parameters<typeof mapSecuritySessionRecord>[0][],
+  currentToken?: string,
+): Promise<SecuritySession[]> {
+  const currentFingerprint = currentToken ? await fingerprintAuthToken(currentToken) : '';
+  const mapped = records.map((record) => {
+    const session = mapSecuritySessionRecord(record);
+    const fingerprint = getSecuritySessionTokenFingerprint(record);
+    return {
+      ...session,
+      isCurrent: currentFingerprint
+        ? fingerprint !== '' && fingerprint === currentFingerprint
+        : session.isCurrent,
+    };
+  });
+  return resolveSecuritySessions(mapped);
+}
+
 export const pocketbaseSecurityApi: SecurityApi = {
   async getOverview(requesterId) {
     return withPbError(async () => {
@@ -88,7 +108,7 @@ export const pocketbaseSecurityApi: SecurityApi = {
       ]);
 
       const loginEntries = history.map(mapLoginHistoryRecord);
-      const sessionsResolved = resolveSecuritySessions(sessions.map(mapSecuritySessionRecord));
+      const sessionsResolved = await mapSessionsForViewer(sessions);
       const overview: SecurityOverview = {
         activeSessions: sessionsResolved.length,
         lastLoginAt: getLastSuccessfulLogin(loginEntries),
@@ -130,7 +150,7 @@ export const pocketbaseSecurityApi: SecurityApi = {
     });
   },
 
-  async getSessions(requesterId, _currentToken) {
+  async getSessions(requesterId, currentToken) {
     return withPbError(async () => {
       const user = await getRequesterUser(requesterId);
       assertViewAccess(requesterId, user);
@@ -140,11 +160,11 @@ export const pocketbaseSecurityApi: SecurityApi = {
         filter: userFilter(requesterId),
         sort: '-lastActiveAt',
       });
-      return resolveSecuritySessions(records.map(mapSecuritySessionRecord));
+      return mapSessionsForViewer(records, currentToken);
     });
   },
 
-  async revokeSession(sessionId, requesterId, _currentToken) {
+  async revokeSession(sessionId, requesterId, currentToken) {
     return withPbError(async () => {
       const user = await getRequesterUser(requesterId);
       if (!canManageSessions(user, requesterId)) {
@@ -162,9 +182,8 @@ export const pocketbaseSecurityApi: SecurityApi = {
         throw error;
       }
 
-      const sessions = resolveSecuritySessions([mapSecuritySessionRecord(record)]);
-      const session = sessions[0];
-      if (session.userId !== requesterId) {
+      const [session] = await mapSessionsForViewer([record], currentToken);
+      if (!session || session.userId !== requesterId) {
         throw new ApiError('Сессия не найдена', 'NOT_FOUND', 404);
       }
       if (session.isCurrent) {
@@ -175,7 +194,7 @@ export const pocketbaseSecurityApi: SecurityApi = {
     });
   },
 
-  async revokeAllOtherSessions(requesterId, _currentToken) {
+  async revokeAllOtherSessions(requesterId, currentToken) {
     return withPbError(async () => {
       const user = await getRequesterUser(requesterId);
       if (!canManageSessions(user, requesterId)) {
@@ -187,7 +206,7 @@ export const pocketbaseSecurityApi: SecurityApi = {
         filter: userFilter(requesterId),
         sort: '-lastActiveAt',
       });
-      const sessions = resolveSecuritySessions(records.map(mapSecuritySessionRecord));
+      const sessions = await mapSessionsForViewer(records, currentToken);
 
       for (const session of sessions) {
         if (!session.isCurrent) {

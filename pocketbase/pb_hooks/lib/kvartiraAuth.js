@@ -8,6 +8,10 @@
 
 const PHONE_REGEX = /^\+79\d{9}$/;
 const MAX_LOGIN_HISTORY = 100;
+/** Failed attempts per user+IP allowed inside the window before a 429. */
+const MAX_FAILED_LOGINS = 10;
+const LOGIN_THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_THROTTLE_LOOKBACK = 50;
 const FAILED_LOGIN_TITLE = 'Неудачная попытка входа';
 const FAILED_LOGIN_MESSAGE =
   'Кто-то пытался войти в аккаунт с неверным паролем.';
@@ -69,6 +73,32 @@ function getClientIp(e) {
 }
 
 /**
+ * @param {string} ua
+ * @returns {string}
+ */
+function detectBrowserName(ua) {
+  if (/Edg\//i.test(ua)) return 'Edge';
+  if (/OPR\/|Opera/i.test(ua)) return 'Opera';
+  if (/Firefox\//i.test(ua)) return 'Firefox';
+  if (/Chrome\//i.test(ua) || /CriOS\//i.test(ua)) return 'Chrome';
+  if (/Safari\//i.test(ua)) return 'Safari';
+  return 'Browser';
+}
+
+/**
+ * @param {string} ua
+ * @returns {string}
+ */
+function detectOsName(ua) {
+  if (/Windows/i.test(ua)) return 'Windows';
+  if (/Android/i.test(ua)) return 'Android';
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS';
+  if (/Mac OS X|Macintosh/i.test(ua)) return 'macOS';
+  if (/Linux/i.test(ua)) return 'Linux';
+  return '';
+}
+
+/**
  * @param {AuthEvent} e
  * @returns {string}
  */
@@ -76,13 +106,10 @@ function getDeviceLabel(e) {
   const info = getRequestInfoSafe(e);
   const headers = (info && info.headers) || {};
   const ua = headers['user-agent'] || headers['User-Agent'] || '';
-  if (!ua) return 'Unknown device';
-  if (/Windows/i.test(ua)) return 'Browser · Windows';
-  if (/Mac OS X|Macintosh/i.test(ua)) return 'Browser · macOS';
-  if (/Android/i.test(ua)) return 'Browser · Android';
-  if (/iPhone|iPad/i.test(ua)) return 'Browser · iOS';
-  if (/Linux/i.test(ua)) return 'Browser · Linux';
-  return 'Browser';
+  if (!ua) return 'Неизвестное устройство';
+  const browser = detectBrowserName(ua);
+  const os = detectOsName(ua);
+  return os ? `${browser} · ${os}` : browser;
 }
 
 /**
@@ -177,13 +204,68 @@ function isValidPhone(phone) {
   return PHONE_REGEX.test(normalizePhone(phone));
 }
 
+/**
+ * Throttle password guessing.
+ *
+ * `login_history` already records every failed attempt with the user and the
+ * client IP, so it doubles as the counter — no extra collection, and the limit
+ * survives a PocketBase restart. Successful logins reset the window because the
+ * lookup only counts rows newer than the last success.
+ *
+ * @param {import('pocketbase').PocketBase} app
+ * @param {string} userId
+ * @param {AuthEvent} e
+ * @throws {ApiError} 429 once the limit is reached
+ */
+function assertLoginNotThrottled(app, userId, e) {
+  if (!userId) return;
+
+  const since = new Date(Date.now() - LOGIN_THROTTLE_WINDOW_MS)
+    .toISOString()
+    .replace('T', ' ')
+    .replace(/\..+$/, 'Z');
+
+  /** @type {Record[]} */
+  let recent = [];
+  try {
+    recent =
+      app.findRecordsByFilter(
+        'login_history',
+        'user = {:userId} && created >= {:since}',
+        '-created',
+        LOGIN_THROTTLE_LOOKBACK,
+        0,
+        { userId, since },
+      ) || [];
+  } catch (_) {
+    // Never lock people out because the counter itself failed.
+    return;
+  }
+
+  const ip = getClientIp(e);
+  let failures = 0;
+
+  for (const row of recent) {
+    // A success inside the window clears the streak.
+    if (row.getBool('success')) break;
+    if (row.getString('ipAddress') === ip) failures += 1;
+  }
+
+  if (failures >= MAX_FAILED_LOGINS) {
+    throw new ApiError(429, 'Слишком много попыток входа. Повторите через 15 минут.');
+  }
+}
+
 module.exports = {
   normalizePhone,
   phoneToEmail,
   getClientIp,
   getDeviceLabel,
   recordLoginAttempt,
+  assertLoginNotThrottled,
   pushSecurityAlert,
   isValidPhone,
   PHONE_REGEX,
+  MAX_FAILED_LOGINS,
+  LOGIN_THROTTLE_WINDOW_MS,
 };

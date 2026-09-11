@@ -7,6 +7,8 @@ import {
   SCHOOL_SOCIAL_LINK_KEYS,
   SCHOOL_SOCIAL_LINK_LABELS,
 } from '@/services/school/constants';
+import type { RegistrationInviteSecret } from '@/services/registration/invite';
+import { extractRegistrationInviteFromContacts } from '@/services/registration/invite';
 
 const URL_PATTERN = /^https?:\/\/.+/i;
 
@@ -109,15 +111,17 @@ export function parseSchoolDirectionsVideo(value: unknown): SchoolDirectionsVide
 }
 
 /**
- * PB payload: socialLinks + directionsVideo живут внутри contacts JSON,
+ * PB payload: socialLinks + directionsVideo + registrationInvite живут внутри contacts JSON,
  * чтобы работать даже без отдельных полей коллекции (миграция не применена).
+ * registrationInvite не попадает в PublicSchoolInfo — только admin API / PB hook.
  */
 export function buildSchoolContactsPayload(input: {
   contacts: PublicContactInfo;
   socialLinks: SchoolSocialLinks;
   directionsVideo?: SchoolDirectionsVideo;
+  registrationInvite?: RegistrationInviteSecret | null;
 }): Record<string, unknown> {
-  return {
+  const payload: Record<string, unknown> = {
     phone: input.contacts.phone,
     email: input.contacts.email,
     address: input.contacts.address,
@@ -125,14 +129,25 @@ export function buildSchoolContactsPayload(input: {
     socialLinks: normalizeSchoolSocialLinks(input.socialLinks),
     directionsVideo: input.directionsVideo ?? null,
   };
+  if (input.registrationInvite?.token) {
+    payload.registrationInvite = {
+      token: input.registrationInvite.token,
+      rotatedAt: input.registrationInvite.rotatedAt,
+    };
+  }
+  return payload;
 }
 
 export function extractSchoolExtrasFromContacts(contactsRaw: unknown): {
   socialLinks: SchoolSocialLinks;
   directionsVideo?: SchoolDirectionsVideo;
+  registrationInvite: RegistrationInviteSecret | null;
 } {
   const obj = coerceJsonObject(contactsRaw);
   const socialLinks = normalizeSchoolSocialLinks(obj?.socialLinks);
   const directionsVideo = parseSchoolDirectionsVideo(obj?.directionsVideo);
-  return directionsVideo ? { socialLinks, directionsVideo } : { socialLinks };
+  const registrationInvite = extractRegistrationInviteFromContacts(contactsRaw);
+  return directionsVideo
+    ? { socialLinks, directionsVideo, registrationInvite }
+    : { socialLinks, registrationInvite };
 }

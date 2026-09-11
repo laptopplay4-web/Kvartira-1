@@ -6,9 +6,9 @@ import { useWebPush } from '@/hooks/useWebPush';
 import { useThemePreference } from '@/hooks/useThemePreference';
 import { THEME_OPTIONS } from '@/services/theme/constants';
 import { api } from '@/services/api';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Toggle } from '@/components/ui/Toggle';
 
@@ -49,20 +49,13 @@ export default function SystemSettingsPage() {
         <h2 className="mb-3 text-label">Оформление</h2>
         <Card className="space-y-3">
           <p className="text-body-sm text-text-secondary">Тема интерфейса</p>
-          <div className="flex flex-wrap gap-2">
-            {THEME_OPTIONS.map(({ value, label }) => (
-              <Button
-                key={value}
-                type="button"
-                size="sm"
-                variant={themePreference === value ? 'primary' : 'secondary'}
-                onClick={() => setThemePreference(value)}
-                aria-pressed={themePreference === value}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
+          <SegmentedControl
+            aria-label="Тема интерфейса"
+            size="sm"
+            value={themePreference}
+            options={THEME_OPTIONS}
+            onChange={setThemePreference}
+          />
         </Card>
       </section>
 

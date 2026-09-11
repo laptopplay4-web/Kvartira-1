@@ -1,5 +1,6 @@
 import { cn } from '@/utils';
 import { formatFileSize } from '@/services/chat/attachments';
+import { downloadFromUrl } from '@/utils/files';
 import type { MessageAttachment } from '@/types';
 import { FileText, Film, Image as ImageIcon } from 'lucide-react';
 import { AudioPlayer } from '@/components/ui/AudioPlayer';
@@ -63,12 +64,14 @@ function AttachmentItem({ attachment, isOwn }: { attachment: MessageAttachment; 
   const Icon = attachment.type === 'video' ? Film : FileText;
 
   return (
-    <a
-      href={attachment.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <button
+      type="button"
+      onClick={() => {
+        if (!attachment.url) return;
+        void downloadFromUrl(attachment.url, attachment.filename);
+      }}
       className={cn(
-        'flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors hover:bg-surface',
+        'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-surface focus-ring',
         isOwn ? 'border-brand-contrast/20' : 'border-border-subtle',
       )}
     >
@@ -77,6 +80,6 @@ function AttachmentItem({ attachment, isOwn }: { attachment: MessageAttachment; 
         <p className="truncate text-sm font-medium">{attachment.filename}</p>
         <p className="text-caption opacity-70">{formatFileSize(attachment.size)}</p>
       </div>
-    </a>
+    </button>
   );
 }

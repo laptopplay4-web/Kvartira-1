@@ -1,10 +1,11 @@
 import type { CalendarViewMode } from '@/utils/calendarRanges';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { cn } from '@/utils';
 
-const VIEWS: { id: CalendarViewMode; label: string }[] = [
-  { id: 'day', label: 'День' },
-  { id: 'week', label: 'Неделя' },
-  { id: 'month', label: 'Месяц' },
+const VIEWS: { value: CalendarViewMode; label: string }[] = [
+  { value: 'day', label: 'День' },
+  { value: 'week', label: 'Неделя' },
+  { value: 'month', label: 'Месяц' },
 ];
 
 interface CalendarViewSwitcherProps {
@@ -15,26 +16,12 @@ interface CalendarViewSwitcherProps {
 
 export function CalendarViewSwitcher({ view, onChange, className }: CalendarViewSwitcherProps) {
   return (
-    <div
-      className={cn('flex gap-1 rounded-xl border border-border-subtle bg-surface p-1', className)}
-      role="tablist"
+    <SegmentedControl
+      className={cn('w-full sm:w-auto', className)}
       aria-label="Режим календаря"
-    >
-      {VIEWS.map((v) => (
-        <button
-          key={v.id}
-          type="button"
-          role="tab"
-          aria-selected={view === v.id}
-          onClick={() => onChange(v.id)}
-          className={cn(
-            'min-h-11 flex-1 rounded-lg px-3 py-2 text-sm font-medium focus-ring sm:flex-none sm:px-4',
-            view === v.id ? 'bg-brand-muted text-brand' : 'text-text-muted hover:bg-surface-elevated',
-          )}
-        >
-          {v.label}
-        </button>
-      ))}
-    </div>
+      value={view}
+      options={VIEWS}
+      onChange={onChange}
+    />
   );
 }

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Minus, Plus, Users } from 'lucide-react';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
-import { getRoleLabel } from '@/permissions';
+import { getRoleLabel, getRoleBadgeVariant } from '@/permissions';
 import { canToggleUserStaffRole } from '@/services/users/access';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
@@ -13,18 +13,14 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AdminPageHeader } from '@/components/ui/AdminPageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
 import { formatUserName } from '@/utils';
 import type { User, UserRole } from '@/types';
-
-const ROLE_VARIANT: Record<UserRole, 'default' | 'brand' | 'info' | 'warning'> = {
-  student: 'info',
-  teacher: 'brand',
-  admin: 'warning',
-};
 
 const SECTION_ORDER: UserRole[] = ['admin', 'teacher', 'student'];
 
@@ -89,20 +85,22 @@ export default function AdminUsersPage() {
 
     return (
       <Card key={user.id} className="flex items-center gap-3">
-        <Avatar
-          src={user.avatarUrl}
-          firstName={user.firstName}
-          lastName={user.lastName}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate font-medium">{formatUserName(user)}</p>
-            <Badge variant={ROLE_VARIANT[user.role]} className="shrink-0">
-              {getRoleLabel(user.role)}
-            </Badge>
+        <UserPreviewTrigger user={user} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-0">
+          <Avatar
+            src={user.avatarUrl}
+            firstName={user.firstName}
+            lastName={user.lastName}
+          />
+          <div className="min-w-0 flex-1 text-left">
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="truncate font-medium">{formatUserName(user)}</p>
+              <Badge variant={getRoleBadgeVariant(user.role)} className="shrink-0">
+                {getRoleLabel(user.role)}
+              </Badge>
+            </div>
+            <p className="text-caption">{user.phone}</p>
           </div>
-          <p className="text-caption">{user.phone}</p>
-        </div>
+        </UserPreviewTrigger>
         {showDemote && (
           <Button
             type="button"
@@ -153,17 +151,14 @@ export default function AdminUsersPage() {
                 {getRoleLabel(role)} ({grouped[role].length})
               </h2>
               {role === 'teacher' && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
+                <IconButton
+                  label="Добавить преподавателя"
                   className={rolePromoteButtonClassName}
                   disabled={!isOnline || grouped.student.length === 0}
                   onClick={() => setPromoteModalOpen(true)}
-                  aria-label="Добавить преподавателя"
                 >
                   <Plus className="h-5 w-5" aria-hidden />
-                </Button>
+                </IconButton>
               )}
             </div>
             <div className="space-y-2">

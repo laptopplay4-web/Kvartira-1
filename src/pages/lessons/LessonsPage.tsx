@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { BookLessonLink } from '@/components/ui/BookLessonLink';
 import { LessonCalendar } from '@/components/calendar/LessonCalendar';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { cn } from '@/utils';
 
 type PageView = 'calendar' | 'list';
@@ -26,6 +27,11 @@ const HISTORY_FILTERS: { id: HistoryFilter; label: string; statuses: LessonStatu
   { id: 'rescheduled', label: 'Перенесены', statuses: ['rescheduled'] },
   { id: 'no_show', label: 'Не состоялись', statuses: ['no_show'] },
 ];
+
+const HISTORY_SEGMENT_OPTIONS = HISTORY_FILTERS.map(({ id, label }) => ({
+  value: id,
+  label,
+}));
 
 export default function LessonsPage() {
   const user = useCurrentUser()!;
@@ -185,24 +191,14 @@ export default function LessonsPage() {
 
       <section>
         <h2 className="mb-3 text-label">История</h2>
-        <div className="mb-4 flex flex-wrap gap-2">
-          {HISTORY_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setHistoryFilter(f.id)}
-              aria-pressed={historyFilter === f.id}
-              className={cn(
-                'min-h-11 rounded-lg px-3 py-1.5 text-sm focus-ring',
-                historyFilter === f.id
-                  ? 'bg-brand-muted text-brand'
-                  : 'bg-surface-elevated text-text-muted hover:text-text-secondary',
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          className="mb-4 w-max max-w-full"
+          aria-label="Фильтр истории занятий"
+          size="sm"
+          value={historyFilter}
+          options={HISTORY_SEGMENT_OPTIONS}
+          onChange={setHistoryFilter}
+        />
         {isLoading ? (
           <LessonCardSkeleton />
         ) : past && past.length > 0 ? (

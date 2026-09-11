@@ -47,8 +47,6 @@ export function passwordForPhone(phone: string): string {
   return 'password';
 }
 
-export { toPbSkillLevel } from '../../src/services/progress/skillLevel';
-
 export function remapLink(link: string | undefined, ids: IdMap): string | undefined {
   if (!link) return link;
   return link.replace(

@@ -152,6 +152,10 @@ describe('admin shell routes', () => {
     expect(screen.getByRole('link', { name: /Расписание/ })).toHaveAttribute('href', '/admin/schedule');
     expect(screen.getByRole('link', { name: /Пользователи/ })).toHaveAttribute('href', '/admin/users');
     expect(screen.queryByRole('link', { name: /Мероприятия/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Направления/ })).toHaveAttribute(
+      'href',
+      '/admin/directions',
+    );
     expect(screen.getByRole('link', { name: /Школа/ })).toHaveAttribute('href', '/admin/school');
     expect(screen.getByRole('link', { name: /Документы/ })).toHaveAttribute('href', '/admin/legal');
   });

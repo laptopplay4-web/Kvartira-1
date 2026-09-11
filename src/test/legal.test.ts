@@ -9,7 +9,10 @@ import {
 import {
   countPendingConsents,
   bumpLegalVersion,
+  getGuardianConsentDocument,
+  getOptionalConsentDocuments,
   getPendingConsents,
+  getRequiredConsentDocuments,
   hasCurrentConsent,
   sortDocumentsByType,
 } from '@/services/legal/helpers';
@@ -102,7 +105,7 @@ describe('legal api', () => {
 
   it('returns all documents publicly', async () => {
     const docs = await api.getDocuments();
-    expect(docs).toHaveLength(4);
+    expect(docs).toHaveLength(initialLegalDocuments.length);
   });
 
   it('returns document by id', async () => {
@@ -126,9 +129,73 @@ describe('legal api', () => {
     const freshDb = createTestDb();
     freshDb.userConsents = [];
     const freshApi = createMockLegalApi(freshDb, async () => {});
-    const required = initialLegalDocuments.filter((d) => d.requiresConsent).map((d) => d.id);
+    const required = getRequiredConsentDocuments(initialLegalDocuments).map((d) => d.id);
     const consents = await freshApi.acceptDocuments(required, otherStudent.id);
-    expect(consents).toHaveLength(3);
+    expect(consents).toHaveLength(required.length);
+    expect(consents.every((c) => c.purpose === 'service')).toBe(true);
+  });
+
+  it('records the legal representative on a guardian consent', async () => {
+    const freshDb = createTestDb();
+    freshDb.userConsents = [];
+    const freshApi = createMockLegalApi(freshDb, async () => {});
+    const guardianDoc = getGuardianConsentDocument(initialLegalDocuments)!;
+
+    await expect(
+      freshApi.acceptDocument(guardianDoc.id, otherStudent.id),
+    ).rejects.toBeInstanceOf(ApiError);
+
+    const consent = await freshApi.acceptDocument(guardianDoc.id, otherStudent.id, {
+      guardian: { fullName: 'Иванова Мария Петровна', phone: '+79001112233', relation: 'мама' },
+    });
+    expect(consent.purpose).toBe('minor_guardian');
+    expect(consent.guardian?.fullName).toBe('Иванова Мария Петровна');
+  });
+
+  it('keeps optional and guardian consents out of the pending list', async () => {
+    const freshDb = createTestDb();
+    freshDb.userConsents = [];
+    const freshApi = createMockLegalApi(freshDb, async () => {});
+
+    const pending = await freshApi.getPendingConsents(otherStudent.id);
+    expect(pending.every((doc) => doc.purpose === 'service')).toBe(true);
+  });
+
+  it('revokes an optional consent but refuses to revoke the service one', async () => {
+    const freshDb = createTestDb();
+    freshDb.userConsents = [];
+    const freshApi = createMockLegalApi(freshDb, async () => {});
+
+    const optional = getOptionalConsentDocuments(initialLegalDocuments)[0];
+    const accepted = await freshApi.acceptDocument(optional.id, otherStudent.id);
+    const revoked = await freshApi.revokeConsent(accepted.id, otherStudent.id);
+    expect(revoked.revokedAt).toBeTruthy();
+
+    const serviceDoc = getRequiredConsentDocuments(initialLegalDocuments)[0];
+    const serviceConsent = await freshApi.acceptDocument(serviceDoc.id, otherStudent.id);
+    await expect(
+      freshApi.revokeConsent(serviceConsent.id, otherStudent.id),
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('splits required, optional and guardian documents by purpose', () => {
+    const required = getRequiredConsentDocuments(initialLegalDocuments);
+    const optional = getOptionalConsentDocuments(initialLegalDocuments);
+    const guardian = getGuardianConsentDocument(initialLegalDocuments);
+
+    expect(required.every((doc) => doc.purpose === 'service')).toBe(true);
+    expect(optional.every((doc) => doc.purpose === 'communication' || doc.purpose === 'publication')).toBe(
+      true,
+    );
+    expect(guardian?.purpose).toBe('minor_guardian');
+    expect(optional.some((doc) => doc.id === guardian?.id)).toBe(false);
+  });
+
+  it('ships full template texts marked for lawyer review', () => {
+    for (const doc of initialLegalDocuments) {
+      expect(doc.content).toContain('Шаблон. Проверить у юриста');
+      expect(doc.content.length).toBeGreaterThan(200);
+    }
   });
 
   it('rejects accept for non-consent document', async () => {

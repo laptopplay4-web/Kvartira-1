@@ -1,5 +1,6 @@
 import { Download, X } from 'lucide-react';
 import { Button } from './Button';
+import { IconButton } from './IconButton';
 
 interface PwaInstallBannerProps {
   onInstall: () => void;
@@ -12,7 +13,7 @@ export function PwaInstallBanner({ onInstall, onDismiss, installing }: PwaInstal
     <div
       role="region"
       aria-label="Установка приложения"
-      className="border-t border-border bg-surface-elevated px-4 py-3 shadow-md"
+      className="glass-card border-t border-white/10 px-4 py-3 shadow-2xl"
     >
       <div className="mx-auto flex max-w-lg items-start gap-3">
         <Download className="mt-0.5 h-5 w-5 shrink-0 text-brand" aria-hidden />
@@ -30,14 +31,9 @@ export function PwaInstallBanner({ onInstall, onDismiss, installing }: PwaInstal
             </Button>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="focus-ring min-h-11 min-w-11 shrink-0 rounded-lg p-2 text-text-muted hover:bg-surface-hover hover:text-text-primary"
-          aria-label="Закрыть"
-        >
+        <IconButton label="Закрыть" size="sm" onClick={onDismiss} className="shrink-0">
           <X className="h-5 w-5" aria-hidden />
-        </button>
+        </IconButton>
       </div>
     </div>
   );

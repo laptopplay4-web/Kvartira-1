@@ -25,24 +25,20 @@ export function getLastSuccessfulLogin(entries: LoginHistoryEntry[]): string | u
   return success?.createdAt;
 }
 
-/** Ensures exactly one current session (fixes PB bool / duplicate isCurrent). */
+/**
+ * Keeps every login session (multi-device) and normalizes exactly one `isCurrent`.
+ * Prefer an already flagged current session; if several/none — most recently active.
+ */
 export function resolveSecuritySessions(sessions: SecuritySession[]): SecuritySession[] {
   if (sessions.length === 0) return [];
 
-  const byDevice = new Map<string, SecuritySession>();
-  for (const session of sessions) {
-    const existing = byDevice.get(session.deviceLabel);
-    if (!existing || session.lastActiveAt.localeCompare(existing.lastActiveAt) > 0) {
-      byDevice.set(session.deviceLabel, session);
-    }
-  }
-
-  const sorted = [...byDevice.values()].sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+  const sorted = [...sessions].sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
   const flaggedCurrent = sorted.filter((session) => session.isCurrent);
   const currentId =
     flaggedCurrent.length === 1
       ? flaggedCurrent[0].id
-      : sorted[0]?.id;
+      : flaggedCurrent.sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt))[0]?.id ??
+        sorted[0]?.id;
 
   return sorted.map((session) => ({
     ...session,

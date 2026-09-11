@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/utils';
 
 interface CalendarNavProps {
@@ -15,16 +16,9 @@ export function CalendarNav({ onPrev, onNext, onToday, title, className }: Calen
     <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between', className)}>
       <h2 className="text-h3 capitalize">{title}</h2>
       <div className="flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onPrev}
-          aria-label="Предыдущий период"
-          className="min-h-11 min-w-11"
-        >
+        <IconButton label="Предыдущий период" onClick={onPrev}>
           <ChevronLeft className="h-5 w-5" aria-hidden />
-        </Button>
+        </IconButton>
         <Button
           type="button"
           variant="secondary"
@@ -34,16 +28,9 @@ export function CalendarNav({ onPrev, onNext, onToday, title, className }: Calen
         >
           Сегодня
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onNext}
-          aria-label="Следующий период"
-          className="min-h-11 min-w-11"
-        >
+        <IconButton label="Следующий период" onClick={onNext}>
           <ChevronRight className="h-5 w-5" aria-hidden />
-        </Button>
+        </IconButton>
       </div>
     </div>
   );

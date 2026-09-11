@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
-import { Copy, Pencil, Reply, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import type { Message, User } from '@/types';
-import { canDeleteMessage, canEditMessage } from '@/services/chat/messages';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Copy, Forward, Pencil, Pin, Reply, SmilePlus, Trash2 } from 'lucide-react';
+import { cn } from '@/utils';
+import type { Conversation, ConversationMember, Message, User } from '@/types';
+import { canDeleteMessage, canEditMessage, canPinMessage } from '@/services/chat/messages';
+import { QUICK_REACTION_EMOJIS } from '@/services/chat/constants';
 
 interface MessageActionsProps {
   message: Message;
@@ -13,8 +15,19 @@ interface MessageActionsProps {
   onReply: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onForward?: () => void;
+  onReact?: (emoji: string) => void;
+  onPin?: () => void;
+  conversation?: Conversation | null;
+  members?: ConversationMember[];
   anchorRef: React.RefObject<HTMLElement | null>;
+  /** @deprecated glass popup is always used */
+  preferSheet?: boolean;
 }
+
+const MORE_EMOJIS = ['🔥', '👏', '🎉', '💯', '👀', '🙌', '😎', '🤔', '😭', '😡', '🤝', '✅'];
+
+const PANEL_WIDTH = 280;
 
 export function MessageActions({
   message,
@@ -25,108 +38,223 @@ export function MessageActions({
   onReply,
   onEdit,
   onDelete,
+  onForward,
+  onReact,
+  onPin,
+  conversation,
+  members = [],
   anchorRef,
 }: MessageActionsProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        menuRef.current?.contains(e.target as Node) ||
-        anchorRef.current?.contains(e.target as Node)
-      ) {
-        return;
-      }
-      onClose();
-    };
-    const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('keydown', keyHandler);
-    return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('keydown', keyHandler);
-    };
-  }, [open, onClose, anchorRef]);
-
-  if (!open || message.messageType === 'system') return null;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [moreReactions, setMoreReactions] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; placeAbove: boolean } | null>(
+    null,
+  );
 
   const showEdit = isOwn && canEditMessage(user, message);
-  const showDelete = canDeleteMessage(user, message);
+  const showDelete = canDeleteMessage(user, message, conversation);
+  const showPin =
+    !!onPin &&
+    !!conversation &&
+    canPinMessage(user, members, conversation.id) &&
+    !message.deletedAt;
+  const isPinned = !!conversation?.pinnedMessageIds?.includes(message.id);
 
-  const handleCopy = async () => {
-    if (message.deletedAt) return;
-    try {
-      await navigator.clipboard.writeText(message.text);
-    } catch {
-      /* ignore */
+  const items = useMemo(() => {
+    if (!open || message.messageType === 'system') return [];
+
+    const list = [
+      {
+        id: 'reply',
+        label: 'Ответить',
+        icon: <Reply className="h-4 w-4" aria-hidden />,
+        onSelect: onReply,
+      },
+      {
+        id: 'forward',
+        label: 'Переслать',
+        icon: <Forward className="h-4 w-4" aria-hidden />,
+        onSelect: () => onForward?.(),
+        disabled: !onForward || !!message.deletedAt,
+      },
+      {
+        id: 'copy',
+        label: 'Копировать',
+        icon: <Copy className="h-4 w-4" aria-hidden />,
+        onSelect: async () => {
+          if (message.deletedAt) return;
+          try {
+            await navigator.clipboard.writeText(message.text);
+          } catch {
+            /* ignore */
+          }
+        },
+        disabled: !!message.deletedAt || !message.text,
+      },
+      {
+        id: 'pin',
+        label: isPinned ? 'Открепить' : 'Закрепить',
+        icon: <Pin className="h-4 w-4" aria-hidden />,
+        onSelect: () => onPin?.(),
+        disabled: !showPin,
+      },
+      {
+        id: 'edit',
+        label: 'Редактировать',
+        icon: <Pencil className="h-4 w-4" aria-hidden />,
+        onSelect: onEdit,
+        disabled: !showEdit,
+      },
+      {
+        id: 'delete',
+        label: 'Удалить',
+        icon: <Trash2 className="h-4 w-4" aria-hidden />,
+        onSelect: onDelete,
+        destructive: true,
+        disabled: !showDelete,
+      },
+    ];
+
+    return list.filter((item) => !item.disabled);
+  }, [
+    isPinned,
+    message,
+    onDelete,
+    onEdit,
+    onForward,
+    onPin,
+    onReply,
+    open,
+    showDelete,
+    showEdit,
+    showPin,
+  ]);
+
+  useLayoutEffect(() => {
+    if (!open || !anchorRef.current) {
+      setCoords(null);
+      return;
     }
-    onClose();
-  };
+    const rect = anchorRef.current.getBoundingClientRect();
+    const estimatedHeight = 320;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const placeAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+    const left = Math.min(
+      window.innerWidth - PANEL_WIDTH - 12,
+      Math.max(12, isOwn ? rect.right - PANEL_WIDTH : rect.left),
+    );
+    const top = placeAbove
+      ? Math.max(12, rect.top - 12)
+      : Math.min(window.innerHeight - 24, rect.bottom + 10);
+    setCoords({ top, left, placeAbove });
+  }, [open, anchorRef, isOwn, items.length, moreReactions]);
 
-  const actions = [
-    { label: 'Ответить', icon: Reply, onClick: () => { onReply(); onClose(); } },
-    { label: 'Копировать', icon: Copy, onClick: handleCopy, hidden: !!message.deletedAt },
-    { label: 'Редактировать', icon: Pencil, onClick: () => { onEdit(); onClose(); }, hidden: !showEdit },
-    { label: 'Удалить', icon: Trash2, onClick: () => { onDelete(); onClose(); }, hidden: !showDelete, danger: true },
-  ].filter((a) => !a.hidden);
+  useEffect(() => {
+    if (!open) {
+      setMoreReactions(false);
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (panelRef.current?.contains(target)) return;
+      onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer, true);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer, true);
+    };
+  }, [open, onClose]);
 
-  return (
-    <>
-      {/* Desktop contextual menu */}
+  if (!open || message.messageType === 'system' || !coords) return null;
+
+  const emojis = moreReactions ? [...QUICK_REACTION_EMOJIS, ...MORE_EMOJIS] : [...QUICK_REACTION_EMOJIS];
+
+  return createPortal(
+    <div className="fixed inset-0 z-sheet pointer-events-none" aria-hidden={false}>
       <div
-        ref={menuRef}
-        role="menu"
-        className="absolute z-20 hidden min-w-[160px] rounded-xl border border-border-subtle bg-surface-elevated py-1 shadow-lg md:block"
-        style={{ top: '100%', right: isOwn ? 0 : 'auto', left: isOwn ? 'auto' : 0 }}
-      >
-        {actions.map((action) => (
-          <button
-            key={action.label}
-            type="button"
-            role="menuitem"
-            onClick={action.onClick}
-            className={`flex w-full items-center gap-2 px-3 py-2.5 text-sm hover:bg-surface focus-ring min-h-[44px] ${
-              action.danger ? 'text-danger' : 'text-text-primary'
-            }`}
-          >
-            <action.icon className="h-4 w-4" aria-hidden />
-            {action.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Mobile bottom sheet */}
+        className="pointer-events-auto absolute inset-0 glass-scrim motion-safe:animate-fade-in"
+        onClick={() => {
+          setMoreReactions(false);
+          onClose();
+        }}
+      />
       <div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:hidden"
+        ref={panelRef}
         role="dialog"
-        aria-modal
-        onClick={onClose}
+        aria-label="Действия с сообщением"
+        className={cn(
+          'pointer-events-auto absolute w-[min(280px,calc(100vw-24px))] overflow-hidden glass-popup',
+          'motion-safe:animate-fade-in',
+          coords.placeAbove && 'origin-bottom -translate-y-full',
+        )}
+        style={{ top: coords.top, left: coords.left }}
       >
-        <div
-          className="w-full rounded-t-2xl border border-border-subtle bg-surface p-4 pb-[calc(1rem+var(--spacing-safe-bottom))]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {actions.map((action) => (
+        {onReact && !message.deletedAt && (
+          <div className="border-b border-white/10 px-2.5 py-2.5">
+            <div className="flex flex-wrap items-center justify-center gap-0.5">
+              {emojis.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-xl transition-transform hover:scale-110 hover:bg-white/10 focus-ring active:scale-95"
+                  onClick={() => {
+                    onReact(emoji);
+                    onClose();
+                  }}
+                  aria-label={`Реакция ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+              {!moreReactions && (
+                <button
+                  type="button"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-white/10 focus-ring"
+                  onClick={() => setMoreReactions(true)}
+                  aria-label="Ещё реакции"
+                >
+                  <SmilePlus className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col p-1.5">
+          {items.map((item) => (
             <button
-              key={action.label}
+              key={item.id}
               type="button"
-              onClick={action.onClick}
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-body-sm min-h-[44px] ${
-                action.danger ? 'text-danger' : 'text-text-primary'
-              }`}
+              className={cn(
+                'glass-menu-item flex min-h-11 w-full items-center gap-3 px-3 py-2.5 text-left text-body-sm',
+                item.destructive
+                  ? 'text-danger hover:bg-danger/15'
+                  : 'text-text-primary',
+              )}
+              onClick={() => {
+                item.onSelect();
+                onClose();
+              }}
             >
-              <action.icon className="h-5 w-5" aria-hidden />
-              {action.label}
+              <span
+                className={cn(
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+                  item.destructive ? 'bg-danger/15' : 'bg-white/10',
+                )}
+              >
+                {item.icon}
+              </span>
+              {item.label}
             </button>
           ))}
-          <Button variant="secondary" className="mt-2 w-full" onClick={onClose}>
-            Отмена
-          </Button>
         </div>
       </div>
-    </>
+    </div>,
+    document.body,
   );
 }

@@ -1,11 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { canCreateGroupChat, canCreatePersonalChat } from '@/services/chat/access';
+import { StudentPickerList } from '@/components/users/StudentPickerList';
+import { ChatAvatarEditor } from '@/components/chat/ChatAvatarEditor';
+import {
+  canCreateGroupChat,
+  canCreatePersonalChat,
+  canCreateSchoolWideChat,
+} from '@/services/chat/access';
+import { SCHOOL_WIDE_CHAT_DEFAULT_TITLE } from '@/services/chat/constants';
 import { useCreateConversation } from '@/hooks/useCreateConversation';
+import { api } from '@/services/api';
 import type { User } from '@/types';
-import { formatUserName } from '@/utils';
 
 interface CreateChatModalProps {
   open: boolean;
@@ -15,138 +23,221 @@ interface CreateChatModalProps {
   onCreated: (conversationId: string) => void;
 }
 
-type Step = 'choose' | 'personal' | 'group';
+type Step = 'choose' | 'personal' | 'group' | 'school';
 
 export function CreateChatModal({ open, onClose, currentUser, users, onCreated }: CreateChatModalProps) {
   const [step, setStep] = useState<Step>('choose');
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [groupTitle, setGroupTitle] = useState('');
-  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [title, setTitle] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [avatarError, setAvatarError] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const createMutation = useCreateConversation(currentUser.id);
+
+  const { data: directions = [] } = useQuery({
+    queryKey: ['directions'],
+    queryFn: () => api.lessons.getDirections(),
+    enabled: open,
+  });
 
   const canPersonal = canCreatePersonalChat(currentUser);
   const canGroup = canCreateGroupChat(currentUser);
+  const canSchoolWide = canCreateSchoolWideChat(currentUser);
+  const students = users
+    .filter((u) => u.role === 'student')
+    .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'ru'));
 
-  const reset = () => {
+  useEffect(() => {
+    if (!open) return;
     setStep('choose');
-    setSelectedUserId('');
-    setGroupTitle('');
-    setSelectedMembers([]);
+    setSelectedUserIds([]);
+    setTitle('');
+    setAvatarUrl('');
+    setAvatarError('');
+    setSubmitError('');
+    // Do not reset mutation here — can abort in-flight school-wide create on remount
+  }, [open]);
+
+  const openSetup = (next: 'personal' | 'group' | 'school') => {
+    setSelectedUserIds([]);
+    setTitle(next === 'school' ? SCHOOL_WIDE_CHAT_DEFAULT_TITLE : '');
+    setAvatarUrl('');
+    setAvatarError('');
+    setSubmitError('');
+    setStep(next);
   };
 
-  const handleClose = () => {
-    reset();
+  const finishCreated = (conversationId: string) => {
     onClose();
+    onCreated(conversationId);
   };
-
-  const otherUsers = users.filter((u) => u.id !== currentUser.id);
 
   const submitPersonal = async () => {
-    if (!selectedUserId) return;
-    const conv = await createMutation.mutateAsync({
-      type: 'personal',
-      participantIds: [selectedUserId],
-    });
-    onCreated(conv.id);
-    handleClose();
+    const studentId = selectedUserIds[0];
+    if (!studentId || createMutation.isPending) return;
+    setSubmitError('');
+    try {
+      const conv = await createMutation.mutateAsync({
+        type: 'personal',
+        participantIds: [studentId],
+      });
+      finishCreated(conv.id);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать чат');
+    }
   };
 
   const submitGroup = async () => {
-    if (!groupTitle.trim() || selectedMembers.length === 0) return;
-    const conv = await createMutation.mutateAsync({
-      type: 'group',
-      title: groupTitle.trim(),
-      participantIds: selectedMembers,
-    });
-    onCreated(conv.id);
-    handleClose();
+    if (!title.trim() || selectedUserIds.length === 0 || createMutation.isPending) return;
+    setSubmitError('');
+    try {
+      const conv = await createMutation.mutateAsync({
+        type: 'group',
+        title: title.trim(),
+        participantIds: selectedUserIds,
+        ...(avatarUrl ? { avatarUrl } : {}),
+      });
+      finishCreated(conv.id);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать группу');
+    }
   };
 
-  const toggleMember = (id: string) => {
-    setSelectedMembers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const submitSchoolWide = async () => {
+    if (!title.trim() || createMutation.isPending) return;
+    setSubmitError('');
+    try {
+      const conv = await createMutation.mutateAsync({
+        type: 'group',
+        title: title.trim(),
+        // Pass visible directory so PB does not re-fetch + getOne every user (RBAC/hangs)
+        participantIds: users.map((u) => u.id),
+        allUsers: true,
+        ...(avatarUrl ? { avatarUrl } : {}),
+      });
+      finishCreated(conv.id);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать общий чат');
+    }
   };
+
+  const modalTitle =
+    step === 'choose'
+      ? 'Новый чат'
+      : step === 'personal'
+        ? 'Личный чат'
+        : step === 'group'
+          ? 'Новая группа'
+          : 'Общий чат';
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={step === 'choose' ? 'Новый чат' : step === 'personal' ? 'Личный чат' : 'Новая группа'}
-    >
+    <Modal open={open} onClose={onClose} title={modalTitle} className="max-h-[90vh] overflow-hidden sm:max-w-lg">
       {step === 'choose' && (
         <div className="flex flex-col gap-2">
           {canPersonal && (
-            <Button variant="secondary" className="justify-start" onClick={() => setStep('personal')}>
-              Личный чат
+            <Button variant="secondary" className="justify-start" onClick={() => openSetup('personal')}>
+              Личный чат с учеником
             </Button>
           )}
           {canGroup && (
-            <Button variant="secondary" className="justify-start" onClick={() => setStep('group')}>
+            <Button variant="secondary" className="justify-start" onClick={() => openSetup('group')}>
               Группа
             </Button>
           )}
-          {!canPersonal && !canGroup && (
+          {canSchoolWide && (
+            <Button variant="secondary" className="justify-start" onClick={() => openSetup('school')}>
+              Общий чат для всех
+            </Button>
+          )}
+          {!canPersonal && !canGroup && !canSchoolWide && (
             <p className="text-body-sm text-text-muted">У вас нет прав на создание чатов</p>
           )}
         </div>
       )}
 
       {step === 'personal' && (
-        <div className="space-y-4">
-          <div className="max-h-60 space-y-1 overflow-y-auto">
-            {otherUsers.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => setSelectedUserId(u.id)}
-                className={`w-full rounded-lg px-3 py-2.5 text-left text-sm focus-ring min-h-[44px] ${
-                  selectedUserId === u.id ? 'bg-brand-muted text-brand' : 'hover:bg-surface-elevated'
-                }`}
-              >
-                {formatUserName(u)}
-              </button>
-            ))}
+        <div className="flex max-h-[70vh] flex-col gap-4">
+          <StudentPickerList
+            students={students}
+            directions={directions}
+            selectedIds={selectedUserIds}
+            onChange={setSelectedUserIds}
+            mode="single"
+            disabled={createMutation.isPending}
+            emptyAllLabel="Нет учеников для чата"
+          />
+          {submitError && <p className="text-caption text-danger">{submitError}</p>}
+          <div className="flex gap-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setStep('choose')}>
+              Назад
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => void submitPersonal()}
+              disabled={selectedUserIds.length === 0}
+              loading={createMutation.isPending}
+            >
+              Начать чат
+            </Button>
           </div>
-          <Button onClick={submitPersonal} disabled={!selectedUserId} loading={createMutation.isPending} className="w-full">
-            Начать чат
-          </Button>
         </div>
       )}
 
-      {step === 'group' && (
-        <div className="space-y-4">
-          <Input
-            label="Название группы"
-            value={groupTitle}
-            onChange={(e) => setGroupTitle(e.target.value)}
-            placeholder="Например: Группа вокала"
-          />
-          <div>
-            <p className="mb-2 text-sm font-medium">Участники</p>
-            <div className="max-h-48 space-y-1 overflow-y-auto">
-              {otherUsers.map((u) => (
-                <label
-                  key={u.id}
-                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface-elevated"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedMembers.includes(u.id)}
-                    onChange={() => toggleMember(u.id)}
-                    className="h-4 w-4 accent-brand"
-                  />
-                  <span className="text-sm">{formatUserName(u)}</span>
-                </label>
-              ))}
+      {(step === 'group' || step === 'school') && (
+        <div className="flex max-h-[70vh] flex-col gap-4">
+          <div className="flex items-start gap-4">
+            <ChatAvatarEditor
+              value={avatarUrl}
+              onChange={setAvatarUrl}
+              onError={setAvatarError}
+              disabled={createMutation.isPending}
+            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Input
+                label="Название чата"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={
+                  step === 'school' ? SCHOOL_WIDE_CHAT_DEFAULT_TITLE : 'Например: Группа вокала'
+                }
+              />
+              {avatarError && <p className="text-caption text-danger">{avatarError}</p>}
             </div>
           </div>
-          <Button
-            onClick={submitGroup}
-            disabled={!groupTitle.trim() || selectedMembers.length === 0}
-            loading={createMutation.isPending}
-            className="w-full"
-          >
-            Создать группу
-          </Button>
+
+          {step === 'school' ? (
+            <p className="rounded-xl bg-surface-elevated px-3 py-3 text-body-sm text-text-secondary">
+              В чат будут добавлены все пользователи школы. Число общих чатов не ограничено.
+            </p>
+          ) : (
+            <div className="flex min-h-0 max-h-[36vh] flex-col gap-2">
+              <p className="text-sm font-medium">Участники</p>
+              <StudentPickerList
+                students={students}
+                directions={directions}
+                selectedIds={selectedUserIds}
+                onChange={setSelectedUserIds}
+                mode="multiple"
+                disabled={createMutation.isPending}
+                emptyAllLabel="Нет учеников для группы"
+              />
+            </div>
+          )}
+
+          {submitError && <p className="text-caption text-danger">{submitError}</p>}
+          <div className="flex gap-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setStep('choose')}>
+              Назад
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => void (step === 'school' ? submitSchoolWide() : submitGroup())}
+              disabled={!title.trim() || (step === 'group' && selectedUserIds.length === 0)}
+              loading={createMutation.isPending}
+            >
+              {step === 'school' ? 'Создать общий чат' : 'Создать группу'}
+            </Button>
+          </div>
         </div>
       )}
     </Modal>

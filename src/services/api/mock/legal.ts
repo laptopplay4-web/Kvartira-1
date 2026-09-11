@@ -14,7 +14,12 @@ import {
   validatePublishLegalVersionInput,
   validateUpdateLegalDocumentInput,
 } from '@/services/legal/validation';
-import type { PublishLegalVersionInput, UpdateLegalDocumentInput } from '@/services/api/types';
+import { REVOKE_SERVICE_CONSENT_MESSAGE } from '@/services/legal/constants';
+import type {
+  AcceptConsentOptions,
+  PublishLegalVersionInput,
+  UpdateLegalDocumentInput,
+} from '@/services/api/types';
 import { ApiError } from '@/services/api/types';
 import type { LegalApi } from '@/services/api/types';
 
@@ -26,6 +31,36 @@ export interface MockLegalDb {
 
 function uid(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Snapshot of what the person agreed to, taken at the moment of acceptance.
+ * The real adapter also stamps IP and User-Agent from the request; the mock has
+ * no request to read them from.
+ */
+function recordConsent(
+  document: LegalDocument,
+  userId: string,
+  options?: AcceptConsentOptions,
+): UserConsent {
+  const consent: UserConsent = {
+    id: uid('consent'),
+    userId,
+    documentId: document.id,
+    documentType: document.type,
+    documentTitle: document.title,
+    version: document.currentVersion,
+    acceptedAt: new Date().toISOString(),
+    consentTextVersion: document.currentVersion,
+  };
+  if (document.purpose) consent.purpose = document.purpose;
+  if (document.purpose === 'minor_guardian') {
+    if (!options?.guardian) {
+      throw new ApiError('Укажите данные законного представителя', 'VALIDATION_ERROR', 400);
+    }
+    consent.guardian = options.guardian;
+  }
+  return consent;
 }
 
 export function createMockLegalApi(
@@ -94,7 +129,7 @@ export function createMockLegalApi(
       return getPendingConsents(db.legalDocuments, consents);
     },
 
-    async acceptDocument(documentId, requesterId) {
+    async acceptDocument(documentId, requesterId, options) {
       await delay(80);
       assertAcceptAccess(requesterId);
       const document = getDocumentById(documentId);
@@ -102,39 +137,42 @@ export function createMockLegalApi(
         throw new ApiError('Документ не требует согласия', 'VALIDATION_ERROR', 400);
       }
 
-      const consent: UserConsent = {
-        id: uid('consent'),
-        userId: requesterId,
-        documentId: document.id,
-        documentType: document.type,
-        documentTitle: document.title,
-        version: document.currentVersion,
-        acceptedAt: new Date().toISOString(),
-      };
+      const consent = recordConsent(document, requesterId, options);
       db.userConsents.push(consent);
       return consent;
     },
 
-    async acceptDocuments(documentIds, requesterId) {
+    async acceptDocuments(documentIds, requesterId, options) {
       await delay(100);
       assertAcceptAccess(requesterId);
       const results: UserConsent[] = [];
       for (const documentId of documentIds) {
         const document = getDocumentById(documentId);
         if (!document.requiresConsent) continue;
-        const consent: UserConsent = {
-          id: uid('consent'),
-          userId: requesterId,
-          documentId: document.id,
-          documentType: document.type,
-          documentTitle: document.title,
-          version: document.currentVersion,
-          acceptedAt: new Date().toISOString(),
-        };
+        const consent = recordConsent(document, requesterId, options);
         db.userConsents.push(consent);
         results.push(consent);
       }
       return results;
+    },
+
+    async revokeConsent(consentId, requesterId) {
+      await delay(80);
+      assertViewConsents(requesterId);
+
+      const consent = db.userConsents.find((c) => c.id === consentId);
+      if (!consent) throw new ApiError('Согласие не найдено', 'NOT_FOUND', 404);
+      if (consent.userId !== requesterId) {
+        throw new ApiError('Нет доступа к согласию', 'FORBIDDEN', 403);
+      }
+      if (consent.revokedAt) return consent;
+
+      if (consent.purpose === 'service') {
+        throw new ApiError(REVOKE_SERVICE_CONSENT_MESSAGE, 'VALIDATION_ERROR', 400);
+      }
+
+      consent.revokedAt = new Date().toISOString();
+      return consent;
     },
 
     async canManageDocuments(requesterId) {
@@ -152,6 +190,11 @@ export function createMockLegalApi(
       if (input.title !== undefined) document.title = input.title.trim();
       if (input.content !== undefined) document.content = input.content.trim();
       if (input.requiresConsent !== undefined) document.requiresConsent = input.requiresConsent;
+      if (input.required !== undefined) document.required = input.required;
+      if (input.purpose !== undefined) {
+        if (input.purpose === null) delete document.purpose;
+        else document.purpose = input.purpose;
+      }
 
       return document;
     },

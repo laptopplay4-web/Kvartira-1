@@ -12,6 +12,7 @@ import {
 import {
   createDefaultNotificationPreferences,
   mergeNotificationPreferences,
+  notificationRequiresAction,
 } from '@/services/notifications/helpers';
 import { validateNotificationPreferencesInput } from '@/services/notifications/validation';
 import type { PushSubscriptionInput, UpdateNotificationPreferencesInput, User } from '@/types';
@@ -112,6 +113,7 @@ export const pocketbaseNotificationsApi: NotificationsApi = {
       });
 
       for (const record of records) {
+        if (notificationRequiresAction(mapNotificationRecord(record))) continue;
         await pb.collection('notifications').update(record.id, { read: true });
       }
     });

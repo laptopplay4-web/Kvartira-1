@@ -8,31 +8,39 @@ import { MessageCircle } from 'lucide-react';
 
 interface ConversationListProps {
   conversations: Conversation[];
-  currentUserId: string;
+  currentUser: User;
   users: User[];
   activeId?: string;
   search: string;
   filter: ChatFilter;
   isLoading?: boolean;
   onSelect: (id: string) => void;
+  onEdit: (conversation: Conversation) => void;
+  onDelete: (conversation: Conversation) => void;
+  onPin: (conversation: Conversation, pinned: boolean) => void;
+  onMute: (conversation: Conversation, muted: boolean) => void;
   emptyAction?: React.ReactNode;
 }
 
 export function ConversationList({
   conversations,
-  currentUserId,
+  currentUser,
   users,
   activeId,
   search,
   filter,
   isLoading,
   onSelect,
+  onEdit,
+  onDelete,
+  onPin,
+  onMute,
   emptyAction,
 }: ConversationListProps) {
   const filtered = filterConversations(conversations, {
     search,
     filter,
-    currentUserId,
+    currentUserId: currentUser.id,
     users,
   });
 
@@ -63,15 +71,19 @@ export function ConversationList({
   }
 
   return (
-    <div className="flex flex-col gap-0.5 p-2" role="list" aria-label="Список чатов">
+    <div className="flex min-h-full flex-col gap-0.5 p-2" role="list" aria-label="Список чатов">
       {filtered.map((conv) => (
         <ConversationItem
           key={conv.id}
           conversation={conv}
-          currentUserId={currentUserId}
+          currentUser={currentUser}
           users={users}
           isActive={conv.id === activeId}
           onClick={() => onSelect(conv.id)}
+          onEdit={() => onEdit(conv)}
+          onDelete={() => onDelete(conv)}
+          onPin={(pinned) => onPin(conv, pinned)}
+          onMute={(muted) => onMute(conv, muted)}
         />
       ))}
     </div>

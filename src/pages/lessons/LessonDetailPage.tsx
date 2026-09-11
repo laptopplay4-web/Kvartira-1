@@ -36,6 +36,8 @@ import { ErrorState } from '@/components/ui/ErrorState';
 
 import { LessonCardSkeleton } from '@/components/ui/Skeleton';
 
+import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
+
 import { formatFullDate, formatLessonDateTime, formatTimeRange } from '@/utils/dates';
 
 import { cn, formatUserName } from '@/utils';
@@ -205,6 +207,24 @@ export default function LessonDetailPage() {
 
   });
 
+  const openLessonChatMutation = useMutation({
+    mutationFn: async () => {
+      if (!lesson) throw new Error('Нет занятия');
+      const otherId = user.id === lesson.teacherId ? lesson.studentId : lesson.teacherId;
+      return api.chat.createConversation(user.id, {
+        type: 'personal',
+        participantIds: [otherId],
+        metadata: { lessonId: lesson.id },
+      });
+    },
+    onSuccess: (conv) => {
+      queryClient.invalidateQueries({ queryKey: ['lesson-chat', id, user.id] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      navigate(`/chat/${conv.id}`);
+    },
+    onError: (e) => setError(e instanceof ApiError ? e.message : 'Не удалось открыть чат'),
+  });
+
   const notesMutation = useMutation({
 
     mutationFn: () => api.lessons.updateTeacherNotes(id!, teacherNotesDraft, user.id),
@@ -313,7 +333,7 @@ export default function LessonDetailPage() {
 
         {teacher && (
 
-          <div className="flex items-center gap-3">
+          <UserPreviewTrigger user={teacher} className="flex w-full items-center gap-3 rounded-xl p-0">
 
             <Avatar
               src={teacher.avatarUrl}
@@ -322,7 +342,7 @@ export default function LessonDetailPage() {
               size="lg"
             />
 
-            <div>
+            <div className="min-w-0 text-left">
 
               <p className="text-caption">Преподаватель</p>
 
@@ -330,13 +350,16 @@ export default function LessonDetailPage() {
 
             </div>
 
-          </div>
+          </UserPreviewTrigger>
 
         )}
 
         {student && user.role !== 'student' && (
 
-          <div className="flex items-center gap-3 border-t border-border-subtle pt-4">
+          <UserPreviewTrigger
+            user={student}
+            className="flex w-full items-center gap-3 border-t border-border-subtle pt-4 rounded-none p-0"
+          >
 
             <Avatar
               src={student.avatarUrl}
@@ -344,7 +367,7 @@ export default function LessonDetailPage() {
               lastName={student.lastName}
             />
 
-            <div>
+            <div className="min-w-0 text-left">
 
               <p className="text-caption">Ученик</p>
 
@@ -352,7 +375,7 @@ export default function LessonDetailPage() {
 
             </div>
 
-          </div>
+          </UserPreviewTrigger>
 
         )}
 
@@ -392,36 +415,37 @@ export default function LessonDetailPage() {
 
 
 
-      {lessonChat && (
-
+      {lessonChat ? (
         <section className="mb-4">
-
           <Link
-
             to={`/chat/${lessonChat.id}`}
-
             className="flex min-h-11 items-center gap-3 rounded-xl border border-border-subtle bg-surface-elevated px-4 py-3 hover:border-brand/30 focus-ring"
-
           >
-
             <MessageCircle className="h-5 w-5 shrink-0 text-brand" aria-hidden />
-
             <div className="min-w-0">
-
               <p className="text-label">Чат по занятию</p>
-
               <p className="truncate text-caption text-text-muted">
-
                 {lessonChat.title ?? 'Открыть переписку'}
-
               </p>
-
             </div>
-
           </Link>
-
         </section>
-
+      ) : (
+        user.role !== 'student' &&
+        lesson && (
+          <section className="mb-4">
+            <Button
+              variant="secondary"
+              className="min-h-11 w-full justify-start"
+              disabled={!isOnline || openLessonChatMutation.isPending}
+              loading={openLessonChatMutation.isPending}
+              onClick={() => openLessonChatMutation.mutate()}
+            >
+              <MessageCircle className="h-5 w-5 text-brand" aria-hidden />
+              Открыть чат по занятию
+            </Button>
+          </section>
+        )
       )}
 
 

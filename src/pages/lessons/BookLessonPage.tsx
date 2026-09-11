@@ -28,6 +28,10 @@ import { Avatar } from '@/components/ui/Avatar';
 
 import { Skeleton } from '@/components/ui/Skeleton';
 
+import { SelectableTile } from '@/components/ui/SelectableTile';
+
+import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
+
 import { cn, formatUserName } from '@/utils';
 
 import { formatFullDate, formatTimeRange, formatWeekday } from '@/utils/dates';
@@ -321,12 +325,14 @@ export default function BookLessonPage() {
 
                   <div className="flex items-center gap-4">
 
-                    <Avatar
-                      src={t.avatarUrl}
-                      firstName={t.firstName}
-                      lastName={t.lastName}
-                      size="lg"
-                    />
+                    <UserPreviewTrigger user={t} className="shrink-0 rounded-full p-0">
+                      <Avatar
+                        src={t.avatarUrl}
+                        firstName={t.firstName}
+                        lastName={t.lastName}
+                        size="lg"
+                      />
+                    </UserPreviewTrigger>
 
                     <div>
 
@@ -366,21 +372,17 @@ export default function BookLessonPage() {
 
               return (
 
-                <button
+                <SelectableTile
 
                   key={ds}
 
-                  type="button"
+                  selected={date === ds}
 
                   onClick={() => { setDate(ds); setStartTime(''); setStep('slot'); }}
 
-                  className={cn(
+                  className="min-h-11 p-3"
 
-                    'min-h-11 rounded-xl border p-3 text-left transition-colors focus-ring',
-
-                    date === ds ? 'border-brand bg-brand-muted' : 'border-border-subtle bg-surface hover:bg-surface-elevated',
-
-                  )}
+                  label={format(d, 'd MMMM', { locale: ru })}
 
                 >
 
@@ -388,7 +390,7 @@ export default function BookLessonPage() {
 
                   <p className="text-lg font-semibold tabular-nums">{format(d, 'd MMM', { locale: ru })}</p>
 
-                </button>
+                </SelectableTile>
 
               );
 
@@ -420,31 +422,23 @@ export default function BookLessonPage() {
 
               {slots.map((slot) => (
 
-                <button
+                <SelectableTile
 
                   key={slot.startTime}
 
-                  type="button"
+                  selected={startTime === slot.startTime}
 
                   onClick={() => { setStartTime(slot.startTime); setStep('confirm'); }}
 
-                  className={cn(
+                  className="min-h-11 py-2.5 text-center text-sm font-medium tabular-nums"
 
-                    'min-h-11 rounded-lg border py-2.5 text-sm font-medium tabular-nums transition-colors focus-ring',
-
-                    startTime === slot.startTime
-
-                      ? 'border-brand bg-brand-muted text-brand'
-
-                      : 'border-border-subtle bg-surface-elevated hover:border-brand/50',
-
-                  )}
+                  label={slot.startTime}
 
                 >
 
                   {slot.startTime}
 
-                </button>
+                </SelectableTile>
 
               ))}
 

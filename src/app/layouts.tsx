@@ -2,6 +2,7 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { BottomNav, SidebarNav } from '@/components/ui/BottomNav';
 import { MobileHeader } from '@/components/ui/MobileHeader';
+import { TeacherDirectionsSetupModal } from '@/components/directions/TeacherDirectionsSetupModal';
 import { useAuthStore, useCurrentUser } from '@/stores/authStore';
 import { can, isKnownUserRole, type Permission } from '@/permissions';
 import { api } from '@/services/api';
@@ -70,6 +71,7 @@ export function AppLayout() {
         <main className="flex min-h-0 flex-1 flex-col overflow-x-hidden">
           <Outlet />
         </main>
+        <TeacherDirectionsSetupModal />
         {showBanner && (
           <PwaInstallBanner
             onInstall={promptInstall}

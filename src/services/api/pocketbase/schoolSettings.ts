@@ -22,6 +22,13 @@ import {
   mergeSchoolSocialLinks,
   validateSchoolDirectionsVideoFile,
 } from '@/services/school/helpers';
+import {
+  createRotatedRegistrationInvite,
+  createSeedRegistrationInvite,
+  extractRegistrationInviteFromContacts,
+  toRegistrationInviteInfo,
+  type RegistrationInviteSecret,
+} from '@/services/registration/invite';
 import type { PublicSchoolInfo, SchoolDirectionsVideo, User } from '@/types';
 
 async function getRequesterUser(requesterId: string): Promise<User> {
@@ -56,6 +63,7 @@ async function loadOrCreateSchoolSettingsRecord() {
   if (existing) return existing;
 
   const pb = getPocketBase();
+  const seedInvite = createSeedRegistrationInvite();
   try {
     return await pb.collection('school_settings').create({
       name: defaultSchoolInfo.name,
@@ -65,6 +73,7 @@ async function loadOrCreateSchoolSettingsRecord() {
         contacts: defaultSchoolInfo.contacts,
         socialLinks: defaultSchoolInfo.socialLinks ?? EMPTY_SCHOOL_SOCIAL_LINKS,
         directionsVideo: defaultSchoolInfo.directionsVideo,
+        registrationInvite: seedInvite,
       }),
     });
   } catch (error) {
@@ -74,6 +83,11 @@ async function loadOrCreateSchoolSettingsRecord() {
     }
     throw error;
   }
+}
+
+function readInviteFromRecord(record: unknown): RegistrationInviteSecret {
+  const contacts = (record as { contacts?: unknown } | null)?.contacts;
+  return extractRegistrationInviteFromContacts(contacts) ?? createSeedRegistrationInvite();
 }
 
 function mergeSchoolSettings(
@@ -117,7 +131,7 @@ async function resolveSchoolSettings(settings: PublicSchoolInfo): Promise<Public
   };
 }
 
-function toPbUpdateBody(settings: PublicSchoolInfo) {
+function toPbUpdateBody(settings: PublicSchoolInfo, invite: RegistrationInviteSecret | null) {
   return {
     name: settings.name,
     tagline: settings.tagline,
@@ -126,6 +140,7 @@ function toPbUpdateBody(settings: PublicSchoolInfo) {
       contacts: settings.contacts,
       socialLinks: settings.socialLinks ?? EMPTY_SCHOOL_SOCIAL_LINKS,
       directionsVideo: settings.directionsVideo,
+      registrationInvite: invite,
     }),
   };
 }
@@ -147,6 +162,7 @@ export const pocketbaseSchoolSettingsApi: SchoolSettingsApi = {
       await assertSchoolSettingsManage(requesterId);
       const record = await loadOrCreateSchoolSettingsRecord();
       const current = mapSchoolSettingsRecord(record);
+      const invite = readInviteFromRecord(record);
 
       const validationError = validateSchoolSettingsInput(input, current);
       if (validationError) {
@@ -159,7 +175,9 @@ export const pocketbaseSchoolSettingsApi: SchoolSettingsApi = {
       }
 
       const pb = getPocketBase();
-      const saved = await pb.collection('school_settings').update(record.id, toPbUpdateBody(updated));
+      const saved = await pb
+        .collection('school_settings')
+        .update(record.id, toPbUpdateBody(updated, invite));
       return resolveSchoolSettings(mapSchoolSettingsRecord(saved));
     });
   },
@@ -173,6 +191,7 @@ export const pocketbaseSchoolSettingsApi: SchoolSettingsApi = {
 
       const record = await loadOrCreateSchoolSettingsRecord();
       const current = mapSchoolSettingsRecord(record);
+      const invite = readInviteFromRecord(record);
 
       const uploaded = await uploadStoredFile({
         userId: requesterId,
@@ -198,7 +217,7 @@ export const pocketbaseSchoolSettingsApi: SchoolSettingsApi = {
       };
 
       const pb = getPocketBase();
-      await pb.collection('school_settings').update(record.id, toPbUpdateBody(next));
+      await pb.collection('school_settings').update(record.id, toPbUpdateBody(next, invite));
 
       if (current.directionsVideo?.url) {
         await deleteStoredFiles(current.directionsVideo.url);
@@ -214,6 +233,7 @@ export const pocketbaseSchoolSettingsApi: SchoolSettingsApi = {
       await assertSchoolSettingsManage(requesterId);
       const record = await loadOrCreateSchoolSettingsRecord();
       const current = mapSchoolSettingsRecord(record);
+      const invite = readInviteFromRecord(record);
 
       const next: PublicSchoolInfo = {
         ...current,
@@ -222,13 +242,44 @@ export const pocketbaseSchoolSettingsApi: SchoolSettingsApi = {
       delete next.directionsVideo;
 
       const pb = getPocketBase();
-      const saved = await pb.collection('school_settings').update(record.id, toPbUpdateBody(next));
+      const saved = await pb
+        .collection('school_settings')
+        .update(record.id, toPbUpdateBody(next, invite));
 
       if (current.directionsVideo?.url) {
         await deleteStoredFiles(current.directionsVideo.url);
       }
 
       return resolveSchoolSettings(mapSchoolSettingsRecord(saved));
+    });
+  },
+
+  async getRegistrationInvite(requesterId, origin) {
+    return withPbError(async () => {
+      await assertSchoolSettingsManage(requesterId);
+      const record = await loadOrCreateSchoolSettingsRecord();
+      let invite = extractRegistrationInviteFromContacts(record.contacts);
+      if (!invite?.token) {
+        invite = createSeedRegistrationInvite();
+        const settings = mapSchoolSettingsRecord(record);
+        const pb = getPocketBase();
+        await pb
+          .collection('school_settings')
+          .update(record.id, toPbUpdateBody(settings, invite));
+      }
+      return toRegistrationInviteInfo(invite, origin);
+    });
+  },
+
+  async rotateRegistrationInvite(requesterId, origin) {
+    return withPbError(async () => {
+      await assertSchoolSettingsManage(requesterId);
+      const record = await loadOrCreateSchoolSettingsRecord();
+      const settings = mapSchoolSettingsRecord(record);
+      const invite = createRotatedRegistrationInvite();
+      const pb = getPocketBase();
+      await pb.collection('school_settings').update(record.id, toPbUpdateBody(settings, invite));
+      return toRegistrationInviteInfo(invite, origin);
     });
   },
 };

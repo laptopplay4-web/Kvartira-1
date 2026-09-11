@@ -12,6 +12,7 @@ import { EVENT_TYPE_LABELS } from '@/services/events/constants';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CompetitionApplicationModal } from '@/components/events/CompetitionApplicationModal';
@@ -250,43 +251,29 @@ export default function EventDetailPage() {
         />
       )}
 
-      {canManage && deleteOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-event-title"
-        >
-          <Card className="w-full max-w-sm p-5">
-            <h2 id="delete-event-title" className="text-h3">
-              Удалить мероприятие?
-            </h2>
-            <p className="mt-2 text-body-sm text-text-secondary">
-              «{event.title}» будет удалено без возможности восстановления.
-            </p>
-            {deleteMutation.error && (
-              <p className="mt-2 text-body-sm text-danger" role="alert">
-                {deleteMutation.error instanceof ApiError
-                  ? deleteMutation.error.message
-                  : 'Не удалось удалить'}
-              </p>
-            )}
-            <div className="mt-4 flex gap-2">
-              <Button variant="ghost" className="min-h-11 flex-1" onClick={() => setDeleteOpen(false)}>
-                Отмена
-              </Button>
-              <Button
-                variant="destructive"
-                className="min-h-11 flex-1"
-                loading={deleteMutation.isPending}
-                disabled={!isOnline}
-                onClick={() => deleteMutation.mutate()}
-              >
-                Удалить
-              </Button>
-            </div>
-          </Card>
-        </div>
+      {canManage && (
+        <ConfirmDialog
+          open={deleteOpen}
+          onClose={() => setDeleteOpen(false)}
+          title="Удалить мероприятие?"
+          description={
+            <>
+              <p>«{event.title}» будет удалено без возможности восстановления.</p>
+              {deleteMutation.error && (
+                <p className="mt-2 text-danger" role="alert">
+                  {deleteMutation.error instanceof ApiError
+                    ? deleteMutation.error.message
+                    : 'Не удалось удалить'}
+                </p>
+              )}
+            </>
+          }
+          confirmLabel="Удалить"
+          tone="destructive"
+          loading={deleteMutation.isPending}
+          disabled={!isOnline}
+          onConfirm={() => deleteMutation.mutate()}
+        />
       )}
     </div>
   );

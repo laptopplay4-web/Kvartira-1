@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mockChatApi, resetMockDatabase } from '@/services/api/mock';
 import { ApiError } from '@/services/api/types';
-import { filterConversations } from '@/services/chat/helpers';
+import {
+  filterConversations,
+  orderPinnedMessagesNewestFirst,
+  resolvePinnedIndexForViewport,
+} from '@/services/chat/helpers';
+import type { Message } from '@/types';
 import { users } from '@/mocks/seed';
 
 describe('chat access', () => {
@@ -99,15 +104,42 @@ describe('personal chat creation', () => {
   });
 
   it('returns existing personal conversation instead of duplicate', async () => {
-    const first = await mockChatApi.createConversation('user-student', {
+    const first = await mockChatApi.createConversation('user-teacher-1', {
       type: 'personal',
-      participantIds: ['user-teacher-1'],
+      participantIds: ['user-student'],
     });
-    const second = await mockChatApi.createConversation('user-student', {
+    const second = await mockChatApi.createConversation('user-teacher-1', {
       type: 'personal',
-      participantIds: ['user-teacher-1'],
+      participantIds: ['user-student'],
     });
     expect(second.id).toBe(first.id);
+  });
+
+  it('student cannot create personal chat', async () => {
+    await expect(
+      mockChatApi.createConversation('user-student', {
+        type: 'personal',
+        participantIds: ['user-teacher-1'],
+      }),
+    ).rejects.toThrow(ApiError);
+  });
+
+  it('rejects personal chat between two teachers', async () => {
+    await expect(
+      mockChatApi.createConversation('user-teacher-1', {
+        type: 'personal',
+        participantIds: ['user-teacher-2'],
+      }),
+    ).rejects.toThrow(ApiError);
+  });
+
+  it('admin can create personal chat with student', async () => {
+    const conv = await mockChatApi.createConversation('user-admin', {
+      type: 'personal',
+      participantIds: ['user-student'],
+    });
+    expect(conv.type).toBe('personal');
+    expect(conv.participantIds).toEqual(expect.arrayContaining(['user-admin', 'user-student']));
   });
 });
 
@@ -154,6 +186,138 @@ describe('group creation', () => {
     });
     expect(new Set(conv.participantIds).size).toBe(conv.participantIds.length);
   });
+
+  it('teacher can create school-wide chat for all users', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      participantIds: [],
+      allUsers: true,
+    });
+    expect(conv.title).toBe('Общий чат');
+    expect(conv.metadata?.schoolWide).toBe(true);
+    expect(conv.participantIds).toHaveLength(users.length);
+    expect(new Set(conv.participantIds).size).toBe(users.length);
+  });
+
+  it('school-wide chat forbids add/remove members', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      participantIds: users.map((u) => u.id),
+      allUsers: true,
+    });
+    await expect(
+      mockChatApi.addMember(conv.id, 'user-teacher-1', 'user-student-2'),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      mockChatApi.removeMember(conv.id, 'user-teacher-1', 'user-student'),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('new registrant joins school-wide chats but not personal/group', async () => {
+    const { mockAuthApi } = await import('@/services/api/mock');
+    const { SEED_REGISTRATION_INVITE_TOKEN } = await import('@/services/registration/constants');
+
+    const schoolWide = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      participantIds: [],
+      allUsers: true,
+      title: 'Объявления школы',
+    });
+    const privateGroup = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Только избранные',
+      participantIds: ['user-student'],
+    });
+
+    const session = await mockAuthApi.register(
+      '+79005550123',
+      'password12',
+      'Новый',
+      'Ученик',
+      ['dir-vocal'],
+      SEED_REGISTRATION_INVITE_TOKEN,
+    );
+
+    const list = await mockChatApi.getConversations(session.user.id);
+    const ids = list.map((c) => c.id);
+    expect(ids).toContain(schoolWide.id);
+    expect(ids).not.toContain(privateGroup.id);
+    expect(ids).not.toContain('conv-1');
+  });
+
+  it('infers chat avatar mime from empty type and aliases', async () => {
+    const { inferChatAvatarMimeType } = await import('@/services/chat/avatar');
+    expect(inferChatAvatarMimeType('photo.jpg', '')).toBe('image/jpeg');
+    expect(inferChatAvatarMimeType('photo.PNG', 'image/jpg')).toBe('image/jpeg');
+    expect(inferChatAvatarMimeType('shot', 'image/png')).toBe('image/png');
+  });
+
+  it('group chat can be created with avatar icon', async () => {
+    const avatarUrl = 'data:image/png;base64,aaa';
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'С иконкой',
+      participantIds: ['user-student'],
+      avatarUrl,
+    });
+    expect(conv.avatarUrl).toBe(avatarUrl);
+  });
+
+  it('teacher can update group avatar in settings', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Редактирование',
+      participantIds: ['user-student'],
+    });
+    const updated = await mockChatApi.updateConversation(conv.id, 'user-teacher-1', {
+      avatarUrl: 'data:image/jpeg;base64,bbb',
+    });
+    expect(updated.avatarUrl).toBe('data:image/jpeg;base64,bbb');
+    const cleared = await mockChatApi.updateConversation(conv.id, 'user-teacher-1', {
+      avatarUrl: '',
+    });
+    expect(cleared.avatarUrl).toBeUndefined();
+  });
+
+  it('school-wide chats are unlimited (no dedupe)', async () => {
+    const first = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      participantIds: [],
+      allUsers: true,
+    });
+    const second = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Общий чат 2',
+      participantIds: [],
+      allUsers: true,
+    });
+    expect(second.id).not.toBe(first.id);
+    expect(second.title).toBe('Общий чат 2');
+  });
+
+  it('student cannot create school-wide chat', async () => {
+    await expect(
+      mockChatApi.createConversation('user-student', {
+        type: 'group',
+        participantIds: [],
+        allUsers: true,
+      }),
+    ).rejects.toThrow(ApiError);
+  });
+
+  it('teacher can delete own conversation', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'К удалению',
+      participantIds: ['user-student'],
+    });
+    await mockChatApi.deleteConversation(conv.id, 'user-teacher-1');
+    await expect(mockChatApi.getConversation(conv.id, 'user-teacher-1')).rejects.toThrow(ApiError);
+  });
+
+  it('student cannot delete conversation', async () => {
+    await expect(mockChatApi.deleteConversation('conv-1', 'user-student')).rejects.toThrow(ApiError);
+  });
 });
 
 describe('search and filters', () => {
@@ -173,14 +337,21 @@ describe('search and filters', () => {
     expect(filtered.length).toBeGreaterThan(0);
   });
 
-  it('filters unread conversations', async () => {
+  it('filters school-wide conversations', async () => {
+    const schoolWide = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      participantIds: [],
+      allUsers: true,
+      title: 'Общий фильтр',
+    });
     const all = await mockChatApi.getConversations('user-student');
     const filtered = filterConversations(all, {
-      filter: 'unread',
+      filter: 'school',
       currentUserId: 'user-student',
       users,
     });
-    expect(filtered.every((c) => (c.unreadCount ?? 0) > 0)).toBe(true);
+    expect(filtered.every((c) => c.metadata?.schoolWide === true)).toBe(true);
+    expect(filtered.some((c) => c.id === schoolWide.id)).toBe(true);
   });
 
   it('filters personal conversations', async () => {
@@ -193,14 +364,26 @@ describe('search and filters', () => {
     expect(filtered.every((c) => c.type === 'personal')).toBe(true);
   });
 
-  it('filters group conversations', async () => {
+  it('filters group conversations without school-wide', async () => {
+    await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      participantIds: [],
+      allUsers: true,
+      title: 'Не в группах',
+    });
+    const privateGroup = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Обычная группа',
+      participantIds: ['user-student'],
+    });
     const all = await mockChatApi.getConversations('user-student');
     const filtered = filterConversations(all, {
       filter: 'group',
       currentUserId: 'user-student',
       users,
     });
-    expect(filtered.every((c) => c.type !== 'personal')).toBe(true);
+    expect(filtered.every((c) => c.type !== 'personal' && !c.metadata?.schoolWide)).toBe(true);
+    expect(filtered.some((c) => c.id === privateGroup.id)).toBe(true);
   });
 });
 
@@ -259,6 +442,75 @@ describe('message pagination', () => {
     });
     expect(page2.messages.length).toBeGreaterThan(0);
   });
+
+  it('returns messages in chronological order (oldest → newest)', async () => {
+    const a = await mockChatApi.sendMessage('conv-1', 'user-student', 'first');
+    const b = await mockChatApi.sendMessage('conv-1', 'user-teacher-1', 'second');
+    const c = await mockChatApi.sendMessage('conv-1', 'user-student', 'third');
+    const page = await mockChatApi.getMessages('conv-1', 'user-student');
+    const ids = page.messages.map((m) => m.id);
+    expect(ids.indexOf(a.id)).toBeLessThan(ids.indexOf(b.id));
+    expect(ids.indexOf(b.id)).toBeLessThan(ids.indexOf(c.id));
+    expect(page.messages.at(-1)?.id).toBe(c.id);
+  });
+});
+
+describe('flattenMessages order', () => {
+  it('merges pages into chronological ASC with newest at the end', async () => {
+    const { flattenMessages } = await import('@/hooks/useChatMessages');
+    const older = {
+      id: 'm1',
+      conversationId: 'c',
+      senderId: 'u1',
+      text: 'old',
+      createdAt: '2026-01-01T10:00:00.000Z',
+      status: 'sent' as const,
+      readBy: [],
+      messageType: 'user' as const,
+    };
+    const newer = {
+      id: 'm2',
+      conversationId: 'c',
+      senderId: 'u2',
+      text: 'new',
+      createdAt: '2026-01-01T11:00:00.000Z',
+      status: 'sent' as const,
+      readBy: [],
+      messageType: 'user' as const,
+    };
+    const flat = flattenMessages([{ messages: [newer] }, { messages: [older] }]);
+    expect(flat.map((m) => m.id)).toEqual(['m1', 'm2']);
+  });
+
+  it('prefers sent server message over failed optimistic with same clientMutationId', async () => {
+    const { flattenMessages } = await import('@/hooks/useChatMessages');
+    const failed = {
+      id: 'client-1',
+      conversationId: 'c',
+      senderId: 'u1',
+      text: 'hi',
+      createdAt: '2026-01-01T10:00:00.000Z',
+      status: 'failed' as const,
+      readBy: ['u1'],
+      clientMutationId: 'client-1',
+      messageType: 'user' as const,
+    };
+    const sent = {
+      id: 'msg-real',
+      conversationId: 'c',
+      senderId: 'u1',
+      text: 'hi',
+      createdAt: '2026-01-01T10:00:00.000Z',
+      status: 'sent' as const,
+      readBy: ['u1'],
+      clientMutationId: 'client-1',
+      messageType: 'user' as const,
+    };
+    const flat = flattenMessages([{ messages: [failed, sent] }]);
+    expect(flat).toHaveLength(1);
+    expect(flat[0]?.id).toBe('msg-real');
+    expect(flat[0]?.status).toBe('sent');
+  });
 });
 
 describe('edit message', () => {
@@ -290,15 +542,73 @@ describe('edit message', () => {
 describe('delete message', () => {
   beforeEach(() => resetMockDatabase());
 
-  it('soft-deletes own message', async () => {
+  it('hard-deletes own message', async () => {
     const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Удалить');
     const deleted = await mockChatApi.deleteMessage('conv-1', msg.id, 'user-student');
     expect(deleted.deletedAt).toBeDefined();
+    await expect(mockChatApi.getMessage('conv-1', msg.id, 'user-student')).rejects.toThrow(ApiError);
+    const page = await mockChatApi.getMessages('conv-1', 'user-student');
+    expect(page.messages.some((m) => m.id === msg.id)).toBe(false);
   });
 
-  it('rejects deleting foreign message (IDOR)', async () => {
+  it('rejects deleting foreign message in personal chat (IDOR)', async () => {
     const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Чужое');
     await expect(mockChatApi.deleteMessage('conv-1', msg.id, 'user-teacher-1')).rejects.toThrow(ApiError);
+  });
+
+  it('teacher can delete foreign message in group chat', async () => {
+    const group = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Модерация',
+      participantIds: ['user-student', 'user-teacher-1'],
+    });
+    const msg = await mockChatApi.sendMessage(group.id, 'user-student', 'Лишнее');
+    const deleted = await mockChatApi.deleteMessage(group.id, msg.id, 'user-teacher-1');
+    expect(deleted.deletedAt).toBeDefined();
+  });
+});
+
+describe('message reactions and forward', () => {
+  beforeEach(() => resetMockDatabase());
+
+  it('toggles reaction on message', async () => {
+    const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Реакция');
+    const reacted = await mockChatApi.setMessageReaction('conv-1', msg.id, 'user-teacher-1', '👍');
+    expect(reacted.reactions?.some((r) => r.emoji === '👍' && r.userIds.includes('user-teacher-1'))).toBe(
+      true,
+    );
+  });
+
+  it('forwards message without author attribution', async () => {
+    const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Перешлите');
+    const group = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Цель',
+      participantIds: ['user-student', 'user-teacher-1'],
+    });
+    const [forwarded] = await mockChatApi.forwardMessage('conv-1', msg.id, 'user-teacher-1', [group.id]);
+    expect(forwarded.text).toBe('Перешлите');
+    expect(forwarded.senderId).toBe('user-teacher-1');
+  });
+
+  it('pins conversation for self', async () => {
+    const member = await mockChatApi.pinConversation('conv-1', 'user-student', true);
+    expect(member.pinnedAt).toBeTruthy();
+    const list = await mockChatApi.getConversations('user-student');
+    expect(list[0]?.viewerPinnedAt || list.find((c) => c.id === 'conv-1')?.viewerPinnedAt).toBeTruthy();
+  });
+});
+
+describe('edit window and leave policy', () => {
+  beforeEach(() => resetMockDatabase());
+
+  it('student cannot leave group chat', async () => {
+    const group = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Группа',
+      participantIds: ['user-student', 'user-teacher-1'],
+    });
+    await expect(mockChatApi.leaveConversation(group.id, 'user-student')).rejects.toThrow(ApiError);
   });
 });
 
@@ -384,9 +694,51 @@ describe('pin message', () => {
     expect(conv.pinnedMessageIds).toContain(msg.id);
   });
 
+  it('admin can pin and unpin message', async () => {
+    const msg = await mockChatApi.sendMessage('conv-4', 'user-admin', 'Важно');
+    const pinned = await mockChatApi.pinMessage('conv-4', msg.id, 'user-admin');
+    expect(pinned.pinnedMessageIds).toContain(msg.id);
+    const unpinned = await mockChatApi.unpinMessage('conv-4', msg.id, 'user-admin');
+    expect(unpinned.pinnedMessageIds ?? []).not.toContain(msg.id);
+  });
+
   it('student cannot pin message', async () => {
     const msg = await mockChatApi.sendMessage('conv-2', 'user-teacher-1', 'Важно');
     await expect(mockChatApi.pinMessage('conv-2', msg.id, 'user-student')).rejects.toThrow(ApiError);
+  });
+
+  it('student cannot unpin message', async () => {
+    const msg = await mockChatApi.sendMessage('conv-2', 'user-teacher-1', 'Важно');
+    await mockChatApi.pinMessage('conv-2', msg.id, 'user-teacher-1');
+    await expect(mockChatApi.unpinMessage('conv-2', msg.id, 'user-student')).rejects.toThrow(ApiError);
+  });
+
+  it('orderPinnedMessagesNewestFirst sorts by chat position newest→oldest', () => {
+    const base = {
+      conversationId: 'c',
+      senderId: 'u',
+      status: 'sent' as const,
+      readBy: [] as string[],
+    };
+    const msgs: Message[] = [
+      { ...base, id: 'old', text: 'old', createdAt: '2026-01-01T10:00:00.000Z' },
+      { ...base, id: 'new', text: 'new', createdAt: '2026-01-01T12:00:00.000Z' },
+      { ...base, id: 'mid', text: 'mid', createdAt: '2026-01-01T11:00:00.000Z' },
+    ];
+    const ordered = orderPinnedMessagesNewestFirst(['old', 'mid', 'new'], msgs);
+    expect(ordered.map((m) => m.id)).toEqual(['new', 'mid', 'old']);
+  });
+
+  it('resolvePinnedIndexForViewport follows scroll past pins newest→oldest', () => {
+    const ids = ['new', 'mid', 'old'];
+    // All pins above viewport top (scrolled to bottom) → newest
+    expect(resolvePinnedIndexForViewport(ids, { new: 10, mid: -100, old: -200 }, 50)).toBe(0);
+    // Passed old+mid, new still below → mid
+    expect(resolvePinnedIndexForViewport(ids, { new: 120, mid: 40, old: -20 }, 50)).toBe(1);
+    // Only old passed → oldest
+    expect(resolvePinnedIndexForViewport(ids, { new: 200, mid: 120, old: 40 }, 50)).toBe(2);
+    // None passed (above all pins) → oldest
+    expect(resolvePinnedIndexForViewport(ids, { new: 200, mid: 150, old: 100 }, 50)).toBe(2);
   });
 });
 

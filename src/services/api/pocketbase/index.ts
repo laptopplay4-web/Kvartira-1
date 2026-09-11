@@ -7,7 +7,6 @@ import { pocketbaseEventsApi } from '@/services/api/pocketbase/events';
 import { pocketbaseChatApi } from '@/services/api/pocketbase/chat';
 import { pocketbaseAssignmentsApi } from '@/services/api/pocketbase/assignments';
 import { pocketbaseAssignmentGroupsApi } from '@/services/api/pocketbase/groups';
-import { pocketbaseProgressApi } from '@/services/api/pocketbase/progress';
 import { pocketbaseSupportApi } from '@/services/api/pocketbase/support';
 import { pocketbaseLegalApi } from '@/services/api/pocketbase/legal';
 import { pocketbaseSecurityApi } from '@/services/api/pocketbase/security';
@@ -29,7 +28,6 @@ export function createPocketbaseApiClient(): ApiClient {
     availability: pocketbaseAvailabilityApi,
     assignments: pocketbaseAssignmentsApi,
     assignmentGroups: pocketbaseAssignmentGroupsApi,
-    progress: pocketbaseProgressApi,
     support: pocketbaseSupportApi,
     legal: pocketbaseLegalApi,
     public: pocketbasePublicApi,

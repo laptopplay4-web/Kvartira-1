@@ -1,7 +1,7 @@
 import { cn } from '@/utils';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
@@ -17,10 +17,13 @@ import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useSearchMessages } from '@/hooks/useSearchMessages';
 import { useBackNavigation } from '@/hooks/useBackNavigation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
-import { canCreateGroupChat, canCreatePersonalChat } from '@/services/chat/access';
-import { isGroupLike } from '@/services/chat/helpers';
+import { canManageChats } from '@/services/chat/access';
+import { canPinMessage } from '@/services/chat/messages';
+import { getConversationDisplayTitle, isGroupLike, orderPinnedMessagesNewestFirst } from '@/services/chat/helpers';
 import type { ChatFilter } from '@/services/chat/helpers';
-import type { Message } from '@/types';
+import { useConversationMembers } from '@/hooks/useConversationMembers';
+import { ForwardMessageModal } from '@/components/chat/ForwardMessageModal';
+import type { Conversation, ConversationMember, Message, MessageAttachment } from '@/types';
 import { ConversationList } from '@/components/chat/ConversationList';
 import { ChatFilters, ChatSearch } from '@/components/chat/ChatFilters';
 import { ChatHeader } from '@/components/chat/ChatHeader';
@@ -31,7 +34,10 @@ import { MessageSearchResults } from '@/components/chat/MessageSearchResults';
 import { PinnedMessageBar } from '@/components/chat/PinnedMessageBar';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ImageViewer } from '@/components/chat/ImageViewer';
+import { ConversationSettings } from '@/components/chat/ConversationSettings';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { IconButton } from '@/components/ui/IconButton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MessageCircle } from 'lucide-react';
@@ -49,10 +55,15 @@ export default function ChatPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('all');
   const [createOpen, setCreateOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [settingsConversation, setSettingsConversation] = useState<Conversation | null>(null);
+  const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
   const [imageViewer, setImageViewer] = useState<{ images: Message['attachments']; index: number } | null>(null);
+  const [pinnedCycleIndex, setPinnedCycleIndex] = useState(0);
+  const freezePinnedScrollSyncRef = useRef(false);
 
   const { draft, setDraft, clearDraft } = useChatDraft(activeId);
 
@@ -91,13 +102,147 @@ export default function ChatPage() {
   const sendMutation = useSendMessage();
   const editMutation = useEditMessage();
   const deleteMutation = useDeleteMessage();
+  const canCreate = canManageChats(user);
+
+  const deleteConversationMutation = useMutation({
+    mutationFn: (conversationId: string) => api.chat.deleteConversation(conversationId, user.id),
+    onSuccess: (_void, conversationId) => {
+      setPendingDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
+      if (activeId === conversationId) {
+        navigate('/chat');
+      }
+    },
+  });
+
+  const muteConversationMutation = useMutation({
+    mutationFn: ({ conversationId, muted }: { conversationId: string; muted: boolean }) =>
+      api.chat.muteConversation(conversationId, user.id, { muted, mutedUntil: null }),
+    onMutate: async ({ conversationId, muted }) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations', user.id] });
+      await queryClient.cancelQueries({ queryKey: ['members', conversationId, user.id] });
+      const previous = queryClient.getQueryData<Conversation[]>(['conversations', user.id]);
+      const previousMembers = queryClient.getQueryData<ConversationMember[]>([
+        'members',
+        conversationId,
+        user.id,
+      ]);
+      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
+        (old ?? []).map((c) => (c.id === conversationId ? { ...c, viewerMuted: muted } : c)),
+      );
+      queryClient.setQueryData<ConversationMember[]>(
+        ['members', conversationId, user.id],
+        (old) =>
+          (old ?? []).map((m) =>
+            m.userId === user.id ? { ...m, muted, mutedUntil: muted ? m.mutedUntil : null } : m,
+          ),
+      );
+      return { previous, previousMembers, conversationId };
+    },
+    onError: (_err, vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(['conversations', user.id], ctx.previous);
+      }
+      if (ctx?.previousMembers) {
+        queryClient.setQueryData(
+          ['members', vars.conversationId, user.id],
+          ctx.previousMembers,
+        );
+      }
+    },
+    onSuccess: (member, { conversationId }) => {
+      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
+        (old ?? []).map((c) =>
+          c.id === conversationId ? { ...c, viewerMuted: !!member.muted } : c,
+        ),
+      );
+      queryClient.setQueryData<ConversationMember[]>(
+        ['members', conversationId, user.id],
+        (old) =>
+          (old ?? []).map((m) => (m.userId === user.id ? { ...m, ...member } : m)),
+      );
+    },
+    onSettled: (_data, _err, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['members', vars.conversationId, user.id] });
+    },
+  });
+
+  const pinConversationMutation = useMutation({
+    mutationFn: ({ conversationId, pinned }: { conversationId: string; pinned: boolean }) =>
+      api.chat.pinConversation(conversationId, user.id, pinned),
+    onMutate: async ({ conversationId, pinned }) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations', user.id] });
+      const previous = queryClient.getQueryData<Conversation[]>(['conversations', user.id]);
+      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
+        (old ?? []).map((c) =>
+          c.id === conversationId
+            ? { ...c, viewerPinnedAt: pinned ? new Date().toISOString() : null }
+            : c,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(['conversations', user.id], ctx.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+    },
+  });
+
+  const pendingDeleteConversation = pendingDeleteId
+    ? (conversations ?? []).find((c) => c.id === pendingDeleteId)
+    : undefined;
+  const pendingDeleteTitle = pendingDeleteConversation
+    ? getConversationDisplayTitle(pendingDeleteConversation, user.id, users ?? [])
+    : 'чат';
+  const { data: members } = useConversationMembers(activeId, user.id);
+
   const messages = flattenMessages(messagePages?.pages);
   const { typingText } = useTypingIndicator(activeId, user.id, users ?? []);
 
-  const pinnedId = activeConversation?.pinnedMessageIds?.[0];
-  const pinnedMessage = pinnedId ? messages.find((m) => m.id === pinnedId) : undefined;
+  const pinnedIds = activeConversation?.pinnedMessageIds ?? [];
+  const pinnedIdsKey = pinnedIds.join(',');
 
-  const canCreate = canCreatePersonalChat(user) || canCreateGroupChat(user);
+  const { data: pinnedLoaded = [] } = useQuery({
+    queryKey: ['pinned-messages', activeId, user.id, pinnedIdsKey],
+    queryFn: async () => {
+      if (!activeId || pinnedIds.length === 0) return [] as Message[];
+      const rows = await Promise.all(
+        pinnedIds.map((id) =>
+          api.chat.getMessage(activeId, id, user.id).catch(() => null),
+        ),
+      );
+      return rows.filter((m): m is Message => !!m && !m.deletedAt);
+    },
+    enabled: !!activeId && pinnedIds.length > 0,
+  });
+
+  const orderedPinned = orderPinnedMessagesNewestFirst(pinnedIds, pinnedLoaded);
+
+  useEffect(() => {
+    setPinnedCycleIndex(0);
+    freezePinnedScrollSyncRef.current = false;
+  }, [activeId, pinnedIdsKey]);
+
+  useEffect(() => {
+    if (orderedPinned.length === 0) {
+      setPinnedCycleIndex(0);
+      return;
+    }
+    if (pinnedCycleIndex >= orderedPinned.length) {
+      setPinnedCycleIndex(0);
+    }
+  }, [orderedPinned.length, pinnedCycleIndex]);
+
+  const pinnedMessage =
+    orderedPinned.length > 0
+      ? orderedPinned[pinnedCycleIndex % orderedPinned.length]
+      : undefined;
 
   useEffect(() => {
     if (!activeId) {
@@ -183,6 +328,63 @@ export default function ChatPage() {
     deleteMutation.mutate({ conversationId: activeId, messageId: message.id, userId: user.id });
   };
 
+  const handleReact = (message: Message, emoji: string) => {
+    if (!activeId) return;
+    void api.chat.setMessageReaction(activeId, message.id, user.id, emoji).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['messages', activeId, user.id] });
+    });
+  };
+
+  const handlePinMessage = (message: Message) => {
+    if (!activeId) return;
+    const alreadyPinned = activeConversation?.pinnedMessageIds?.includes(message.id);
+    const op = alreadyPinned
+      ? api.chat.unpinMessage(activeId, message.id, user.id)
+      : api.chat.pinMessage(activeId, message.id, user.id);
+    void op.then(() => {
+      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['conversation', activeId, user.id] });
+      queryClient.invalidateQueries({ queryKey: ['pinned-messages', activeId, user.id] });
+    });
+  };
+
+  const handleUnpinMessage = (message: Message) => {
+    if (!activeId) return;
+    void api.chat.unpinMessage(activeId, message.id, user.id).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['conversation', activeId, user.id] });
+      queryClient.invalidateQueries({ queryKey: ['pinned-messages', activeId, user.id] });
+    });
+  };
+
+  const handlePinnedBarClick = () => {
+    if (!pinnedMessage || orderedPinned.length === 0) return;
+    freezePinnedScrollSyncRef.current = true;
+    messageListRef.current?.scrollToMessage(pinnedMessage.id);
+    if (orderedPinned.length > 1) {
+      setPinnedCycleIndex((i) => (i + 1) % orderedPinned.length);
+    }
+  };
+
+  const handlePinnedIndexFromScroll = useCallback((index: number) => {
+    if (freezePinnedScrollSyncRef.current) return;
+    setPinnedCycleIndex((prev) => (prev === index ? prev : index));
+  }, []);
+
+  const handlePinnedScrollResume = useCallback(() => {
+    freezePinnedScrollSyncRef.current = false;
+  }, []);
+
+  const handleForward = (targetIds: string[]) => {
+    if (!activeId || !forwardMessage) return;
+    void api.chat
+      .forwardMessage(activeId, forwardMessage.id, user.id, targetIds)
+      .then(() => {
+        setForwardMessage(null);
+        queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      });
+  };
+
   const handleRetryMessage = (message: Message) => {
     if (!activeId) return;
     sendMutation.mutate({
@@ -205,8 +407,16 @@ export default function ChatPage() {
   };
 
   const handleImageClick = (message: Message, index: number) => {
-    const images = message.attachments?.filter((a) => a.type === 'image') ?? [];
-    if (images.length > 0) setImageViewer({ images, index });
+    const allImages: MessageAttachment[] = [];
+    let startIndex = 0;
+    for (const m of messages) {
+      const imgs = m.attachments?.filter((a) => a.type === 'image') ?? [];
+      if (m.id === message.id) {
+        startIndex = allImages.length + index;
+      }
+      allImages.push(...imgs);
+    }
+    if (allImages.length > 0) setImageViewer({ images: allImages, index: startIndex });
   };
 
   const convForbidden = convError instanceof ApiError && convError.status === 403;
@@ -218,9 +428,13 @@ export default function ChatPage() {
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-h2">Чат</h1>
           {canCreate && (
-            <Button size="icon" variant="secondary" onClick={() => setCreateOpen(true)} aria-label="Новый чат">
-              <Plus className="h-5 w-5" />
-            </Button>
+            <IconButton
+              label="Новый чат"
+              variant="secondary"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="h-5 w-5" aria-hidden />
+            </IconButton>
           )}
         </div>
         <ChatSearch value={search} onChange={setSearch} icon={Search} />
@@ -239,13 +453,24 @@ export default function ChatPage() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <ConversationList
             conversations={conversations ?? []}
-            currentUserId={user.id}
+            currentUser={user}
             users={users ?? []}
             activeId={activeId}
             search={search}
             filter={filter}
             isLoading={listLoading}
             onSelect={handleSelect}
+            onEdit={(conv) => setSettingsConversation(conv)}
+            onDelete={(conv) => {
+              if (deleteConversationMutation.isPending) return;
+              setPendingDeleteId(conv.id);
+            }}
+            onPin={(conv, pinned) => {
+              pinConversationMutation.mutate({ conversationId: conv.id, pinned });
+            }}
+            onMute={(conv, muted) => {
+              muteConversationMutation.mutate({ conversationId: conv.id, muted });
+            }}
             emptyAction={
               canCreate ? (
                 <Button onClick={() => setCreateOpen(true)}>
@@ -273,11 +498,18 @@ export default function ChatPage() {
             onBack={handleBack}
           />
 
-          {pinnedMessage && (
+          {pinnedMessage && orderedPinned.length > 0 && (
             <PinnedMessageBar
               message={pinnedMessage}
               sender={users?.find((u) => u.id === pinnedMessage.senderId)}
-              onClick={() => messageListRef.current?.scrollToMessage(pinnedMessage.id)}
+              pinnedCount={orderedPinned.length}
+              currentIndex={(pinnedCycleIndex % orderedPinned.length) + 1}
+              onClick={handlePinnedBarClick}
+              onUnpin={
+                activeId && members && canPinMessage(user, members, activeId)
+                  ? () => handleUnpinMessage(pinnedMessage)
+                  : undefined
+              }
             />
           )}
 
@@ -331,8 +563,20 @@ export default function ChatPage() {
                 onReply={setReplyTo}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onForward={setForwardMessage}
+                onReact={handleReact}
+                onPin={
+                  activeId && members && canPinMessage(user, members, activeId)
+                    ? handlePinMessage
+                    : undefined
+                }
                 onImageClick={handleImageClick}
+                conversation={activeConversation}
+                members={members ?? []}
                 highlightMessageId={highlightMessageId}
+                pinnedIdsNewestFirst={orderedPinned.map((m) => m.id)}
+                onPinnedIndexChange={handlePinnedIndexFromScroll}
+                onPinnedScrollResume={handlePinnedScrollResume}
               />
               <TypingIndicator text={typingText} />
               <MessageComposer
@@ -342,7 +586,7 @@ export default function ChatPage() {
                 onDraftChange={setDraft}
                 onClearDraft={clearDraft}
                 onSend={handleSend}
-                isSending={sendMutation.isPending || editMutation.isPending}
+                isSending={editMutation.isPending}
                 replyTo={replyTo}
                 users={users ?? []}
                 onCancelReply={() => setReplyTo(null)}
@@ -407,8 +651,71 @@ export default function ChatPage() {
         onClose={() => setCreateOpen(false)}
         currentUser={user}
         users={users ?? []}
-        onCreated={(conversationId) => navigate(`/chat/${conversationId}`)}
+        onCreated={(conversationId) => {
+          setCreateOpen(false);
+          navigate(`/chat/${conversationId}`);
+        }}
       />
+
+      <ForwardMessageModal
+        open={!!forwardMessage}
+        onClose={() => setForwardMessage(null)}
+        conversations={conversations ?? []}
+        currentUserId={user.id}
+        users={users ?? []}
+        excludeConversationId={activeId}
+        onForward={handleForward}
+      />
+
+      <ConfirmDialog
+        open={!!pendingDeleteId}
+        onClose={() => {
+          if (deleteConversationMutation.isPending) return;
+          setPendingDeleteId(null);
+          deleteConversationMutation.reset();
+        }}
+        title="Удалить чат?"
+        description={
+          <>
+            <p>«{pendingDeleteTitle}» будет удалён без возможности восстановления.</p>
+            {deleteConversationMutation.error && (
+              <p className="mt-2 text-caption text-danger" role="alert">
+                {deleteConversationMutation.error instanceof ApiError
+                  ? deleteConversationMutation.error.message
+                  : 'Не удалось удалить чат'}
+              </p>
+            )}
+          </>
+        }
+        confirmLabel="Удалить"
+        tone="destructive"
+        loading={deleteConversationMutation.isPending}
+        disabled={!isOnline || !pendingDeleteId}
+        onConfirm={() => {
+          if (!pendingDeleteId || deleteConversationMutation.isPending) return;
+          deleteConversationMutation.mutate(pendingDeleteId);
+        }}
+      />
+
+      {settingsConversation && (
+        <ConversationSettings
+          open
+          onClose={() => setSettingsConversation(null)}
+          conversation={
+            conversations?.find((c) => c.id === settingsConversation.id) ?? settingsConversation
+          }
+          currentUser={user}
+          users={users ?? []}
+          onLeft={() => {
+            setSettingsConversation(null);
+            if (activeId === settingsConversation.id) navigate('/chat');
+          }}
+          onDeleted={() => {
+            setSettingsConversation(null);
+            if (activeId === settingsConversation.id) navigate('/chat');
+          }}
+        />
+      )}
 
       {imageViewer && (
         <ImageViewer

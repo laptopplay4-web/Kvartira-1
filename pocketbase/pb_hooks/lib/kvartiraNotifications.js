@@ -18,9 +18,43 @@ function relId(value) {
 }
 
 /**
+ * Does a teacher share a lesson, an assignment group or a conversation with
+ * the target user? Without this check any teacher could push a notification —
+ * i.e. arbitrary text with a link — to every account in the school.
+ *
+ * @param {core.App} app
+ * @param {string} teacherId
+ * @param {string} targetUserId
+ * @returns {boolean}
+ */
+function teacherSharesContextWith(app, teacherId, targetUserId) {
+  /** @type {Array<[string, string]>} */
+  const probes = [
+    ['lessons', `teacher = {:staff} && student = {:target}`],
+    ['assignment_groups', `teacher = {:staff} && members ~ {:target}`],
+    ['conversations', `participantIds ~ {:staff} && participantIds ~ {:target}`],
+  ];
+
+  for (const [collection, filter] of probes) {
+    try {
+      const found = app.findFirstRecordByFilter(collection, filter, {
+        staff: teacherId,
+        target: targetUserId,
+      });
+      if (found) return true;
+    } catch (_) {
+      /* no match — PocketBase throws instead of returning null */
+    }
+  }
+
+  return false;
+}
+
+/**
+ * @param {core.App} app
  * @param {core.RecordRequestEvent} e
  */
-function assertNotificationCreate(e) {
+function assertNotificationCreate(app, e) {
   const auth = e.auth;
   if (!auth) {
     return;
@@ -30,7 +64,8 @@ function assertNotificationCreate(e) {
   if (userId === auth.id) return;
 
   const role = auth.getString('role');
-  if (role === 'admin' || role === 'teacher') return;
+  if (role === 'admin') return;
+  if (role === 'teacher' && teacherSharesContextWith(app, auth.id, userId)) return;
 
   throw new ApiError(403, 'Нет доступа');
 }
@@ -100,6 +135,7 @@ function assertNotificationPreferencesUpdate(e) {
 
 module.exports = {
   relId,
+  teacherSharesContextWith,
   assertNotificationCreate,
   assertNotificationUpdate,
   assertNotificationPreferencesCreate,

@@ -1,10 +1,17 @@
 import { Link } from 'react-router-dom';
-import { Settings, Shield, LogOut, ChevronRight, TrendingUp, HelpCircle, FileText } from 'lucide-react';
-import { isProgressFeatureEnabled } from '@/config/features';
+import {
+  Settings,
+  Shield,
+  LogOut,
+  ChevronRight,
+  HelpCircle,
+  FileText,
+  Music2,
+} from 'lucide-react';
 import { useCurrentUser, useAuthStore } from '@/stores/authStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAvatarMutations } from '@/hooks/useAvatarMutations';
-import { getRoleLabel, can } from '@/permissions';
+import { getRoleLabel, can, actsAsTeacher } from '@/permissions';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -18,11 +25,8 @@ export default function ProfilePage() {
 
   const menuItems = [
     { to: '/profile/settings', icon: Settings, label: 'Настройки' },
-    ...(isProgressFeatureEnabled() &&
-    (can(user, 'progress:view-own') ||
-      can(user, 'progress:view-assigned') ||
-      can(user, 'progress:view-all'))
-      ? [{ to: '/profile/progress', icon: TrendingUp, label: 'Прогресс' }]
+    ...(user.role === 'student' || actsAsTeacher(user.role)
+      ? [{ to: '/profile/directions', icon: Music2, label: 'Направления' }]
       : []),
     ...(can(user, 'support:view-faq') ? [{ to: '/profile/help', icon: HelpCircle, label: 'Помощь' }] : []),
     ...(can(user, 'legal:view-own')

@@ -3,13 +3,17 @@
  * PB hook sends POST here when WEB_PUSH_RELAY_URL is set (e.g. http://127.0.0.1:3001/send).
  *
  * Env: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:...)
+ *      WEB_PUSH_RELAY_SECRET — shared secret, required outside NODE_ENV=development
  * Usage: npm run push:relay
  */
 
 import http from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import webpush from 'web-push';
 
 const port = Number(process.env.PUSH_RELAY_PORT || 3001);
+const relaySecret = process.env.WEB_PUSH_RELAY_SECRET || '';
+const isDev = process.env.NODE_ENV === 'development';
 const subject = process.env.VAPID_SUBJECT || 'mailto:admin@kvartira.local';
 const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.VITE_VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -19,11 +23,30 @@ if (!publicKey || !privateKey) {
   process.exit(1);
 }
 
+if (!relaySecret && !isDev) {
+  console.error('Set WEB_PUSH_RELAY_SECRET (same value in the PocketBase env) to run push relay');
+  process.exit(1);
+}
+
 webpush.setVapidDetails(subject, publicKey, privateKey);
+
+/** Constant-time compare that tolerates differing lengths. */
+function secretMatches(provided) {
+  if (!relaySecret) return true;
+  const a = Buffer.from(String(provided || ''));
+  const b = Buffer.from(relaySecret);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 const server = http.createServer(async (req, res) => {
   if (req.method !== 'POST' || req.url !== '/send') {
     res.writeHead(404);
+    res.end();
+    return;
+  }
+
+  if (!secretMatches(req.headers['x-relay-secret'])) {
+    res.writeHead(401);
     res.end();
     return;
   }

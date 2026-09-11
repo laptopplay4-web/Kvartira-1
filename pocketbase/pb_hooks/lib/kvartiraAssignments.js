@@ -133,23 +133,65 @@ function assertAssignmentGroupUpdate(app, e) {
 }
 
 /**
- * @param {core.App} _app
+ * @param {core.App} app
  * @param {core.RecordRequestEvent} e
  */
-function assertAssignmentGroupDelete(_app, e) {
+function assertAssignmentGroupDelete(app, e) {
   const users = require(`${__hooks}/lib/kvartiraUsers.js`);
   if (users.isUserPurgeInProgress()) return;
 
   const auth = e.auth;
   if (!auth) return;
-  if (!isUsersAuth(auth) || auth.getString('role') === 'admin') return;
 
   const kind = e.record.getString('kind');
   if (kind === 'general') {
     throw new ApiError(403, 'Общую группу нельзя удалить');
   }
+
+  if (!isUsersAuth(auth) || auth.getString('role') === 'admin') {
+    purgeAssignmentsForGroup(app, e.record.id);
+    return;
+  }
+
   if (relId(e.record.get('teacher')) !== auth.id) {
     throw new ApiError(403, 'Нет доступа');
+  }
+  purgeAssignmentsForGroup(app, e.record.id);
+}
+
+/**
+ * assignments.group is required without cascadeDelete — remove linked rows first.
+ * @param {core.App} app
+ * @param {string} groupId
+ */
+function purgeAssignmentsForGroup(app, groupId) {
+  if (!groupId) return;
+  const batchSize = 200;
+  for (let i = 0; i < 50; i += 1) {
+    /** @type {Record[]} */
+    let rows = [];
+    try {
+      rows =
+        app.findRecordsByFilter(
+          'assignments',
+          'group = {:groupId}',
+          '-id',
+          batchSize,
+          0,
+          { groupId },
+        ) || [];
+    } catch (_) {
+      return;
+    }
+    if (!rows.length) return;
+    for (const row of rows) {
+      try {
+        app.delete(row);
+      } catch (_) {
+        /* best-effort */
+      }
+    }
+    if (rows.length < batchSize) return;
   }
 }
 
@@ -173,5 +215,6 @@ module.exports = {
   assertAssignmentGroupCreate,
   assertAssignmentGroupUpdate,
   assertAssignmentGroupDelete,
+  purgeAssignmentsForGroup,
   relId,
 };

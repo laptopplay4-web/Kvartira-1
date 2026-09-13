@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.166 User content legal + report message · 2026-09-13
+Версия: 1.167 Pending consent modal + legal bootstrap · 2026-09-13
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -93,7 +93,7 @@ kvartira/
 │   │   ├── chat/                # ConversationList, MessageList, MessageComposer, …
 │   │   ├── calendar/            # LessonCalendar, Day/Week/Month views
 │   │   ├── availability/        # AvailabilityMonthCalendar, AvailabilityIntervalModal
-│   │   └── legal/               # LegalDocumentEditModal, LegalPublishVersionModal
+│   │   └── legal/               # CookieConsent*, ConsentCheckbox, PendingConsentModal, CMS modals
 │   ├── hooks/
 │   │   ├── useOnlineStatus.ts
 │   │   ├── useCalendarLessons.ts
@@ -1421,8 +1421,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **699** (48 files); booking cancel flake вне scope; §166 legal+report |
-| Graphify | 2804 nodes, 3103 edges, 428 communities |
+| Тесты | **702** (48 files); booking cancel flake вне scope; §167 pending consent + bootstrap |
+| Graphify | 2830 nodes, 3121 edges, 440 communities |
 
 ### Фазы (кратко)
 
@@ -1444,7 +1444,35 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2818 nodes, 3109 edges, 432 communities (post-§166).
+**Graphify stats:** 2830 nodes, 3121 edges, 440 communities (post-§167).
+
+---
+
+## 167. Pending consent modal + legal bootstrap (2026-09-13)
+
+**Scope:** убрать блок «Требуют согласия» из профиля; gate при обновлении документов; починить пустые legal_documents на сервере.
+
+**Graphify:** `PendingConsentModal()` → `getPendingConsents()` → `AppLayout`; `1792400000_*` / `kvartiraLegalBootstrap.js` → `legal_documents`.
+
+### Profile UI (✅)
+
+- `LegalConsentsPage`: нет секции pending; «Принятые согласия»; убран комментарий про 152-ФЗ / доступ к данным; кнопка экспорта остаётся.
+- `PendingConsentModal` в `AppLayout`: не dismissible; галочки unchecked; ссылка на документ; «Принять» только после всех галочек.
+
+### Production legal empty (✅)
+
+- Миграция `1792400000_kvartira_legal_docs_bootstrap.js`: optional bools, autodate, bootstrap missing docs.
+- Hook `onBootstrap` → `ensureRequiredLegalDocuments` (idempotent, не перезаписывает существующие).
+- `getDocuments` sort `-id`; `ensureLegal` / seed создают school_rules с `requiresConsent: false`.
+- Рекомендуется `npm run pb:seed:legal` для полных текстов после migrate.
+
+### Tests
+
+`legal` gate wiring; schema bootstrap migration; adapter bootstrap + sort. Suite **702** (48 files). typecheck ✅.
+
+### Deploy
+
+Миграция `1792400000_*` + `pb_hooks` (`legal.pb.js`, `kvartiraLegalBootstrap.js`) + фронт; **перезапуск PocketBase**; опционально `pb:seed:legal`.
 
 ---
 

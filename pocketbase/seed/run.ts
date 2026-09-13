@@ -311,9 +311,9 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
       content: doc.content,
       currentVersion: doc.currentVersion,
       effectiveAt: doc.effectiveAt,
-      requiresConsent: doc.requiresConsent,
+      requiresConsent: doc.requiresConsent === true,
       purpose: doc.purpose ?? '',
-      required: doc.required ?? false,
+      required: doc.required === true,
       versionHistory: doc.versionHistory ?? [],
     });
     ids.set(doc.id, rec.id);

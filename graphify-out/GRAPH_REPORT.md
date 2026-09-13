@@ -1,12 +1,12 @@
 # Graph Report - Kvartira 1  (2026-09-13)
 
 ## Corpus Check
-- 450 files · ~205,662 words
+- 453 files · ~207,075 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2818 nodes · 3109 edges · 432 communities (286 shown, 146 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 121 edges (avg confidence: 0.55)
+- 2830 nodes · 3121 edges · 440 communities (292 shown, 148 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 122 edges (avg confidence: 0.55)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -305,7 +305,14 @@
 - cookies/helpers.ts
 - zod
 - ReportMessageModal.tsx
-- class-variance-authority
+- kvartiraInvite.js
+- kvartiraSecurity.js
+- pocketbase
+- kvartiraNotifications.js
+- 1792400000_kvartira_legal_docs_bootstrap.js
+- 1789104000_kvartira_all_autodate.js
+- kvartiraLegalBootstrap.js
+- clsx
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
@@ -334,7 +341,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (432 total, 146 thin omitted)
+## Communities (440 total, 148 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -673,8 +680,8 @@ Cohesion: 0.18
 Nodes (10): AVATAR_TEXT_MAX_MIGRATION, AVATAR_TEXT_MIGRATION, MIGRATION, REQUIRED_COLLECTIONS, ROOT, SCHEMA_DOC, USER_CASCADE_FIX_MIGRATION, USER_CASCADE_MIGRATION (+2 more)
 
 ### Community 226 - "kvartiraAuth.js"
-Cohesion: 0.05
-Nodes (38): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+30 more)
+Cohesion: 0.28
+Nodes (11): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+3 more)
 
 ### Community 227 - "pocketbaseAuth.test.ts"
 Cohesion: 0.18
@@ -902,7 +909,7 @@ Nodes (3): EventParticipationDeltaBadges(), EventParticipationDeltaBadgesProps, 
 
 ### Community 400 - "dependencies"
 Cohesion: 0.15
-Nodes (13): clsx, dependencies, clsx, pocketbase, qrcode, react-router-dom, tailwind-merge, @tanstack/react-query (+5 more)
+Nodes (13): class-variance-authority, dependencies, class-variance-authority, pocketbase, qrcode, react-router-dom, tailwind-merge, @tanstack/react-query (+5 more)
 
 ### Community 401 - "orientation.ts"
 Cohesion: 0.47
@@ -936,22 +943,42 @@ Nodes (5): COOKIE_CONSENT_BODY, COOKIE_CONSENT_LABELS, COOKIE_CONSENT_STORAGE_KE
 Cohesion: 0.24
 Nodes (10): acceptCookieConsent(), buildPreferences(), decideCookieConsent(), getCookieConsentPreferences(), hasAcceptedCookieConsent(), hasCookieConsentDecision(), parseStored(), preferencesFromDecision() (+2 more)
 
+### Community 429 - "kvartiraInvite.js"
+Cohesion: 0.36
+Nodes (11): asObject(), assertRegistrationInviteOnUserCreate(), decodeJsonField(), findSchoolSettingsRecord(), isDevEnvironment(), isValidInviteToken(), readInviteFromRequest(), readJsonObjectField() (+3 more)
+
+### Community 432 - "kvartiraSecurity.js"
+Cohesion: 0.31
+Nodes (8): assertSecuritySessionCreate(), assertSecuritySessionUpdate(), auth, fingerprintToken(), markOnlyCurrentSession(), recordSecuritySession(), relId(), trimSecuritySessions()
+
+### Community 434 - "kvartiraNotifications.js"
+Cohesion: 0.36
+Nodes (6): assertNotificationCreate(), assertNotificationPreferencesCreate(), assertNotificationPreferencesUpdate(), isUsersAuth(), relId(), teacherSharesContextWith()
+
+### Community 435 - "1792400000_kvartira_legal_docs_bootstrap.js"
+Cohesion: 0.40
+Nodes (3): BOOTSTRAP_DOCS, bootstrapMissingLegalDocuments(), findExisting()
+
+### Community 437 - "kvartiraLegalBootstrap.js"
+Cohesion: 0.67
+Nodes (3): DOCS, ensureRequiredLegalDocuments(), findExisting()
+
 ## Knowledge Gaps
-- **941 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+936 more)
+- **943 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+938 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **146 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **148 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `LessonsApi` connect `LessonsApi` to `types.ts`?**
+- **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
+- **Why does `AuthApi` connect `AuthApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _941 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _943 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

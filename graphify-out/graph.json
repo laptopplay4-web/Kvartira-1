@@ -307,8 +307,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "package_dependencies_class_variance_authority",
-      "community": 429,
-      "community_name": "class-variance-authority",
+      "community": 400,
+      "community_name": "dependencies",
       "norm_label": "class-variance-authority"
     },
     {
@@ -318,8 +318,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "class_variance_authority",
-      "community": 429,
-      "community_name": "class-variance-authority",
+      "community": 400,
+      "community_name": "dependencies",
       "norm_label": "class-variance-authority"
     },
     {
@@ -329,8 +329,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "package_dependencies_clsx",
-      "community": 400,
-      "community_name": "dependencies",
+      "community": 438,
+      "community_name": "clsx",
       "norm_label": "clsx"
     },
     {
@@ -340,8 +340,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "clsx",
-      "community": 400,
-      "community_name": "dependencies",
+      "community": 438,
+      "community_name": "clsx",
       "norm_label": "clsx"
     },
     {
@@ -1932,8 +1932,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirafiles",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "kvartirafiles.js"
     },
     {
@@ -1943,8 +1943,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirafiles_purposes",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "purposes"
     },
     {
@@ -1955,8 +1955,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirafiles_assertfilecreate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "assertfilecreate()"
     },
     {
@@ -1967,8 +1967,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirafiles_assertfileupdate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "assertfileupdate()"
     },
     {
@@ -1978,8 +1978,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "kvartirainvite.js"
     },
     {
@@ -1990,8 +1990,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_asobject",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "asobject()"
     },
     {
@@ -2002,8 +2002,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_decodejsonfield",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "decodejsonfield()"
     },
     {
@@ -2014,8 +2014,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_readjsonobjectfield",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "readjsonobjectfield()"
     },
     {
@@ -2026,8 +2026,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_tokensequal",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "tokensequal()"
     },
     {
@@ -2038,8 +2038,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_findschoolsettingsrecord",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "findschoolsettingsrecord()"
     },
     {
@@ -2050,8 +2050,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_readstoredinvite",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "readstoredinvite()"
     },
     {
@@ -2062,8 +2062,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_isvalidinvitetoken",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "isvalidinvitetoken()"
     },
     {
@@ -2074,8 +2074,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_readinvitefromrequest",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "readinvitefromrequest()"
     },
     {
@@ -2086,8 +2086,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_stripinvitefromschoolsettingsrecord",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "stripinvitefromschoolsettingsrecord()"
     },
     {
@@ -2098,8 +2098,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_assertregistrationinviteonusercreate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "assertregistrationinviteonusercreate()"
     },
     {
@@ -2110,8 +2110,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirainvite_isdevenvironment",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 429,
+      "community_name": "kvartiraInvite.js",
       "norm_label": "isdevenvironment()"
     },
     {
@@ -2246,6 +2246,52 @@
       "norm_label": "assertlegaldocumentupdate()"
     },
     {
+      "label": "kvartiraLegalBootstrap.js",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap",
+      "community": 437,
+      "community_name": "kvartiraLegalBootstrap.js",
+      "norm_label": "kvartiralegalbootstrap.js"
+    },
+    {
+      "label": "DOCS",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap_docs",
+      "community": 437,
+      "community_name": "kvartiraLegalBootstrap.js",
+      "norm_label": "docs"
+    },
+    {
+      "label": "findExisting()",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js",
+      "source_location": "L77",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap_findexisting",
+      "community": 437,
+      "community_name": "kvartiraLegalBootstrap.js",
+      "norm_label": "findexisting()"
+    },
+    {
+      "label": "ensureRequiredLegalDocuments()",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js",
+      "source_location": "L98",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap_ensurerequiredlegaldocuments",
+      "community": 437,
+      "community_name": "kvartiraLegalBootstrap.js",
+      "norm_label": "ensurerequiredlegaldocuments()"
+    },
+    {
       "label": "kvartiraLessons.js",
       "file_type": "code",
       "source_file": "pocketbase/pb_hooks/lib/kvartiraLessons.js",
@@ -2368,8 +2414,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "kvartiranotifications.js"
     },
     {
@@ -2380,8 +2426,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications_relid",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "relid()"
     },
     {
@@ -2392,8 +2438,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications_teachersharescontextwith",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "teachersharescontextwith()"
     },
     {
@@ -2404,8 +2450,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications_assertnotificationcreate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "assertnotificationcreate()"
     },
     {
@@ -2416,8 +2462,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications_assertnotificationupdate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "assertnotificationupdate()"
     },
     {
@@ -2428,8 +2474,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications_isusersauth",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "isusersauth()"
     },
     {
@@ -2440,8 +2486,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications_assertnotificationpreferencescreate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "assertnotificationpreferencescreate()"
     },
     {
@@ -2452,8 +2498,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications_assertnotificationpreferencesupdate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "assertnotificationpreferencesupdate()"
     },
     {
@@ -2464,8 +2510,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartiranotifications_createnotificationforuser",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 434,
+      "community_name": "kvartiraNotifications.js",
       "norm_label": "createnotificationforuser()"
     },
     {
@@ -2615,8 +2661,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "kvartirasecurity.js"
     },
     {
@@ -2626,8 +2672,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_auth",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "auth"
     },
     {
@@ -2638,8 +2684,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_relid",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "relid()"
     },
     {
@@ -2650,8 +2696,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_fingerprinttoken",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "fingerprinttoken()"
     },
     {
@@ -2662,8 +2708,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_markonlycurrentsession",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "markonlycurrentsession()"
     },
     {
@@ -2674,8 +2720,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_trimsecuritysessions",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "trimsecuritysessions()"
     },
     {
@@ -2686,8 +2732,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_recordsecuritysession",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "recordsecuritysession()"
     },
     {
@@ -2698,8 +2744,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_assertsecuritysessioncreate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "assertsecuritysessioncreate()"
     },
     {
@@ -2710,8 +2756,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_assertsecuritysessionupdate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "assertsecuritysessionupdate()"
     },
     {
@@ -2722,8 +2768,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_hooks_lib_kvartirasecurity_assertsecurityalertupdate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 432,
+      "community_name": "kvartiraSecurity.js",
       "norm_label": "assertsecurityalertupdate()"
     },
     {
@@ -3241,8 +3287,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789017600_kvartira_messages_autodate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "1789017600_kvartira_messages_autodate.js"
     },
     {
@@ -3253,8 +3299,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789017600_kvartira_messages_autodate_addautodatefields",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "addautodatefields()"
     },
     {
@@ -3265,8 +3311,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789017600_kvartira_messages_autodate_backfillmessagetimestamps",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "backfillmessagetimestamps()"
     },
     {
@@ -3277,8 +3323,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789017600_kvartira_messages_autodate_removeautodatefields",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "removeautodatefields()"
     },
     {
@@ -3288,8 +3334,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789104000_kvartira_all_autodate",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 436,
+      "community_name": "1789104000_kvartira_all_autodate.js",
       "norm_label": "1789104000_kvartira_all_autodate.js"
     },
     {
@@ -3299,8 +3345,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789104000_kvartira_all_autodate_collections",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 436,
+      "community_name": "1789104000_kvartira_all_autodate.js",
       "norm_label": "collections"
     },
     {
@@ -3311,8 +3357,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789104000_kvartira_all_autodate_ensureautodatefields",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 436,
+      "community_name": "1789104000_kvartira_all_autodate.js",
       "norm_label": "ensureautodatefields()"
     },
     {
@@ -3323,8 +3369,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789104000_kvartira_all_autodate_backfillcollectiontimestamps",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 436,
+      "community_name": "1789104000_kvartira_all_autodate.js",
       "norm_label": "backfillcollectiontimestamps()"
     },
     {
@@ -3335,8 +3381,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "pocketbase_pb_migrations_1789104000_kvartira_all_autodate_removeautodatefields",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 436,
+      "community_name": "1789104000_kvartira_all_autodate.js",
       "norm_label": "removeautodatefields()"
     },
     {
@@ -3817,6 +3863,76 @@
       "community": 431,
       "community_name": "1792300000_kvartira_support_report_context.js",
       "norm_label": "1792300000_kvartira_support_report_context.js"
+    },
+    {
+      "label": "1792400000_kvartira_legal_docs_bootstrap.js",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap",
+      "community": 435,
+      "community_name": "1792400000_kvartira_legal_docs_bootstrap.js",
+      "norm_label": "1792400000_kvartira_legal_docs_bootstrap.js"
+    },
+    {
+      "label": "BOOTSTRAP_DOCS",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_bootstrap_docs",
+      "community": 435,
+      "community_name": "1792400000_kvartira_legal_docs_bootstrap.js",
+      "norm_label": "bootstrap_docs"
+    },
+    {
+      "label": "relaxBoolField()",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L88",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_relaxboolfield",
+      "community": 435,
+      "community_name": "1792400000_kvartira_legal_docs_bootstrap.js",
+      "norm_label": "relaxboolfield()"
+    },
+    {
+      "label": "ensureAutodateFields()",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L101",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_ensureautodatefields",
+      "community": 435,
+      "community_name": "1792400000_kvartira_legal_docs_bootstrap.js",
+      "norm_label": "ensureautodatefields()"
+    },
+    {
+      "label": "findExisting()",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L132",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_findexisting",
+      "community": 435,
+      "community_name": "1792400000_kvartira_legal_docs_bootstrap.js",
+      "norm_label": "findexisting()"
+    },
+    {
+      "label": "bootstrapMissingLegalDocuments()",
+      "file_type": "code",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L151",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_bootstrapmissinglegaldocuments",
+      "community": 435,
+      "community_name": "1792400000_kvartira_legal_docs_bootstrap.js",
+      "norm_label": "bootstrapmissinglegaldocuments()"
     },
     {
       "label": "push-relay.mjs",
@@ -4529,7 +4645,7 @@
       "label": "AppLayout()",
       "file_type": "code",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L19",
+      "source_location": "L20",
       "_callable": true,
       "_origin": "ast",
       "id": "src_app_layouts_applayout",
@@ -4541,7 +4657,7 @@
       "label": "AuthRouteLoading()",
       "file_type": "code",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L111",
+      "source_location": "L113",
       "_callable": true,
       "_origin": "ast",
       "id": "src_app_layouts_authrouteloading",
@@ -4553,7 +4669,7 @@
       "label": "ProtectedRoute()",
       "file_type": "code",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L117",
+      "source_location": "L119",
       "_callable": true,
       "_origin": "ast",
       "id": "src_app_layouts_protectedroute",
@@ -4565,7 +4681,7 @@
       "label": "GuestRoute()",
       "file_type": "code",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L126",
+      "source_location": "L128",
       "_callable": true,
       "_origin": "ast",
       "id": "src_app_layouts_guestroute",
@@ -4577,7 +4693,7 @@
       "label": "AdminRoute()",
       "file_type": "code",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L134",
+      "source_location": "L136",
       "_callable": true,
       "_origin": "ast",
       "id": "src_app_layouts_adminroute",
@@ -7677,6 +7793,29 @@
       "community": 170,
       "community_name": "LegalPublishVersionModal.tsx",
       "norm_label": "legalpublishversionmodal()"
+    },
+    {
+      "label": "PendingConsentModal.tsx",
+      "file_type": "code",
+      "source_file": "src/components/legal/PendingConsentModal.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_components_legal_pendingconsentmodal",
+      "community": 439,
+      "community_name": "PendingConsentModal.tsx",
+      "norm_label": "pendingconsentmodal.tsx"
+    },
+    {
+      "label": "PendingConsentModal()",
+      "file_type": "code",
+      "source_file": "src/components/legal/PendingConsentModal.tsx",
+      "source_location": "L17",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_components_legal_pendingconsentmodal_pendingconsentmodal",
+      "community": 439,
+      "community_name": "PendingConsentModal.tsx",
+      "norm_label": "pendingconsentmodal()"
     },
     {
       "label": "AvatarActionSheet.tsx",
@@ -27525,7 +27664,7 @@
       "label": "createTestDb()",
       "file_type": "code",
       "source_file": "src/test/legal.test.ts",
-      "source_location": "L29",
+      "source_location": "L31",
       "_callable": true,
       "_origin": "ast",
       "id": "src_test_legal_test_createtestdb",
@@ -32501,7 +32640,7 @@
       "label": "\u0427\u0442\u043e \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c",
       "file_type": "document",
       "source_file": "docs/PRODUCTION_READINESS.md",
-      "source_location": "L24",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "docs_production_readiness_\u0447\u0442\u043e_\u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c",
       "community": 261,
@@ -32512,7 +32651,7 @@
       "label": "\u0427\u0442\u043e \u0443\u0431\u0440\u0430\u0442\u044c / \u043d\u0435 \u0442\u0440\u043e\u0433\u0430\u0442\u044c",
       "file_type": "document",
       "source_file": "docs/PRODUCTION_READINESS.md",
-      "source_location": "L35",
+      "source_location": "L36",
       "_origin": "ast",
       "id": "docs_production_readiness_\u0447\u0442\u043e_\u0443\u0431\u0440\u0430\u0442\u044c_\u043d\u0435_\u0442\u0440\u043e\u0433\u0430\u0442\u044c",
       "community": 261,
@@ -32523,7 +32662,7 @@
       "label": "\u0427\u0442\u043e \u0438\u0441\u043f\u0440\u0430\u0432\u0438\u0442\u044c / \u0434\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c",
       "file_type": "document",
       "source_file": "docs/PRODUCTION_READINESS.md",
-      "source_location": "L41",
+      "source_location": "L42",
       "_origin": "ast",
       "id": "docs_production_readiness_\u0447\u0442\u043e_\u0438\u0441\u043f\u0440\u0430\u0432\u0438\u0442\u044c_\u0434\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c",
       "community": 261,
@@ -32534,7 +32673,7 @@
       "label": "\u041a\u0440\u0438\u0442\u0435\u0440\u0438\u0439 \u00ab\u043c\u043e\u0436\u043d\u043e \u043f\u0443\u0441\u043a\u0430\u0442\u044c \u0443\u0447\u0435\u043d\u0438\u043a\u043e\u0432\u00bb",
       "file_type": "document",
       "source_file": "docs/PRODUCTION_READINESS.md",
-      "source_location": "L51",
+      "source_location": "L52",
       "_origin": "ast",
       "id": "docs_production_readiness_\u043a\u0440\u0438\u0442\u0435\u0440\u0438\u0439_\u043c\u043e\u0436\u043d\u043e_\u043f\u0443\u0441\u043a\u0430\u0442\u044c_\u0443\u0447\u0435\u043d\u0438\u043a\u043e\u0432",
       "community": 261,
@@ -32976,8 +33115,8 @@
       "source_file": "pocketbase",
       "confidence": "EXTRACTED",
       "_origin": "ast",
-      "community": 226,
-      "community_name": "kvartiraAuth.js",
+      "community": 433,
+      "community_name": "pocketbase",
       "norm_label": "pocketbase",
       "id": "pocketbase"
     }
@@ -35916,6 +36055,52 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js",
+      "source_location": "L12",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap",
+      "target": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap_docs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "indirect_call",
+      "confidence": "INFERRED",
+      "source_file": "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js",
+      "source_location": "L130",
+      "weight": 1.0,
+      "_origin": "ast",
+      "context": "collection",
+      "source": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap",
+      "target": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap_ensurerequiredlegaldocuments",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js",
+      "source_location": "L77",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap",
+      "target": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap_findexisting",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js",
+      "source_location": "L104",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap_ensurerequiredlegaldocuments",
+      "target": "pocketbase_pb_hooks_lib_kvartiralegalbootstrap_findexisting",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "indirect_call",
       "confidence": "INFERRED",
       "source_file": "pocketbase/pb_hooks/lib/kvartiraLessons.js",
@@ -37242,6 +37427,82 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "dynamic_import",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "_origin": "ast",
+      "source": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap",
+      "target": "pocketbase",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap",
+      "target": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_bootstrap_docs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L151",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap",
+      "target": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_bootstrapmissinglegaldocuments",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L101",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap",
+      "target": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_ensureautodatefields",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L132",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap",
+      "target": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_findexisting",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L88",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap",
+      "target": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_relaxboolfield",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js",
+      "source_location": "L156",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_bootstrapmissinglegaldocuments",
+      "target": "pocketbase_pb_migrations_1792400000_kvartira_legal_docs_bootstrap_findexisting",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "pocketbase/push-relay.mjs",
@@ -37537,7 +37798,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "pocketbase/seed/ensureLegal.ts",
-      "source_location": "L178",
+      "source_location": "L167",
       "weight": 1.0,
       "_origin": "ast",
       "source": "pocketbase_seed_ensurelegal_ensurelegaldocuments",
@@ -37561,7 +37822,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "pocketbase/seed/ensureLegal.ts",
-      "source_location": "L175",
+      "source_location": "L164",
       "weight": 1.0,
       "_origin": "ast",
       "source": "pocketbase_seed_ensurelegal_ensurelegaldocuments",
@@ -38898,7 +39159,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L134",
+      "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_layouts",
@@ -38909,7 +39170,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L19",
+      "source_location": "L20",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_layouts",
@@ -38920,7 +39181,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L111",
+      "source_location": "L113",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_layouts",
@@ -38931,7 +39192,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L126",
+      "source_location": "L128",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_layouts",
@@ -38942,7 +39203,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/app/layouts.tsx",
-      "source_location": "L117",
+      "source_location": "L119",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_layouts",
@@ -42055,6 +42316,17 @@
       "_origin": "ast",
       "source": "src_components_legal_legalpublishversionmodal_legalpublishversionmodal",
       "target": "src_components_legal_legalpublishversionmodal_todayiso",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/legal/PendingConsentModal.tsx",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_components_legal_pendingconsentmodal",
+      "target": "src_components_legal_pendingconsentmodal_pendingconsentmodal",
       "confidence_score": 1.0
     },
     {
@@ -63158,7 +63430,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/test/legal.test.ts",
-      "source_location": "L29",
+      "source_location": "L31",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_test_legal_test",
@@ -67550,7 +67822,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/PRODUCTION_READINESS.md",
-      "source_location": "L51",
+      "source_location": "L52",
       "weight": 1.0,
       "_origin": "ast",
       "source": "docs_production_readiness_\u0433\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c_\u043a_\u0432\u044b\u043a\u043b\u0430\u0434\u043a\u0435_\u043d\u0430_\u0441\u0435\u0440\u0432\u0435\u0440",
@@ -67572,7 +67844,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/PRODUCTION_READINESS.md",
-      "source_location": "L24",
+      "source_location": "L25",
       "weight": 1.0,
       "_origin": "ast",
       "source": "docs_production_readiness_\u0433\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c_\u043a_\u0432\u044b\u043a\u043b\u0430\u0434\u043a\u0435_\u043d\u0430_\u0441\u0435\u0440\u0432\u0435\u0440",
@@ -67583,7 +67855,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/PRODUCTION_READINESS.md",
-      "source_location": "L41",
+      "source_location": "L42",
       "weight": 1.0,
       "_origin": "ast",
       "source": "docs_production_readiness_\u0433\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c_\u043a_\u0432\u044b\u043a\u043b\u0430\u0434\u043a\u0435_\u043d\u0430_\u0441\u0435\u0440\u0432\u0435\u0440",
@@ -67594,7 +67866,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/PRODUCTION_READINESS.md",
-      "source_location": "L35",
+      "source_location": "L36",
       "weight": 1.0,
       "_origin": "ast",
       "source": "docs_production_readiness_\u0433\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c_\u043a_\u0432\u044b\u043a\u043b\u0430\u0434\u043a\u0435_\u043d\u0430_\u0441\u0435\u0440\u0432\u0435\u0440",

@@ -992,6 +992,21 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('isUsersAuth(auth)');
   });
 
+  it('legal bootstrap hook + getDocuments sort avoid empty production register', () => {
+    const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/legal.pb.js'), 'utf8');
+    const bootstrap = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js'),
+      'utf8',
+    );
+    const adapter = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/legal.ts'), 'utf8');
+
+    expect(hook).toContain('onBootstrap');
+    expect(hook).toContain('kvartiraLegalBootstrap');
+    expect(bootstrap).toContain('ensureRequiredLegalDocuments');
+    expect(bootstrap).toContain('privacy_policy');
+    expect(adapter).toContain("sort: '-id'");
+  });
+
   it('mapSecuritySessionRecord, mapLoginHistoryRecord and mapSecurityAlertRecord map relations', () => {
     const session = mapSecuritySessionRecord({
       id: 'sess-1',

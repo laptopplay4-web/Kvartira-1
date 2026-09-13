@@ -155,21 +155,10 @@ export async function ensureLegalDocuments(client: PbClient): Promise<EnsureLega
       effectiveAt: doc.effectiveAt,
       purpose: doc.purpose,
       versionHistory: doc.versionHistory,
+      // Migration 1792400000 makes requiresConsent optional — false is safe.
+      requiresConsent: doc.requiresConsent === true,
+      required: doc.required === true,
     };
-    // PB required bool: `false` is treated as blank — only send true, or skip.
-    if (doc.requiresConsent) {
-      body.requiresConsent = true;
-    } else {
-      // Informational docs (school_rules) cannot be created with requiresConsent=false
-      // on a required bool field — skip create; admin can add via UI if needed.
-      if (!existing[0]?.id) {
-        continue;
-      }
-      body.requiresConsent = true; // keep existing row updatable; content still syncs
-    }
-    if (doc.required) {
-      body.required = true;
-    }
 
     if (existing[0]?.id) {
       await client.updateRecord('legal_documents', existing[0].id, body);

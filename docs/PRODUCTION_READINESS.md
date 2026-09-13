@@ -14,12 +14,13 @@
 
 ## Нужно сделать вам перед запуском
 
-1. Выложить фронт + `pb_hooks` + миграции (`1790227200`, `1790313600`, `1790400000` и ранее некатанные) и **перезапустить PocketBase**.
-2. В `/admin/registration-qr` открыть страницу (seed автоматически заменяется) и **распечатать** QR; при компрометации — «Новый QR».
-3. Задать секреты: `WEB_PUSH_RELAY_SECRET`, VAPID, HTTPS, `VITE_API_MODE=pocketbase`.
-4. Подключить `deploy/security-headers.conf` на nginx.
-5. Отдать шаблонные тексты документов юристу (`docs/ROSKOMNADZOR_CHECKLIST.md`).
-6. Хостинг БД и бэкапов — на территории РФ.
+1. Выложить фронт + `pb_hooks` + миграции (включая `1792400000` legal bootstrap и ранее некатанные) и **перезапустить PocketBase**.
+2. (Рекомендуется) `npm run pb:seed:legal` — полные тексты документов; без seed миграция/bootstrap создаёт краткие stub, регистрация уже работает.
+3. В `/admin/registration-qr` открыть страницу (seed автоматически заменяется) и **распечатать** QR; при компрометации — «Новый QR».
+4. Задать секреты: `WEB_PUSH_RELAY_SECRET`, VAPID, HTTPS, `VITE_API_MODE=pocketbase`.
+5. Подключить `deploy/security-headers.conf` на nginx.
+6. Отдать шаблонные тексты документов юристу (`docs/ROSKOMNADZOR_CHECKLIST.md`).
+7. Хостинг БД и бэкапов — на территории РФ.
 
 ## Что добавить
 

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BottomNav, SidebarNav } from '@/components/ui/BottomNav';
 import { MobileHeader } from '@/components/ui/MobileHeader';
 import { TeacherDirectionsSetupModal } from '@/components/directions/TeacherDirectionsSetupModal';
+import { PendingConsentModal } from '@/components/legal/PendingConsentModal';
 import { useAuthStore, useCurrentUser } from '@/stores/authStore';
 import { can, isKnownUserRole, type Permission } from '@/permissions';
 import { api } from '@/services/api';
@@ -95,6 +96,7 @@ export function AppLayout() {
           <Outlet />
         </main>
         <TeacherDirectionsSetupModal />
+        <PendingConsentModal />
         {showBanner && (
           <PwaInstallBanner
             onInstall={promptInstall}

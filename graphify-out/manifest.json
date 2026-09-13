@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "src/app/layouts.tsx": {
-    "mtime": 1789274210.931246,
-    "ast_hash": "d13a778bab60556c8c8fe80d90a8539b",
+    "mtime": 1789284940.8172457,
+    "ast_hash": "946cb9f90cd5d88a7e284fd13ea2d18f",
     "semantic_hash": ""
   },
   "src/app/providers.tsx": {
@@ -815,8 +815,8 @@
     "semantic_hash": ""
   },
   "src/pages/profile/LegalConsentsPage.tsx": {
-    "mtime": 1789283249.625543,
-    "ast_hash": "00b8720fd64fde4991a8ab89c03624ab",
+    "mtime": 1789285022.1668413,
+    "ast_hash": "395a96df7127e3665e2c6d57dc2dd6f1",
     "semantic_hash": ""
   },
   "src/services/api/mock/legal.ts": {
@@ -840,8 +840,8 @@
     "semantic_hash": ""
   },
   "src/test/legal.test.ts": {
-    "mtime": 1789283533.0960543,
-    "ast_hash": "d465284745fdadbb4ddf16766241145a",
+    "mtime": 1789285104.8537135,
+    "ast_hash": "6ca20e4fd6cd0ecf8e52161b98d59004",
     "semantic_hash": ""
   },
   "src/components/legal/LegalDocumentEditModal.tsx": {
@@ -1105,8 +1105,8 @@
     "semantic_hash": ""
   },
   "src/test/pocketbaseSchema.test.ts": {
-    "mtime": 1789283467.9928048,
-    "ast_hash": "3a795b403d2ae67682c29c3a1216ebb2",
+    "mtime": 1789285047.058576,
+    "ast_hash": "a89b6059803e6fc33cdb5c80dcb19550",
     "semantic_hash": ""
   },
   "pocketbase/SCHEMA.md": {
@@ -1190,8 +1190,8 @@
     "semantic_hash": ""
   },
   "pocketbase/seed/run.ts": {
-    "mtime": 1789178141.235494,
-    "ast_hash": "6a34faffb034770da4c88f1925186ff5",
+    "mtime": 1789284978.9631875,
+    "ast_hash": "c6d223c681caea71e495456fe2c2c0d2",
     "semantic_hash": ""
   },
   "src/test/pocketbaseSeed.test.ts": {
@@ -1235,8 +1235,8 @@
     "semantic_hash": ""
   },
   "src/test/pocketbaseAdapter.test.ts": {
-    "mtime": 1789279890.105934,
-    "ast_hash": "ea012d4c160be03ee99c3c65e2893180",
+    "mtime": 1789285064.9239142,
+    "ast_hash": "eff8aef88d269935e24769c088c0bf43",
     "semantic_hash": ""
   },
   "pocketbase/pb_migrations/1788499200_kvartira_lessons_adapter.js": {
@@ -1325,8 +1325,8 @@
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/legal.pb.js": {
-    "mtime": 1788952079.6425202,
-    "ast_hash": "48bdd1fa7bf179c99fc2782837e1b189",
+    "mtime": 1789284998.3644278,
+    "ast_hash": "c2e7624c3ffb6dbc784a70ee21172fe5",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/lib/kvartiraLegal.js": {
@@ -1335,8 +1335,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/legal.ts": {
-    "mtime": 1788952496.021019,
-    "ast_hash": "7bcd6eefcfbc8000b2634c7e9e54d789",
+    "mtime": 1789284944.9528258,
+    "ast_hash": "09cbbdbaedf6d81102995c8eceb7edbc",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/lib/kvartiraSecurity.js": {
@@ -1995,8 +1995,8 @@
     "semantic_hash": ""
   },
   "docs/PRODUCTION_READINESS.md": {
-    "mtime": 1789208410.782587,
-    "ast_hash": "720d86336ea77ad1e48fce9f36cc9c90",
+    "mtime": 1789285050.4676518,
+    "ast_hash": "46e1e0aac1363ca7df7a24afdb3841d7",
     "semantic_hash": ""
   },
   "pocketbase/pb_migrations/1789135448_updated_conversations.js": {
@@ -2215,8 +2215,8 @@
     "semantic_hash": ""
   },
   "pocketbase/seed/ensureLegal.ts": {
-    "mtime": 1789283212.1808991,
-    "ast_hash": "9ef9860b8332dd8e585f0a007fe078fc",
+    "mtime": 1789284945.3300624,
+    "ast_hash": "12b3e25539c78b4d298c31d7b8cedba4",
     "semantic_hash": ""
   },
   "pocketbase/seed/seedLegal.ts": {
@@ -2262,6 +2262,21 @@
   "src/services/support/reportMessage.ts": {
     "mtime": 1789283273.6241572,
     "ast_hash": "101a34d64b93cc6acd4f6caf1c61c349",
+    "semantic_hash": ""
+  },
+  "pocketbase/pb_hooks/lib/kvartiraLegalBootstrap.js": {
+    "mtime": 1789284998.057903,
+    "ast_hash": "78ad6e69ddf871dd8c475645cde4b597",
+    "semantic_hash": ""
+  },
+  "pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js": {
+    "mtime": 1789284993.957002,
+    "ast_hash": "561f6e2209ac70fa33dbd268b26664ea",
+    "semantic_hash": ""
+  },
+  "src/components/legal/PendingConsentModal.tsx": {
+    "mtime": 1789284921.7791014,
+    "ast_hash": "71f2cf7453468dcbcf3911296bbccf86",
     "semantic_hash": ""
   }
 }

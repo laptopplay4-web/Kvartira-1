@@ -235,6 +235,18 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(source).toContain("type: 'json'");
   });
 
+  it('legal docs bootstrap migration relaxes bools and seeds missing docs', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1792400000_kvartira_legal_docs_bootstrap.js'),
+      'utf8',
+    );
+    expect(source).toContain('legal_documents');
+    expect(source).toContain('requiresConsent');
+    expect(source).toContain('bootstrapMissingLegalDocuments');
+    expect(source).toContain('privacy_policy');
+    expect(source).toContain('terms_of_service');
+  });
+
   it('avatar purpose select fix migration sets full purpose values list', () => {
     const source = readFileSync(
       resolve(ROOT, 'pocketbase/pb_migrations/1789795200_kvartira_avatar_purpose_select.js'),

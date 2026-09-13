@@ -106,7 +106,8 @@ export const pocketbaseLegalApi: LegalApi = {
   async getDocuments() {
     return withPbError(async () => {
       const pb = getPocketBase();
-      const records = await pb.collection('legal_documents').getFullList();
+      // `-id` — у legal_documents может не быть autodate `created` (см. bootstrap migration).
+      const records = await pb.collection('legal_documents').getFullList({ sort: '-id' });
       return sortDocumentsByType(records.map(mapLegalDocumentRecord));
     });
   },

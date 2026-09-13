@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { can } from '@/permissions';
 import {
@@ -127,6 +129,25 @@ describe('legal helpers', () => {
       .map(({ purpose: _p, required: _r, ...doc }) => doc);
     const registration = getRegistrationRequiredDocuments(stripped);
     expect(registration).toHaveLength(3);
+  });
+
+  it('pending consent gate lives in AppLayout, profile page has accepted list only', () => {
+    const layouts = readFileSync(resolve(process.cwd(), 'src/app/layouts.tsx'), 'utf8');
+    const page = readFileSync(
+      resolve(process.cwd(), 'src/pages/profile/LegalConsentsPage.tsx'),
+      'utf8',
+    );
+    const modal = readFileSync(
+      resolve(process.cwd(), 'src/components/legal/PendingConsentModal.tsx'),
+      'utf8',
+    );
+
+    expect(layouts).toContain('PendingConsentModal');
+    expect(page).toContain('Принятые согласия');
+    expect(page).not.toContain('Требуют согласия');
+    expect(page).not.toContain('Право на доступ к своим данным');
+    expect(modal).toContain('dismissible={false}');
+    expect(modal).toContain('ConsentCheckbox');
   });
 });
 

@@ -45,3 +45,20 @@ onRecordAfterCreateSuccess((e) => {
   audit.logConsentEvent($app, e, 'consent.accepted', e.record);
   e.next();
 }, 'user_consents');
+
+/**
+ * Empty production DB → registration /legal fail without seed.
+ * Create missing consent docs on serve (idempotent; never overwrites existing).
+ */
+onBootstrap((e) => {
+  e.next();
+  try {
+    const bootstrap = require(`${__hooks}/lib/kvartiraLegalBootstrap.js`);
+    const result = bootstrap.ensureRequiredLegalDocuments($app);
+    if (result.created > 0) {
+      console.log(`[kvartira] legal bootstrap: created ${result.created} document(s)`);
+    }
+  } catch (err) {
+    console.log('[kvartira] legal bootstrap failed:', err);
+  }
+});

@@ -42,8 +42,16 @@ describe('PocketBase seed (ROADMAP 1.5)', () => {
     const indexSource = readFileSync(SEED_INDEX, 'utf8');
     const runSource = readFileSync(SEED_RUN, 'utf8');
     expect(indexSource).toContain('runSeed');
+    expect(indexSource).toContain('ensureLegalDocuments');
     expect(runSource).toContain("from '../../src/mocks/seed'");
     expect(runSource).toContain('DEMO_ACCOUNTS');
+  });
+
+  it('ensureLegal upserts legal_documents without full reseed', () => {
+    const source = readFileSync(resolve(ROOT, 'pocketbase/seed/ensureLegal.ts'), 'utf8');
+    expect(source).toContain('LEGAL_PRIVACY_POLICY_TEXT');
+    expect(source).toContain('createRecord');
+    expect(source).toContain('updateRecord');
   });
 
   it('helpers map demo phones for PB schema', () => {

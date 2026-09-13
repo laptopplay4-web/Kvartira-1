@@ -203,7 +203,8 @@ function revokeConsentRecord(app, e, consentId) {
  */
 function assertLegalDocumentUpdate(_app, e) {
   const auth = e.auth;
-  if (!auth || auth.getString('role') !== 'admin') {
+  // Superuser / non-users auth (seed CLI) may update; users collection needs admin.
+  if (isUsersAuth(auth) && auth.getString('role') !== 'admin') {
     throw new ApiError(403, 'Нет прав на управление документами');
   }
 

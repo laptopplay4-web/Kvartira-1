@@ -205,6 +205,36 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(source).toContain('AVATAR_REF_MAX');
   });
 
+  it('message hiddenForUserIds migration for delete-for-me', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1792100000_kvartira_message_hidden_for.js'),
+      'utf8',
+    );
+    expect(source).toContain('messages');
+    expect(source).toContain('hiddenForUserIds');
+    expect(source).toContain("type: 'json'");
+  });
+
+  it('legal optional consents soft-remove migration', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1792200000_kvartira_legal_optional_remove.js'),
+      'utf8',
+    );
+    expect(source).toContain('communication');
+    expect(source).toContain('publication');
+    expect(source).toContain('requiresConsent');
+  });
+
+  it('support ticket reportContext migration', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1792300000_kvartira_support_report_context.js'),
+      'utf8',
+    );
+    expect(source).toContain('support_tickets');
+    expect(source).toContain('reportContext');
+    expect(source).toContain("type: 'json'");
+  });
+
   it('avatar purpose select fix migration sets full purpose values list', () => {
     const source = readFileSync(
       resolve(ROOT, 'pocketbase/pb_migrations/1789795200_kvartira_avatar_purpose_select.js'),

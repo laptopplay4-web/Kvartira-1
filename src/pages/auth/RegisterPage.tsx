@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
@@ -21,14 +21,16 @@ import { ConsentCheckbox } from '@/components/legal/ConsentCheckbox';
 import { CONSENT_ADULT_AGE } from '@/services/legal/constants';
 import {
   getGuardianConsentDocument,
-  getOptionalConsentDocuments,
-  getRequiredConsentDocuments,
+  getRegistrationConsentTitle,
+  getRegistrationRequiredDocuments,
 } from '@/services/legal/helpers';
 import {
   clearPersistedRegistrationInviteToken,
   persistRegistrationInviteToken,
   resolveRegistrationInviteToken,
 } from '@/services/registration/invite';
+import type { LegalDocument } from '@/types';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 const schema = z
   .object({
@@ -36,7 +38,7 @@ const schema = z
     password: z
       .string()
       .min(AUTH_PASSWORD_MIN_LENGTH, `Минимум ${AUTH_PASSWORD_MIN_LENGTH} символов`),
-    confirmPassword: z.string(),
+    confirmPassword: z.string().min(1, 'Подтвердите пароль'),
     firstName: z.string().min(2, 'Введите имя'),
     lastName: z.string().min(2, 'Введите фамилию'),
     directionIds: z.array(z.string()).min(1, 'Выберите хотя бы одно направление'),
@@ -76,12 +78,23 @@ const schema = z
 
 type FormData = z.infer<typeof schema>;
 
+function scrollToFirstInvalid() {
+  const el = document.querySelector<HTMLElement>(
+    '[aria-invalid="true"], [data-invalid="true"]',
+  );
+  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function RegistrationInviteGate({
   checking,
   hasInviteToken,
+  queryFailed,
+  onRetry,
 }: {
   checking: boolean;
   hasInviteToken: boolean;
+  queryFailed?: boolean;
+  onRetry?: () => void;
 }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-8">
@@ -93,9 +106,11 @@ function RegistrationInviteGate({
           </div>
           <h1 className="text-h1">Регистрация по QR</h1>
           <p className="mt-3 text-body-sm text-text-secondary">
-            {hasInviteToken
-              ? 'Это приглашение недействительно или устарело. Попросите актуальный QR на стенде школы «Квартира».'
-              : 'Аккаунт ученика создаётся только после сканирования QR-кода в школе «Квартира». Код размещён на стенде у входа.'}
+            {queryFailed
+              ? 'Не удалось проверить приглашение. Проверьте сеть и попробуйте снова.'
+              : hasInviteToken
+                ? 'Это приглашение недействительно или устарело. Попросите актуальный QR на стенде школы «Квартира».'
+                : 'Аккаунт ученика создаётся только после сканирования QR-кода в школе «Квартира». Код размещён на стенде у входа.'}
           </p>
         </div>
 
@@ -114,9 +129,15 @@ function RegistrationInviteGate({
                   : 'Откройте камеру телефона, наведите на распечатанный QR — браузер откроет форму регистрации с действующим приглашением.'}
               </p>
             </div>
-            <p className="text-body-sm text-text-muted" role="status">
-              {INVALID_REGISTRATION_INVITE_MESSAGE}
-            </p>
+            {queryFailed && onRetry ? (
+              <Button type="button" variant="secondary" fullWidth className="min-h-11" onClick={onRetry}>
+                Повторить
+              </Button>
+            ) : (
+              <p className="text-body-sm text-text-muted" role="status">
+                {INVALID_REGISTRATION_INVITE_MESSAGE}
+              </p>
+            )}
           </div>
         )}
 
@@ -156,24 +177,39 @@ export default function RegisterPage() {
   });
 
   const inviteValid = !!inviteToken && inviteQuery.data?.valid === true;
-  const inviteChecking = !!inviteToken && inviteQuery.isLoading;
+  const inviteChecking = !!inviteToken && (inviteQuery.isLoading || inviteQuery.isFetching);
+  const inviteQueryFailed = !!inviteToken && inviteQuery.isError;
 
-  const { data: legalDocs = [] } = useQuery({
+  const {
+    data: legalDocs = [],
+    isLoading: legalLoading,
+    isError: legalError,
+    refetch: refetchLegal,
+  } = useQuery({
     queryKey: ['legal', 'documents'],
     queryFn: () => api.legal.getDocuments(),
     enabled: inviteValid,
   });
 
-  const requiredDocs = useMemo(() => getRequiredConsentDocuments(legalDocs), [legalDocs]);
-  const optionalDocs = useMemo(() => getOptionalConsentDocuments(legalDocs), [legalDocs]);
+  const registrationRequiredDocs = useMemo(
+    () => getRegistrationRequiredDocuments(legalDocs),
+    [legalDocs],
+  );
   const guardianDoc = useMemo(() => getGuardianConsentDocument(legalDocs), [legalDocs]);
 
   // Nothing is pre-checked: a pre-ticked box is not consent under 152-ФЗ.
   const [acceptedIds, setAcceptedIds] = useState<Record<string, boolean>>({});
+  const [invalidConsentIds, setInvalidConsentIds] = useState<Set<string>>(new Set());
   const [consentError, setConsentError] = useState('');
 
   const toggleConsent = (documentId: string, checked: boolean) => {
     setAcceptedIds((prev) => ({ ...prev, [documentId]: checked }));
+    setInvalidConsentIds((prev) => {
+      if (!prev.has(documentId)) return prev;
+      const next = new Set(prev);
+      next.delete(documentId);
+      return next;
+    });
     setConsentError('');
   };
 
@@ -191,10 +227,43 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { phone: '+7', directionIds: [], isMinor: false, guardianPhone: '+7' },
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
+    shouldFocusError: true,
+    criteriaMode: 'all',
+    defaultValues: {
+      phone: '+7',
+      directionIds: [],
+      isMinor: false,
+      guardianPhone: '+7',
+    },
   });
 
   const isMinorSelected = watch('isMinor');
+
+  const collectMissingConsentDocs = (isMinor: boolean): LegalDocument[] => {
+    const missing = registrationRequiredDocs.filter((doc) => !acceptedIds[doc.id]);
+    if (isMinor && guardianDoc && !acceptedIds[guardianDoc.id]) {
+      missing.push(guardianDoc);
+    }
+    return missing;
+  };
+
+  const markConsentErrors = (isMinor: boolean): boolean => {
+    const missing = collectMissingConsentDocs(isMinor);
+    setInvalidConsentIds(new Set(missing.map((doc) => doc.id)));
+    if (missing.length > 0) {
+      setConsentError('Отметьте все обязательные согласия — без них регистрация невозможна');
+      return false;
+    }
+    setConsentError('');
+    return true;
+  };
+
+  const onInvalid = (_errors: FieldErrors<FormData>) => {
+    markConsentErrors(isMinorSelected);
+    requestAnimationFrame(() => scrollToFirstInvalid());
+  };
 
   const onSubmit = async (data: FormData) => {
     if (!inviteToken) {
@@ -202,13 +271,13 @@ export default function RegisterPage() {
       return;
     }
 
-    const missingRequired = requiredDocs.filter((doc) => !acceptedIds[doc.id]);
-    if (missingRequired.length > 0) {
-      setConsentError('Без обязательных согласий аккаунт создать нельзя');
+    if (registrationRequiredDocs.length === 0) {
+      setConsentError('Обязательные согласия не загрузились — обновите страницу');
       return;
     }
-    if (data.isMinor && guardianDoc && !acceptedIds[guardianDoc.id]) {
-      setConsentError('Нужно согласие законного представителя');
+
+    if (!markConsentErrors(data.isMinor)) {
+      requestAnimationFrame(() => scrollToFirstInvalid());
       return;
     }
 
@@ -228,8 +297,7 @@ export default function RegisterPage() {
         const guardianConsentId =
           data.isMinor && guardianDoc && acceptedIds[guardianDoc.id] ? guardianDoc.id : null;
         const documentIds = [
-          ...requiredDocs.map((doc) => doc.id),
-          ...optionalDocs.filter((doc) => acceptedIds[doc.id]).map((doc) => doc.id),
+          ...registrationRequiredDocs.filter((doc) => acceptedIds[doc.id]).map((doc) => doc.id),
         ];
 
         if (documentIds.length > 0) {
@@ -254,7 +322,12 @@ export default function RegisterPage() {
 
   if (!inviteValid) {
     return (
-      <RegistrationInviteGate checking={inviteChecking} hasInviteToken={!!inviteToken} />
+      <RegistrationInviteGate
+        checking={inviteChecking}
+        hasInviteToken={!!inviteToken}
+        queryFailed={inviteQueryFailed}
+        onRetry={() => void inviteQuery.refetch()}
+      />
     );
   }
 
@@ -269,7 +342,11 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
+        <form
+          onSubmit={handleSubmit(onSubmit, onInvalid)}
+          className="mt-8 space-y-4"
+          noValidate
+        >
           <div className="grid grid-cols-2 gap-3">
             <Input label="Имя" error={errors.firstName?.message} {...register('firstName')} />
             <Input label="Фамилия" error={errors.lastName?.message} {...register('lastName')} />
@@ -312,31 +389,42 @@ export default function RegisterPage() {
             )}
           />
 
-          <fieldset className="space-y-3">
+          <fieldset id="registration-consents" className="space-y-3">
             <legend className="text-body-sm font-medium">Согласия</legend>
-            <p className="text-caption text-text-muted">
-              Каждая цель обработки данных подтверждается отдельно. Согласия по желанию можно
-              не давать сейчас и отозвать позже в профиле.
-            </p>
 
-            {requiredDocs.map((doc) => (
-              <ConsentCheckbox
-                key={doc.id}
-                document={doc}
-                required
-                checked={!!acceptedIds[doc.id]}
-                onChange={(checked) => toggleConsent(doc.id, checked)}
-              />
-            ))}
+            {legalLoading && (
+              <div className="space-y-2" aria-busy="true" aria-label="Загрузка согласий">
+                <Skeleton className="h-16 w-full rounded-xl" />
+                <Skeleton className="h-16 w-full rounded-xl" />
+                <Skeleton className="h-16 w-full rounded-xl" />
+              </div>
+            )}
 
-            {optionalDocs.map((doc) => (
-              <ConsentCheckbox
-                key={doc.id}
-                document={doc}
-                checked={!!acceptedIds[doc.id]}
-                onChange={(checked) => toggleConsent(doc.id, checked)}
+            {!legalLoading && (legalError || registrationRequiredDocs.length === 0) && (
+              <ErrorState
+                title="Не удалось загрузить согласия"
+                message={
+                  legalError
+                    ? 'Проверьте сеть и доступ к серверу, затем нажмите «Повторить».'
+                    : 'В базе нет юридических документов. Администратору: npm run pb:seed:legal'
+                }
+                onRetry={() => void refetchLegal()}
+                className="py-6"
               />
-            ))}
+            )}
+
+            {!legalLoading &&
+              registrationRequiredDocs.map((doc) => (
+                <ConsentCheckbox
+                  key={doc.id}
+                  document={doc}
+                  title={getRegistrationConsentTitle(doc)}
+                  required
+                  invalid={invalidConsentIds.has(doc.id)}
+                  checked={!!acceptedIds[doc.id]}
+                  onChange={(checked) => toggleConsent(doc.id, checked)}
+                />
+              ))}
 
             {guardianDoc && (
               <Controller
@@ -389,6 +477,7 @@ export default function RegisterPage() {
                 <ConsentCheckbox
                   document={guardianDoc}
                   required
+                  invalid={invalidConsentIds.has(guardianDoc.id)}
                   checked={!!acceptedIds[guardianDoc.id]}
                   onChange={(checked) => toggleConsent(guardianDoc.id, checked)}
                 />

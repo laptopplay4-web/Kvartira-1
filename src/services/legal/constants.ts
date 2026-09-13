@@ -30,7 +30,8 @@ export const CONSENT_PURPOSE_DESCRIPTIONS: Record<ConsentPurpose, string> = {
 /** Purposes without which the account cannot function. */
 export const REQUIRED_CONSENT_PURPOSES: ConsentPurpose[] = ['service'];
 
-export const OPTIONAL_CONSENT_PURPOSES: ConsentPurpose[] = ['communication', 'publication'];
+/** Legacy purposes kept for old DB rows; no longer offered in the app. */
+export const OPTIONAL_CONSENT_PURPOSES: ConsentPurpose[] = [];
 
 /** Age below which a legal representative must give consent. */
 export const CONSENT_ADULT_AGE = 18;

@@ -93,16 +93,11 @@ export default function TeacherDetailPage() {
 
             <Card className="mt-10 text-center" padding="lg">
               <p className="text-body text-text-secondary">
-                Выберите удобное время и запишитесь на занятие
+                Выберите удобное время и запишитесь на занятие после входа
               </p>
               <div className="mt-4 flex flex-col justify-center gap-3 sm:flex-row">
-                <Link to="/register">
-                  <Button className="w-full sm:w-auto">Записаться</Button>
-                </Link>
                 <Link to="/login">
-                  <Button className="w-full sm:w-auto" variant="secondary">
-                    Войти
-                  </Button>
+                  <Button className="w-full sm:w-auto">Войти</Button>
                 </Link>
               </div>
             </Card>

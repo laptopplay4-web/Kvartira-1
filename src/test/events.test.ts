@@ -613,3 +613,41 @@ describe('event unread helpers', () => {
     ]);
   });
 });
+
+describe('event image crop helpers', () => {
+  it('covers viewport with initial 16:9 crop and clamps zoom', async () => {
+    const {
+      getInitialEventCropState,
+      getEventCropZoomBounds,
+      clampEventCropState,
+      zoomEventCropAtPoint,
+      validateEventImageFile,
+      EVENT_IMAGE_ASPECT,
+    } = await import('@/services/events/imageCrop');
+
+    const vw = 320;
+    const vh = Math.round(vw / EVENT_IMAGE_ASPECT);
+    const state = getInitialEventCropState(800, 600, vw, vh);
+    expect(state.scale).toBeGreaterThan(0);
+    // Image must cover both axes
+    expect(800 * state.scale).toBeGreaterThanOrEqual(vw - 0.01);
+    expect(600 * state.scale).toBeGreaterThanOrEqual(vh - 0.01);
+
+    const bounds = getEventCropZoomBounds(800, 600, vw, vh);
+    const zoomed = clampEventCropState(
+      zoomEventCropAtPoint(state, bounds.maxScale * 2, vw / 2, vh / 2),
+      800,
+      600,
+      vw,
+      vh,
+    );
+    expect(zoomed.scale).toBeCloseTo(bounds.maxScale);
+
+    expect(validateEventImageFile({ name: 'a.jpg', type: 'image/jpeg', size: 100 }).valid).toBe(
+      true,
+    );
+    expect(validateEventImageFile({ name: 'a.txt', type: 'text/plain', size: 10 }).valid).toBe(
+      false,
+    );
+  });
+});

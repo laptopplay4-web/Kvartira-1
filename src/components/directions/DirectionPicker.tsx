@@ -1,5 +1,6 @@
 import { SelectableTile } from '@/components/ui/SelectableTile';
 import type { Direction } from '@/types';
+import { cn } from '@/utils';
 
 interface DirectionPickerProps {
   directions: Direction[];
@@ -32,9 +33,17 @@ export function DirectionPicker({
   }
 
   return (
-    <fieldset className="space-y-2" disabled={disabled}>
+    <fieldset
+      className={cn(
+        'space-y-2 rounded-xl border p-3 transition-colors',
+        error ? 'border-danger' : 'border-transparent',
+      )}
+      disabled={disabled}
+      data-invalid={error ? true : undefined}
+      aria-invalid={!!error}
+    >
       <legend className="text-body-sm font-medium text-text-primary">{label}</legend>
-      {hint && <p className="text-caption text-text-muted">{hint}</p>}
+      {hint && !error && <p className="text-caption text-text-muted">{hint}</p>}
       <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
         {directions.map((d) => {
           const isOn = selected.has(d.id);
@@ -44,10 +53,17 @@ export function DirectionPicker({
               selected={isOn}
               disabled={disabled}
               onClick={() => toggle(d.id)}
-              className="w-auto min-h-11 px-3 py-2"
+              className={cn(
+                'w-auto min-h-11 px-3 py-2',
+                error && !isOn && 'border-danger/60',
+              )}
               label={d.name}
             >
-              {d.icon ? <span className="mr-1.5" aria-hidden>{d.icon}</span> : null}
+              {d.icon ? (
+                <span className="mr-1.5" aria-hidden>
+                  {d.icon}
+                </span>
+              ) : null}
               {d.name}
             </SelectableTile>
           );

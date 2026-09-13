@@ -1,9 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Copy, Forward, Pencil, Pin, Reply, SmilePlus, Trash2 } from 'lucide-react';
+import { ChevronLeft, Copy, Flag, Forward, Pencil, Pin, Reply, SmilePlus, Trash2, UserRound, Users } from 'lucide-react';
 import { cn } from '@/utils';
 import type { Conversation, ConversationMember, Message, User } from '@/types';
-import { canDeleteMessage, canEditMessage, canPinMessage } from '@/services/chat/messages';
+import {
+  canDeleteMessageForEveryone,
+  canDeleteMessageForMe,
+  canEditMessage,
+  canPinMessage,
+  type DeleteMessageScope,
+} from '@/services/chat/messages';
+import { canReportMessage } from '@/services/support/reportMessage';
 import { QUICK_REACTION_EMOJIS } from '@/services/chat/constants';
 
 interface MessageActionsProps {
@@ -14,7 +21,8 @@ interface MessageActionsProps {
   onClose: () => void;
   onReply: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete: (scope: DeleteMessageScope) => void;
+  onReport?: () => void;
   onForward?: () => void;
   onReact?: (emoji: string) => void;
   onPin?: () => void;
@@ -88,6 +96,7 @@ export function MessageActions({
   onReply,
   onEdit,
   onDelete,
+  onReport,
   onForward,
   onReact,
   onPin,
@@ -97,12 +106,17 @@ export function MessageActions({
 }: MessageActionsProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [moreReactions, setMoreReactions] = useState(false);
+  const [deleteMenu, setDeleteMenu] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number; placeAbove: boolean } | null>(
     null,
   );
 
   const showEdit = isOwn && canEditMessage(user, message);
-  const showDelete = canDeleteMessage(user, message, conversation);
+  const showDeleteForMe = canDeleteMessageForMe(user, message, conversation, members);
+  const showDeleteForEveryone = canDeleteMessageForEveryone(user, message, conversation);
+  const showDeleteEntry = showDeleteForMe || showDeleteForEveryone;
+  const showReport =
+    !!onReport && canReportMessage(user, message, conversation, members);
   const showPin =
     !!onPin &&
     !!conversation &&
@@ -112,6 +126,36 @@ export function MessageActions({
 
   const items = useMemo(() => {
     if (!open || message.messageType === 'system') return [];
+
+    if (deleteMenu) {
+      const deleteItems = [
+        {
+          id: 'delete-back',
+          label: 'Назад',
+          icon: <ChevronLeft className="h-4 w-4" aria-hidden />,
+          onSelect: () => setDeleteMenu(false),
+          destructive: false,
+          keepOpen: true,
+        },
+        {
+          id: 'delete-me',
+          label: 'Удалить у себя',
+          icon: <UserRound className="h-4 w-4" aria-hidden />,
+          onSelect: () => onDelete('me'),
+          destructive: true,
+          disabled: !showDeleteForMe,
+        },
+        {
+          id: 'delete-everyone',
+          label: 'Удалить у всех',
+          icon: <Users className="h-4 w-4" aria-hidden />,
+          onSelect: () => onDelete('everyone'),
+          destructive: true,
+          disabled: !showDeleteForEveryone,
+        },
+      ];
+      return deleteItems.filter((item) => !('disabled' in item && item.disabled));
+    }
 
     const list = [
       {
@@ -156,17 +200,26 @@ export function MessageActions({
         disabled: !showEdit,
       },
       {
+        id: 'report',
+        label: 'Пожаловаться',
+        icon: <Flag className="h-4 w-4" aria-hidden />,
+        onSelect: () => onReport?.(),
+        disabled: !showReport,
+      },
+      {
         id: 'delete',
         label: 'Удалить',
         icon: <Trash2 className="h-4 w-4" aria-hidden />,
-        onSelect: onDelete,
+        onSelect: () => setDeleteMenu(true),
         destructive: true,
-        disabled: !showDelete,
+        keepOpen: true,
+        disabled: !showDeleteEntry,
       },
     ];
 
     return list.filter((item) => !item.disabled);
   }, [
+    deleteMenu,
     isPinned,
     message,
     onDelete,
@@ -174,10 +227,14 @@ export function MessageActions({
     onForward,
     onPin,
     onReply,
+    onReport,
     open,
-    showDelete,
+    showDeleteEntry,
+    showDeleteForEveryone,
+    showDeleteForMe,
     showEdit,
     showPin,
+    showReport,
   ]);
 
   useLayoutEffect(() => {
@@ -199,15 +256,22 @@ export function MessageActions({
       if (measured && measured > 0) place(measured);
     });
     return () => cancelAnimationFrame(raf);
-  }, [open, anchorRef, isOwn, items.length, moreReactions]);
+  }, [open, anchorRef, isOwn, items.length, moreReactions, deleteMenu]);
 
   useEffect(() => {
     if (!open) {
       setMoreReactions(false);
+      setDeleteMenu(false);
       return;
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (deleteMenu) {
+          setDeleteMenu(false);
+          return;
+        }
+        onClose();
+      }
     };
     const onPointer = (e: PointerEvent) => {
       const target = e.target as Node;
@@ -220,7 +284,7 @@ export function MessageActions({
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onPointer, true);
     };
-  }, [open, onClose]);
+  }, [open, onClose, deleteMenu]);
 
   if (!open || message.messageType === 'system' || !coords) return null;
 
@@ -232,13 +296,14 @@ export function MessageActions({
         className="pointer-events-auto absolute inset-0 glass-scrim motion-safe:animate-fade-in"
         onClick={() => {
           setMoreReactions(false);
+          setDeleteMenu(false);
           onClose();
         }}
       />
       <div
         ref={panelRef}
         role="dialog"
-        aria-label="Действия с сообщением"
+        aria-label={deleteMenu ? 'Удаление сообщения' : 'Действия с сообщением'}
         className={cn(
           'pointer-events-auto absolute w-[min(280px,calc(100vw-24px))] max-h-[min(70dvh,calc(100dvh-48px))] overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-none glass-popup',
           'motion-safe:animate-fade-in',
@@ -246,7 +311,7 @@ export function MessageActions({
         )}
         style={{ top: coords.top, left: coords.left }}
       >
-        {onReact && !message.deletedAt && (
+        {onReact && !message.deletedAt && !deleteMenu && (
           <div className="border-b border-white/10 px-2.5 py-2.5">
             <div className="flex flex-wrap items-center justify-center gap-0.5">
               {emojis.map((emoji) => (
@@ -290,7 +355,7 @@ export function MessageActions({
               )}
               onClick={() => {
                 item.onSelect();
-                onClose();
+                if (!('keepOpen' in item && item.keepOpen)) onClose();
               }}
             >
               <span

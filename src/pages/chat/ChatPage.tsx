@@ -1,6 +1,6 @@
 import { cn } from '@/utils';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
@@ -24,6 +24,7 @@ import { getConversationDisplayTitle, isGroupLike, orderPinnedMessagesNewestFirs
 import type { ChatFilter } from '@/services/chat/helpers';
 import { useConversationMembers } from '@/hooks/useConversationMembers';
 import { ForwardMessageModal } from '@/components/chat/ForwardMessageModal';
+import { ReportMessageModal } from '@/components/chat/ReportMessageModal';
 import type { Conversation, ConversationMember, Message, MessageAttachment } from '@/types';
 import { ConversationList } from '@/components/chat/ConversationList';
 import { ChatFilters, ChatSearch } from '@/components/chat/ChatFilters';
@@ -46,6 +47,7 @@ import { MessageCircle } from 'lucide-react';
 
 export default function ChatPage() {
   const { id: activeId } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useCurrentUser()!;
   const navigate = useNavigate();
   const goBackToChatList = useBackNavigation('/chat');
@@ -53,6 +55,7 @@ export default function ChatPage() {
   const messageListRef = useRef<MessageListHandle>(null);
   const isOnline = useOnlineStatus();
   const wasOfflineRef = useRef(false);
+  const deepLinkMsgHandledRef = useRef<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('all');
@@ -60,6 +63,7 @@ export default function ChatPage() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [settingsConversation, setSettingsConversation] = useState<Conversation | null>(null);
   const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
+  const [reportMessage, setReportMessage] = useState<Message | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
@@ -261,6 +265,28 @@ export default function ChatPage() {
     }
   }, [isOnline, activeId, refetchList, refetchMessages, queryClient, user.id]);
 
+  useEffect(() => {
+    const msgId = searchParams.get('msg');
+    if (!activeId || !msgId || messagesLoading) return;
+    const key = `${activeId}:${msgId}`;
+    if (deepLinkMsgHandledRef.current === key) return;
+    deepLinkMsgHandledRef.current = key;
+    setHighlightMessageId(msgId);
+    const timer = window.setTimeout(() => {
+      messageListRef.current?.scrollToMessage(msgId);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('msg');
+          return next;
+        },
+        { replace: true },
+      );
+      window.setTimeout(() => setHighlightMessageId(null), 2000);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [activeId, messagesLoading, searchParams, setSearchParams]);
+
   const handleSelect = (conversationId: string) => {
     setReplyTo(null);
     setEditingMessage(null);
@@ -312,9 +338,14 @@ export default function ChatPage() {
     setDraft(message.text);
   };
 
-  const handleDelete = (message: Message) => {
+  const handleDelete = (message: Message, scope: 'me' | 'everyone' = 'everyone') => {
     if (!activeId) return;
-    deleteMutation.mutate({ conversationId: activeId, messageId: message.id, userId: user.id });
+    deleteMutation.mutate({
+      conversationId: activeId,
+      messageId: message.id,
+      userId: user.id,
+      scope,
+    });
   };
 
   const handleReact = (message: Message, emoji: string) => {
@@ -554,6 +585,7 @@ export default function ChatPage() {
                 onReply={setReplyTo}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onReport={setReportMessage}
                 onForward={setForwardMessage}
                 onReact={handleReact}
                 onPin={
@@ -657,6 +689,16 @@ export default function ChatPage() {
         excludeConversationId={activeId}
         onForward={handleForward}
       />
+
+      {reportMessage && activeId && (
+        <ReportMessageModal
+          open
+          onClose={() => setReportMessage(null)}
+          message={reportMessage}
+          conversationId={activeId}
+          userId={user.id}
+        />
+      )}
 
       <ConfirmDialog
         open={!!pendingDeleteId}

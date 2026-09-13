@@ -1,12 +1,12 @@
 # Graph Report - Kvartira 1  (2026-09-13)
 
 ## Corpus Check
-- 433 files · ~197,203 words
+- 450 files · ~205,662 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2715 nodes · 2975 edges · 418 communities (276 shown, 142 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 114 edges (avg confidence: 0.55)
+- 2818 nodes · 3109 edges · 432 communities (286 shown, 146 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 121 edges (avg confidence: 0.55)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -50,7 +50,7 @@
 - slots.test.ts
 - vite-env.d.ts
 - tsconfig.json
-- documentTexts.ts
+- ensureLegal.ts
 - LessonsApi
 - chat/helpers.ts
 - chat/constants.ts
@@ -289,15 +289,23 @@
 - package.json
 - pb-serve.mjs
 - @hookform/resolvers
-- class-variance-authority
-- tailwind-merge
-- pocketbase
+- imageCrop.ts
+- analytics.ts
+- CookieConsentBanner.tsx
 - react-dom
 - react-hook-form
-- react-router-dom
-- clsx
+- cookies/types.ts
+- reportMessage.ts
 - zustand
 - adminGroups.ts
+- lucide-react
+- date-fns
+- cookies/constants.ts
+- react
+- cookies/helpers.ts
+- zod
+- ReportMessageModal.tsx
+- class-variance-authority
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
@@ -305,8 +313,8 @@
 3. `ChatApi` - 28 edges
 4. `КВАРТИРА — DESIGN SYSTEM` - 26 edges
 5. `compilerOptions` - 20 edges
-6. `compilerOptions` - 16 edges
-7. `scripts` - 15 edges
+6. `scripts` - 16 edges
+7. `compilerOptions` - 16 edges
 8. `runSeed()` - 15 edges
 9. `PocketBase schema — «Квартира»` - 15 edges
 10. `LessonsApi` - 14 edges
@@ -318,15 +326,15 @@
   pocketbase/seed/index.ts → pocketbase/seed/run.ts
 - `MessageList` --indirect_call--> `formatChatDateSeparator()`  [INFERRED]
   src/components/chat/MessageList.tsx → src/utils/dates.ts
+- `EventImageCropModal()` --indirect_call--> `getEventCropViewportSize()`  [INFERRED]
+  src/components/events/EventImageCropModal.tsx → src/services/events/imageCrop.ts
 - `usePwaInstall()` --indirect_call--> `isPwaInstalled()`  [INFERRED]
   src/hooks/usePwaInstall.ts → src/services/pwa/helpers.ts
-- `AssignmentGroupsPage()` --indirect_call--> `isManagedAssignmentGroup()`  [INFERRED]
-  src/pages/assignments/AssignmentGroupsPage.tsx → src/services/assignments/groups/helpers.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (418 total, 142 thin omitted)
+## Communities (432 total, 146 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -341,8 +349,8 @@ Cohesion: 0.05
 Nodes (38): AcceptConsentOptions, ApiClient, ApiError, ChangePasswordInput, CompletePasswordResetInput, CreateAssignmentGroupInput, CreateAssignmentInput, CreateConversationInput (+30 more)
 
 ### Community 3 - "scripts"
-Cohesion: 0.13
-Nodes (15): scripts, build, dev, lint, pb:down, pb:logs, pb:seed, pb:serve (+7 more)
+Cohesion: 0.12
+Nodes (16): scripts, build, dev, lint, pb:down, pb:logs, pb:seed, pb:seed:legal (+8 more)
 
 ### Community 4 - "КВАРТИРА — DEVELOPMENT RULES FOR CURSOR"
 Cohesion: 0.06
@@ -362,7 +370,7 @@ Nodes (25): DOM, DOM.Iterable, ES2022, src, compilerOptions, allowImportingTsExt
 
 ### Community 8 - "types/index.ts"
 Cohesion: 0.03
-Nodes (71): AppNotification, Assignment, AssignmentContentBlock, AssignmentContentType, AttachmentType, AuthSession, AvailabilityException, BookLessonInput (+63 more)
+Nodes (73): AppNotification, Assignment, AssignmentContentBlock, AssignmentContentType, AttachmentType, AuthSession, AvailabilityException, BookLessonInput (+65 more)
 
 ### Community 9 - "compilerOptions"
 Cohesion: 0.10
@@ -404,6 +412,10 @@ Nodes (30): AttachmentList(), AttachmentListProps, ChatVoiceAttachment(), ChatVo
 Cohesion: 0.60
 Nodes (4): getSnapshot(), OFFLINE_NETWORK_MESSAGE, subscribe(), useOnlineStatus()
 
+### Community 25 - "RegisterPage.tsx"
+Cohesion: 0.40
+Nodes (4): FormData, RegisterPage(), schema, scrollToFirstInvalid()
+
 ### Community 26 - "authStore.ts"
 Cohesion: 0.43
 Nodes (7): AuthState, hasAuthenticatedUser(), mergeRefreshedSession(), partializeSession(), useAuthStore, useCurrentUser(), withSessionPhone()
@@ -424,9 +436,9 @@ Nodes (4): HISTORY_FILTERS, HISTORY_SEGMENT_OPTIONS, HistoryFilter, PageView
 Cohesion: 0.40
 Nodes (3): availability, baseLesson, MONDAY
 
-### Community 43 - "documentTexts.ts"
+### Community 43 - "ensureLegal.ts"
 Cohesion: 0.22
-Nodes (8): LEGAL_COMMUNICATION_CONSENT_TEXT, LEGAL_GUARDIAN_CONSENT_TEXT, LEGAL_PERSONAL_DATA_CONSENT_TEXT, LEGAL_PRIVACY_POLICY_TEXT, LEGAL_PUBLICATION_CONSENT_TEXT, LEGAL_SCHOOL_RULES_TEXT, LEGAL_TERMS_OF_SERVICE_TEXT, LEGAL_TEXT_DISCLAIMER
+Nodes (12): buildLegalDocuments(), documentFilter(), EnsureLegalResult, escapeFilterValue(), SeedLegalDoc, todayISO(), LEGAL_GUARDIAN_CONSENT_TEXT, LEGAL_PERSONAL_DATA_CONSENT_TEXT (+4 more)
 
 ### Community 46 - "chat/helpers.ts"
 Cohesion: 0.10
@@ -513,7 +525,7 @@ Cohesion: 0.29
 Nodes (4): mockGetTeacherAvailability, mockUpdateTeacherAvailability, mockUseOnlineStatus, teacherUser
 
 ### Community 112 - "assignments.test.ts"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (7): admin, baseAssignment, guitarGroup, otherStudent, student, teacher, vocalGroup
 
 ### Community 113 - "assignments/helpers.ts"
@@ -557,8 +569,8 @@ Cohesion: 0.67
 Nodes (3): SupportAttachmentList(), SupportAttachmentListProps, toMessageAttachment()
 
 ### Community 147 - "legal/helpers.ts"
-Cohesion: 0.20
-Nodes (10): calculateAge(), countPendingConsents(), getActiveConsentForDocument(), getOptionalConsentDocuments(), getPendingConsents(), getRequiredConsentDocuments(), hasCurrentConsent(), isConsentActive() (+2 more)
+Cohesion: 0.16
+Nodes (10): calculateAge(), countPendingConsents(), getActiveConsentForDocument(), getPendingConsents(), getRegistrationRequiredDocuments(), getRequiredConsentDocuments(), hasCurrentConsent(), isConsentActive() (+2 more)
 
 ### Community 150 - "mock/security.ts"
 Cohesion: 0.24
@@ -616,10 +628,6 @@ Nodes (15): classifyEventParticipationNotification(), countUnreadEventParticipat
 Cohesion: 0.23
 Nodes (8): BeforeInstallPromptEvent, usePwaInstall(), PWA_INSTALL_DISMISS_COOLDOWN_MS, PWA_INSTALL_DISMISS_KEY, PWA_INSTALL_SHOW_DELAY_MS, canShowInstallBanner(), isPwaInstalled(), wasInstallPromptDismissedRecently()
 
-### Community 186 - "EventFormModal.tsx"
-Cohesion: 0.40
-Nodes (5): EVENT_IMAGE_MIME, EventFormModal(), EventFormModalProps, readFileAsDataUrl(), TYPE_OPTIONS
-
 ### Community 187 - "mock/notifications.ts"
 Cohesion: 0.24
 Nodes (9): afterAuthSession(), notifyStudentsNewEvent(), pushNotification(), createMockNotificationsApi(), getPreferencesForUser(), MockPushDelivery, MockPushSubscriptionRecord, tryPushNotification() (+1 more)
@@ -641,8 +649,8 @@ Cohesion: 0.10
 Nodes (21): AVATAR_EXT_TO_MIME, AvatarCropState, AvatarCropZoomBounds, AvatarUploadInput, clampCropState(), getCoverScale(), getCropZoomBounds(), getInitialCropState() (+13 more)
 
 ### Community 210 - "messages.ts"
-Cohesion: 0.16
-Nodes (12): isGroupConversation(), MESSAGE_EDIT_WINDOW_MS, getReplyPreviewText(), canDeleteMessage(), canEditMessage(), DELETED_MESSAGE_TEXT, getMessageDisplayText(), isMessageDeleted() (+4 more)
+Cohesion: 0.15
+Nodes (14): isGroupConversation(), getReplyPreviewText(), canDeleteMessage(), canDeleteMessageForEveryone(), canDeleteMessageForMe(), canEditMessage(), DELETED_MESSAGE_TEXT, DeleteMessageScope (+6 more)
 
 ### Community 211 - "attachments.ts"
 Cohesion: 0.21
@@ -665,8 +673,8 @@ Cohesion: 0.18
 Nodes (10): AVATAR_TEXT_MAX_MIGRATION, AVATAR_TEXT_MIGRATION, MIGRATION, REQUIRED_COLLECTIONS, ROOT, SCHEMA_DOC, USER_CASCADE_FIX_MIGRATION, USER_CASCADE_MIGRATION (+2 more)
 
 ### Community 226 - "kvartiraAuth.js"
-Cohesion: 0.06
-Nodes (35): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+27 more)
+Cohesion: 0.05
+Nodes (38): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+30 more)
 
 ### Community 227 - "pocketbaseAuth.test.ts"
 Cohesion: 0.18
@@ -753,8 +761,8 @@ Cohesion: 0.32
 Nodes (4): assertViewAccess(), getRequesterUser(), loadTicketOrThrow(), pocketbaseSupportApi
 
 ### Community 272 - "kvartiraLegal.js"
-Cohesion: 0.38
-Nodes (9): assertConsentCreate(), clientIp(), guardianOf(), isUsersAuth(), relId(), requestInfoSafe(), revokeConsentRecord(), safeParse() (+1 more)
+Cohesion: 0.40
+Nodes (10): assertConsentCreate(), assertLegalDocumentUpdate(), clientIp(), guardianOf(), isUsersAuth(), relId(), requestInfoSafe(), revokeConsentRecord() (+2 more)
 
 ### Community 274 - "pocketbase/security.ts"
 Cohesion: 0.29
@@ -874,7 +882,7 @@ Nodes (9): ID_ALIASES, IdMap, passwordForPhone(), patchRecordTimestamps(), phone
 
 ### Community 383 - "PbClient"
 Cohesion: 0.21
-Nodes (4): env(), main(), PbClient, PbRecord
+Nodes (7): ensureLegalDocuments(), env(), main(), PbClient, PbRecord, env(), main()
 
 ### Community 384 - "notifications/helpers.ts"
 Cohesion: 0.17
@@ -894,7 +902,7 @@ Nodes (3): EventParticipationDeltaBadges(), EventParticipationDeltaBadgesProps, 
 
 ### Community 400 - "dependencies"
 Cohesion: 0.15
-Nodes (13): date-fns, lucide-react, dependencies, date-fns, lucide-react, qrcode, react, @tanstack/react-query (+5 more)
+Nodes (13): clsx, dependencies, clsx, pocketbase, qrcode, react-router-dom, tailwind-merge, @tanstack/react-query (+5 more)
 
 ### Community 401 - "orientation.ts"
 Cohesion: 0.47
@@ -908,26 +916,42 @@ Nodes (4): name, private, type, version
 Cohesion: 0.40
 Nodes (4): child, exe, pbDir, root
 
+### Community 405 - "imageCrop.ts"
+Cohesion: 0.10
+Nodes (22): CropHole, EventImageCropModal(), EventImageCropModalProps, getCenter(), getDistance(), PointerPoint, clampEventCropState(), EVENT_IMAGE_ASPECT (+14 more)
+
+### Community 406 - "analytics.ts"
+Cohesion: 0.27
+Nodes (7): applyCookieConsentScripts(), loadGoogleAnalytics(), loadMarketingTags(), loadYandexMetrika(), TODO: insert Metrika counter, e.g.:, TODO: insert GA4, e.g.:, TODO: insert remarketing / ads pixels here.
+
 ### Community 413 - "adminGroups.ts"
 Cohesion: 0.50
 Nodes (3): AdminGroupMembershipDb, listAdminUserIds(), withAdminsInParticipants()
 
+### Community 420 - "cookies/constants.ts"
+Cohesion: 0.33
+Nodes (5): COOKIE_CONSENT_BODY, COOKIE_CONSENT_LABELS, COOKIE_CONSENT_STORAGE_KEY, COOKIE_CONSENT_TITLE, COOKIE_CONSENT_VERSION
+
+### Community 422 - "cookies/helpers.ts"
+Cohesion: 0.24
+Nodes (10): acceptCookieConsent(), buildPreferences(), decideCookieConsent(), getCookieConsentPreferences(), hasAcceptedCookieConsent(), hasCookieConsentDecision(), parseStored(), preferencesFromDecision() (+2 more)
+
 ## Knowledge Gaps
-- **919 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+914 more)
+- **941 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+936 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **142 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **146 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
-  _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **Why does `LessonsApi` connect `LessonsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `SupportApi` connect `SupportApi` to `types.ts`?**
+- **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
+- **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _919 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _941 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

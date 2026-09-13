@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.156 Chat list last-message sort · 2026-09-13
+Версия: 1.166 User content legal + report message · 2026-09-13
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -464,7 +464,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 678 passed (47 files); booking cancel past-slot flake вне scope.
+**Итого:** 699 passed (48 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -604,10 +604,11 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Push toggle fix (prefs + SW hang + PB bool) | ✅ 2026-09-12, см. §148 |
 | Portrait orientation lock (PWA) | ✅ 2026-09-12, см. §149 |
 | Admin ↔ all group chats (member) | ✅ 2026-09-12, см. §150 |
-| QR registration → account form | ✅ 2026-09-12, см. §151 |
+| QR registration → account form | ✅ §151·§158·§159 (JSONRaw + invite on create) |
 | Desktop popup sizing (Modal/Sheet) | ✅ 2026-09-12, см. §152 |
 | UI helper copy cleanup | ✅ 2026-09-12, см. §153 |
 | Chat list last-message sort | ✅ 2026-09-13, см. §156 |
+| Event image crop 16:9 on upload | ✅ 2026-09-13, см. §157 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1420,7 +1421,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | 678 (47 files); booking cancel flake вне scope; §156 chat list sort |
+| Тесты | **699** (48 files); booking cancel flake вне scope; §166 legal+report |
+| Graphify | 2804 nodes, 3103 edges, 428 communities |
 
 ### Фазы (кратко)
 
@@ -1442,7 +1444,192 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2715 nodes, 2975 edges, 418 communities (post-§156).
+**Graphify stats:** 2818 nodes, 3109 edges, 432 communities (post-§166).
+
+---
+
+## 166. User content legal + report message (2026-09-13)
+
+**Scope:** юридическая модель пользовательского контента; убрать optional-согласия; жалоба на сообщение → тикет Help.
+
+**Graphify:** `ReportMessageModal` → `SupportApi.createTicket(reportContext)` → `HelpTicketDetailPage` → `/chat/:id?msg=`.
+
+### Legal (✅)
+
+- `documentTexts`: privacy 3.1, personal_data 2.1, terms 3.0 («Пользовательский контент»), school_rules/guardian 2.1.
+- Убраны communication / publication из seed и `OPTIONAL_CONSENT_PURPOSES`; Register без optional auto-accept.
+- `LegalConsentsPage`: без revoke UI; история + accept pending + экспорт.
+- Миграция `1792200000_kvartira_legal_optional_remove.js` — soft-disable legacy optional docs.
+
+### Report (✅)
+
+- `reportContext` на `SupportTicket`; mock + PB (`1792300000_*`); dedupe open report; notify admins.
+- Chat: «Пожаловаться» в `MessageActions` → `ReportMessageModal`.
+- Admin Help detail: блок жалобы + ссылка `/chat/:id?msg=`; ChatPage deep-link scroll/highlight.
+
+### Tests
+
+`legal` / `support` / `chat` report helpers / schema migrations / cookieConsent Register. typecheck ✅.
+
+### Deploy
+
+Миграции `1792200000_*` + `1792300000_*` + фронт; **перезапуск PocketBase**; при необходимости `pb:seed --force` или публикация текстов через `/admin/legal`.
+
+---
+
+## 165. Chat delete for me / everyone + edit anytime (2026-09-13)
+
+**Scope:** правка без лимита 15 мин; удаление — подменю «У себя» / «У всех».
+
+**Graphify:** `MessageActions` → `deleteMessage(scope)` → `hiddenForUserIds` | hard-delete.
+
+### Behavior (✅)
+
+- `canEditMessage` — свои non-system без окна времени; `MESSAGE_EDIT_WINDOW_MS` удалён.
+- «Удалить» → подменю: **У себя** (`hiddenForUserIds`) / **У всех** (hard-delete, права как раньше).
+- У себя — любой участник чата (в т.ч. чужое); у всех — own / admin / teacher в group.
+- Mock + PB: filter hidden в getMessages / search / list preview; миграция `1792100000_kvartira_message_hidden_for.js`.
+
+### Tests
+
+`chat.test.ts` edit older + delete me/everyone; schema migration assert. typecheck ✅.
+
+### Deploy
+
+Миграция `1792100000_*` + фронт; **перезапуск PocketBase**.
+
+---
+
+## 163. Legal docs for Kvartira app (2026-09-13)
+
+**Scope:** полные тексты согласий/политики под функции PWA «Квартира».
+
+**Graphify:** `documentTexts.ts` → `initialLegalDocuments` → `/legal` · Register consents.
+
+### Documents (✅)
+
+- Политика v3.1 + terms v3.0 с «Пользовательский контент» — см. §166 (optional communication/publication убраны).
+- Seed + mock; в PocketBase — `npm run pb:seed -- --force` или публикация через `/admin/legal`.
+- Дисклеймер «проверить у юриста» сохранён.
+
+### Tests
+
+`legal.test.ts` ✅.
+
+---
+
+## 161. Cookie banner + register PD/terms (2026-09-13)
+
+**Scope:** GDPR cookie banner (низ экрана) + на регистрации отдельно ПДн и оферта.
+
+**Graphify:** `CookieConsentHost` → `CookieConsentBanner` → `decideCookieConsent` / `applyCookieConsentScripts`; `RegisterPage` → `ConsentCheckbox` (ПДн / оферта).
+
+### Behavior (✅)
+
+- Фиксированный баннер снизу (blur + shadow): «Принять все» · «Отклонить необязательные» · «Настройки» (аккордеон: технические locked, аналитика/маркетинг).
+- Выбор в `localStorage` (`version: 2` JSON); legacy `"1"` → повторный вопрос.
+- `/legal/*` — баннер скрыт; плейсхолдеры Метрики/GA/marketing в `services/cookies/analytics.ts` только при согласии.
+- Регистрация: ПДн + оферта отдельно; cookie с формы нет.
+
+### Tests
+
+`cookieConsent.test.ts` 7; typecheck ✅.
+
+---
+
+## 160. Register consents + field errors (2026-09-13)
+
+**Scope:** на регистрации сразу все согласия; пустые обязательные поля подсвечиваются красным при submit.
+
+**Graphify:** `RegisterPage` → `ConsentCheckbox` / `DirectionPicker` → RHF `onInvalid`.
+
+### Behavior (✅)
+
+- `noValidate` + `criteriaMode: 'all'` + `onInvalid`: все ошибки полей сразу; согласия без галочки — `border-danger`.
+- Направления: красная рамка fieldset при пустом выборе.
+- Scroll к первому `aria-invalid` / `data-invalid`.
+- Cookie checkbox на форме заменён баннером — см. §161.
+
+### Tests
+
+typecheck ✅; legal + registrationInvite ✅.
+
+---
+
+## 159. QR register — invite not applied on create (2026-09-13)
+
+**Scope:** форма регистрации открывалась, но submit → «Регистрация доступна только по QR».
+
+**Graphify:** `pocketbaseAuthApi.register()` → `users.create` headers/query → `readInviteFromRequest()` → `assertRegistrationInviteOnUserCreate`.
+
+### Root cause (✅)
+
+- Invite уходил в `X-Registration-Invite`, а PB `requestInfo().headers` нормализует ключи в `x_registration_invite` — хук не находил токен.
+- Кастомный header ещё и рискует отвалиться на CORS preflight.
+
+### Fix (✅)
+
+- `readInviteFromRequest`: `x_registration_invite` + `query.invite` + body fallbacks.
+- Клиент: `create(..., { headers, invite: token })` — query backup.
+- PB перезапущен локально.
+
+### Deploy
+
+`pb_hooks/lib/kvartiraInvite.js` + фронт `pocketbase/auth.ts` → перезапуск PB → снова `/admin/registration-qr` ссылка → регистрация.
+
+### Tests
+
+`registrationInvite` +1 (adapter query wiring) → **14** в файле.
+
+---
+
+## 158. QR invite validate — JSONRaw decode (2026-09-13)
+
+**Scope:** после §151 QR всё ещё открывал gate «приглашение недействительно» — токен в URL был, `validate` всегда `valid: false`.
+
+**Graphify:** `invite.pb.js` validate → `readStoredInvite()` / `decodeJsonField()` → `school_settings.contacts`.
+
+### Root cause (✅)
+
+- В PB JSVM поле `contacts` (json) приходит как `types.JSONRaw` (`[]byte`) — array-like с ключами `0,1,2…` (коды символов).
+- `asObject(record.get('contacts'))` не видел `registrationInvite` → `readStoredInvite` = null → validate false.
+- Пустой filter `findRecordsByFilter(..., '')` ненадёжен — заменён на `id != ""` / `findFirstRecordByFilter`.
+
+### Fix (✅)
+
+- `decodeJsonField` / `readJsonObjectField` — байтовый JSON → строка → object.
+- `findSchoolSettingsRecord` — устойчивый поиск singleton.
+- `stripInviteFromSchoolSettingsRecord` — не трогает superuser; при ошибке auth не strip.
+- Gate: отдельный copy при ошибке сети + retry.
+- PocketBase локально перезапущен с обновлёнными `pb_hooks` (live read+compare ✅).
+
+### Deploy
+
+Выложить `pb_hooks/lib/kvartiraInvite.js` → **обязательный перезапуск PocketBase**. Открыть `/admin/registration-qr` и сканировать актуальный QR (не старый распечатанный seed).
+
+### Tests
+
+`registrationInvite` wiring asserts decode helpers. typecheck/suite invite ✅.
+
+---
+
+## 157. Event image crop 16:9 (2026-09-13)
+
+**Scope:** при загрузке фото мероприятия — выбор миниатюры (кадр 16:9), как у аватара.
+
+**Graphify:** `EventFormModal` → `EventImageCropModal` → `services/events/imageCrop.ts`.
+
+### Behavior (✅)
+
+- Файл → валидация → fullscreen кроп (drag / pinch / wheel).
+- Рамка 16:9, затемнение снаружи; «Готово» → JPEG 1280×720 в `imageUrl`.
+- Подсказка в форме: «после выбора — кадрирование 16:9».
+
+### Tests
+
+`events` image crop helpers +1. typecheck ✅.
+
+**Graphify stats:** 2743 nodes, 3012 edges, 420 communities.
 
 ---
 
@@ -2149,7 +2336,7 @@ adapter hook assertions + events unread; typecheck ✅.
 
 ### Rules (✅)
 
-- Править своё — 15 мин; удалять своё всегда (hard delete — исчезает).
+- Править своё — без лимита по времени; удалять: «у себя» (hide) / «у всех» (hard delete).
 - Чужие: admin везде; teacher — только group/school-wide.
 - Ученик не выходит из групп; создавать чаты — только staff (без изменений).
 - Чат из занятия: открыть/создать личный с `metadata.lessonId`.

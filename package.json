@@ -15,7 +15,8 @@
     "pb:down": "docker compose down",
     "pb:logs": "docker compose logs -f pocketbase",
     "pb:serve": "node --env-file=.env scripts/pb-serve.mjs",
-    "pb:seed": "tsx --env-file=.env pocketbase/seed/index.ts",
+    "pb:seed": "tsx --tsconfig tsconfig.app.json --env-file=.env pocketbase/seed/index.ts",
+    "pb:seed:legal": "tsx --env-file=.env pocketbase/seed/seedLegal.ts",
     "push:relay": "node --env-file=.env pocketbase/push-relay.mjs",
     "push:vapid": "npx --yes web-push generate-vapid-keys"
   },

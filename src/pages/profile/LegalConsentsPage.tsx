@@ -1,27 +1,24 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Download, FileCheck, FileWarning } from 'lucide-react';
 import { format } from 'date-fns';
+import { useState } from 'react';
 import { BackLink } from '@/components/ui/BackLink';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { can } from '@/permissions';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
-import { REVOKE_SERVICE_CONSENT_MESSAGE } from '@/services/legal/constants';
 import { isConsentActive } from '@/services/legal/helpers';
 import {
   downloadPersonalDataExport,
   personalDataExportFilename,
 } from '@/services/profile/dataExport';
 import { useCurrentUser } from '@/stores/authStore';
-import type { UserConsent } from '@/types';
 
 export default function LegalConsentsPage() {
   const user = useCurrentUser()!;
@@ -29,7 +26,6 @@ export default function LegalConsentsPage() {
   const isOnline = useOnlineStatus();
   const enabled = can(user, 'legal:view-own');
 
-  const [revokeTarget, setRevokeTarget] = useState<UserConsent | null>(null);
   const [actionError, setActionError] = useState('');
 
   const {
@@ -68,18 +64,6 @@ export default function LegalConsentsPage() {
     },
   });
 
-  const revokeMutation = useMutation({
-    mutationFn: (consentId: string) => api.legal.revokeConsent(consentId, user.id),
-    onSuccess: () => {
-      setRevokeTarget(null);
-      setActionError('');
-      queryClient.invalidateQueries({ queryKey: ['legal'] });
-    },
-    onError: (e) => {
-      setActionError(e instanceof ApiError ? e.message : 'Не удалось отозвать согласие');
-    },
-  });
-
   const exportMutation = useMutation({
     mutationFn: () => api.users.exportOwnData(user.id),
     onSuccess: (data) => {
@@ -101,21 +85,13 @@ export default function LegalConsentsPage() {
     acceptAllMutation.mutate();
   };
 
-  const openRevoke = (consent: UserConsent) => {
-    setActionError('');
-    if (consent.purpose === 'service') {
-      setActionError(REVOKE_SERVICE_CONSENT_MESSAGE);
-      return;
-    }
-    setRevokeTarget(consent);
-  };
-
   return (
     <div className="page-container max-w-lg">
       <BackLink label="Профиль" fallbackTo="/profile" />
       <h1 className="text-h1">Документы и согласия</h1>
       <p className="mt-2 text-body-sm text-text-secondary">
-        Отдельные согласия по целям обработки, история и право отозвать.
+        История принятых документов. По вопросам данных — раздел «Помощь» или удаление аккаунта в
+        «Настройки → Аккаунт».
       </p>
 
       <Link to="/legal" className="mt-4 inline-flex items-center gap-1 text-sm text-brand hover:underline">
@@ -216,7 +192,6 @@ export default function LegalConsentsPage() {
           <div className="mt-3 space-y-2">
             {consents.map((consent) => {
               const active = isConsentActive(consent);
-              const isService = consent.purpose === 'service';
               return (
                 <Card key={consent.id} className="p-4">
                   <p className="font-medium">{consent.documentTitle}</p>
@@ -226,17 +201,6 @@ export default function LegalConsentsPage() {
                       ? ` · отозвано ${format(new Date(consent.revokedAt), 'dd.MM.yyyy')}`
                       : ''}
                   </p>
-                  {active && (
-                    <Button
-                      className="mt-3"
-                      size="sm"
-                      variant="secondary"
-                      disabled={!isOnline || revokeMutation.isPending}
-                      onClick={() => openRevoke(consent)}
-                    >
-                      {isService ? 'Как отозвать' : 'Отозвать'}
-                    </Button>
-                  )}
                 </Card>
               );
             })}
@@ -264,26 +228,6 @@ export default function LegalConsentsPage() {
           Скачать мои данные
         </Button>
       </section>
-
-      <ConfirmDialog
-        open={!!revokeTarget}
-        onClose={() => setRevokeTarget(null)}
-        title="Отозвать согласие?"
-        description={
-          <>
-            Вы отзываете согласие на «{revokeTarget?.documentTitle}». Школа перестанет обрабатывать
-            данные по этой цели. Запись об отзыве сохранится в журнале.
-          </>
-        }
-        confirmLabel="Отозвать"
-        tone="destructive"
-        loading={revokeMutation.isPending}
-        disabled={!isOnline}
-        onConfirm={() => {
-          if (!revokeTarget || !isOnline) return;
-          revokeMutation.mutate(revokeTarget.id);
-        }}
-      />
     </div>
   );
 }

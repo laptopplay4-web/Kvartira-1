@@ -207,6 +207,8 @@ export interface Message {
   updatedAt?: string;
   editedAt?: string;
   deletedAt?: string;
+  /** User ids who hid this message locally («удалить у себя»). */
+  hiddenForUserIds?: string[];
   status: MessageStatus;
   readBy: string[];
   attachments?: MessageAttachment[];
@@ -401,6 +403,14 @@ export interface SupportTicketAttachment {
   url: string;
 }
 
+export type MessageReportReason = 'image_rights' | 'harassment' | 'spam' | 'other';
+
+export interface SupportTicketReportContext {
+  conversationId: string;
+  messageId: string;
+  reason: MessageReportReason;
+}
+
 export interface SupportTicket {
   id: string;
   userId: string;
@@ -412,6 +422,7 @@ export interface SupportTicket {
   updatedAt: string;
   attachments: SupportTicketAttachment[];
   adminReply?: SupportTicketReply;
+  reportContext?: SupportTicketReportContext;
 }
 
 export interface PublicContactInfo {

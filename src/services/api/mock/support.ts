@@ -146,7 +146,31 @@ export function createMockSupportApi(
             id: uid('attach'),
           })) ?? [],
       };
+      if (input.reportContext) {
+        ticket.reportContext = input.reportContext;
+        const duplicate = db.supportTickets.find(
+          (t) =>
+            t.userId === userId &&
+            t.reportContext?.messageId === input.reportContext?.messageId &&
+            t.status !== 'closed',
+        );
+        if (duplicate) {
+          throw new ApiError('Жалоба на это сообщение уже отправлена', 'CONFLICT', 409);
+        }
+      }
       db.supportTickets.push(ticket);
+
+      if (input.reportContext) {
+        for (const admin of db.users.filter((u) => u.role === 'admin')) {
+          pushSupportNotification(
+            admin.id,
+            'Жалоба на сообщение в чате',
+            ticket.subject,
+            `/profile/help/${ticket.id}`,
+          );
+        }
+      }
+
       return ticket;
     },
 

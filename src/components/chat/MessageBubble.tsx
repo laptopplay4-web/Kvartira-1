@@ -32,7 +32,8 @@ interface MessageBubbleProps {
   replyToSender?: User;
   onReply?: (message: Message) => void;
   onEdit?: (message: Message) => void;
-  onDelete?: (message: Message) => void;
+  onDelete?: (message: Message, scope: 'me' | 'everyone') => void;
+  onReport?: (message: Message) => void;
   onForward?: (message: Message) => void;
   onReact?: (message: Message, emoji: string) => void;
   onPin?: (message: Message) => void;
@@ -65,6 +66,7 @@ export function MessageBubble({
   onReply,
   onEdit,
   onDelete,
+  onReport,
   onForward,
   onReact,
   onPin,
@@ -308,7 +310,8 @@ export function MessageBubble({
           onClose={() => setActionsOpen(false)}
           onReply={() => onReply?.(message)}
           onEdit={() => onEdit?.(message)}
-          onDelete={() => onDelete?.(message)}
+          onDelete={(scope) => onDelete?.(message, scope)}
+          onReport={onReport ? () => onReport(message) : undefined}
           onForward={onForward ? () => onForward(message) : undefined}
           onReact={onReact ? (emoji) => onReact(message, emoji) : undefined}
           onPin={onPin ? () => onPin(message) : undefined}

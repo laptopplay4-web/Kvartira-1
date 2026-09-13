@@ -554,6 +554,15 @@ describe('edit message', () => {
     expect(edited.editedAt).toBeDefined();
   });
 
+  it('allows editing own message older than 15 minutes', async () => {
+    const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Старое');
+    msg.createdAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const edited = await mockChatApi.editMessage('conv-1', msg.id, 'user-student', {
+      text: 'Правка позже',
+    });
+    expect(edited.text).toBe('Правка позже');
+  });
+
   it('rejects editing foreign message (IDOR)', async () => {
     const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Текст');
     await expect(
@@ -573,7 +582,7 @@ describe('edit message', () => {
 describe('delete message', () => {
   beforeEach(() => resetMockDatabase());
 
-  it('hard-deletes own message', async () => {
+  it('hard-deletes own message for everyone', async () => {
     const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Удалить');
     const deleted = await mockChatApi.deleteMessage('conv-1', msg.id, 'user-student');
     expect(deleted.deletedAt).toBeDefined();
@@ -582,12 +591,39 @@ describe('delete message', () => {
     expect(page.messages.some((m) => m.id === msg.id)).toBe(false);
   });
 
-  it('rejects deleting foreign message in personal chat (IDOR)', async () => {
+  it('hides message only for the requesting user (delete for me)', async () => {
+    const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Скрыть у себя');
+    const hidden = await mockChatApi.deleteMessage('conv-1', msg.id, 'user-student', {
+      scope: 'me',
+    });
+    expect(hidden.hiddenForUserIds).toContain('user-student');
+    expect(hidden.deletedAt).toBeUndefined();
+
+    const studentPage = await mockChatApi.getMessages('conv-1', 'user-student');
+    expect(studentPage.messages.some((m) => m.id === msg.id)).toBe(false);
+
+    const teacherPage = await mockChatApi.getMessages('conv-1', 'user-teacher-1');
+    expect(teacherPage.messages.some((m) => m.id === msg.id)).toBe(true);
+  });
+
+  it('rejects deleting foreign message in personal chat for everyone (IDOR)', async () => {
     const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Чужое');
     await expect(mockChatApi.deleteMessage('conv-1', msg.id, 'user-teacher-1')).rejects.toThrow(ApiError);
   });
 
-  it('teacher can delete foreign message in group chat', async () => {
+  it('allows hide-for-me on foreign message when member', async () => {
+    const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Чужое скрыть');
+    const hidden = await mockChatApi.deleteMessage('conv-1', msg.id, 'user-teacher-1', {
+      scope: 'me',
+    });
+    expect(hidden.hiddenForUserIds).toContain('user-teacher-1');
+    const teacherPage = await mockChatApi.getMessages('conv-1', 'user-teacher-1');
+    expect(teacherPage.messages.some((m) => m.id === msg.id)).toBe(false);
+    const studentPage = await mockChatApi.getMessages('conv-1', 'user-student');
+    expect(studentPage.messages.some((m) => m.id === msg.id)).toBe(true);
+  });
+
+  it('teacher can delete foreign message in group chat for everyone', async () => {
     const group = await mockChatApi.createConversation('user-teacher-1', {
       type: 'group',
       title: 'Модерация',
@@ -857,6 +893,27 @@ describe('edit window and leave policy', () => {
       participantIds: ['user-student', 'user-teacher-1'],
     });
     await expect(mockChatApi.leaveConversation(group.id, 'user-student')).rejects.toThrow(ApiError);
+  });
+});
+
+describe('report message helpers', () => {
+  it('allows reporting others messages in accessible chats', async () => {
+    const { canReportMessage, buildReportTicketSubject } = await import(
+      '@/services/support/reportMessage'
+    );
+    const { users: seedUsers, conversations, conversationMembers, messages } = await import(
+      '@/mocks/seed'
+    );
+    const studentUser = seedUsers.find((u) => u.id === 'user-student')!;
+    const conv = conversations.find((c) => c.id === 'conv-1')!;
+    const members = conversationMembers.filter((m) => m.conversationId === 'conv-1');
+    const otherMsg = messages.find((m) => m.conversationId === 'conv-1' && m.senderId !== 'user-student');
+    expect(otherMsg).toBeTruthy();
+    expect(canReportMessage(studentUser, otherMsg!, conv, members)).toBe(true);
+    expect(canReportMessage(studentUser, { ...otherMsg!, senderId: 'user-student' }, conv, members)).toBe(
+      false,
+    );
+    expect(buildReportTicketSubject('image_rights')).toContain('Изображение');
   });
 });
 

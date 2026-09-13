@@ -1,10 +1,11 @@
 import { can } from '@/permissions';
 import type { Conversation, ConversationMember, Message, MessageReaction, User } from '@/types';
-import { MESSAGE_EDIT_WINDOW_MS } from './constants';
-import { isGroupConversation } from './access';
+import { isConversationMember, isGroupConversation } from './access';
 import { isSyntheticMediaCaption } from './attachments';
 
 export const DELETED_MESSAGE_TEXT = 'Сообщение удалено';
+
+export type DeleteMessageScope = 'me' | 'everyone';
 
 export function isMessageDeleted(message: Message): boolean {
   return !!message.deletedAt;
@@ -20,25 +21,32 @@ export function getMessageDisplayText(message: Message): string {
   return message.text;
 }
 
-export function isWithinEditWindow(message: Message, nowMs = Date.now()): boolean {
-  const created = Date.parse(message.createdAt);
-  if (Number.isNaN(created)) return false;
-  return nowMs - created <= MESSAGE_EDIT_WINDOW_MS;
+export function isMessageHiddenForUser(message: Message, userId: string): boolean {
+  return (message.hiddenForUserIds ?? []).includes(userId);
 }
 
-export function canEditMessage(user: User, message: Message, nowMs = Date.now()): boolean {
+/** Own non-deleted non-system messages — no time window. */
+export function canEditMessage(user: User, message: Message): boolean {
   if (!can(user, 'chat:send') && !can(user, 'chat:write')) return false;
   if (isMessageDeleted(message)) return false;
   if (isSystemMessage(message)) return false;
-  if (message.senderId !== user.id) return false;
-  return isWithinEditWindow(message, nowMs);
+  return message.senderId === user.id;
 }
 
 /**
+ * Soft/hard delete for everyone.
  * Own: always. Admin: any accessible chat.
  * Teacher: only in group / school-wide (not personal).
  */
 export function canDeleteMessage(
+  user: User,
+  message: Message,
+  conversation?: Conversation | null,
+): boolean {
+  return canDeleteMessageForEveryone(user, message, conversation);
+}
+
+export function canDeleteMessageForEveryone(
   user: User,
   message: Message,
   conversation?: Conversation | null,
@@ -52,6 +60,27 @@ export function canDeleteMessage(
     return true;
   }
   return false;
+}
+
+/** Hide only for the current user («удалить у себя»). */
+export function canDeleteMessageForMe(
+  user: User,
+  message: Message,
+  conversation: Conversation | null | undefined,
+  members: ConversationMember[],
+): boolean {
+  if (!conversation) return false;
+  if (isMessageDeleted(message)) return false;
+  if (isSystemMessage(message)) return false;
+  if (isMessageHiddenForUser(message, user.id)) return false;
+  if (!can(user, 'chat:read')) return false;
+  return isConversationMember(conversation.id, user.id, members);
+}
+
+export function withUserHidden(message: Message, userId: string): Message {
+  const ids = new Set(message.hiddenForUserIds ?? []);
+  ids.add(userId);
+  return { ...message, hiddenForUserIds: [...ids] };
 }
 
 export function canPinMessage(

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BackLink } from '@/components/ui/BackLink';
 import { format } from 'date-fns';
@@ -7,6 +7,7 @@ import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { canReplyToTicket } from '@/services/support/access';
 import { SUPPORT_CATEGORY_LABELS } from '@/services/support/helpers';
+import { MESSAGE_REPORT_REASON_LABELS } from '@/services/support/reportMessage';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +16,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { SupportTicketStatusBadge } from '@/components/ui/SupportTicketStatusBadge';
 import { SupportAttachmentList } from '@/components/support/SupportAttachmentList';
+import { can } from '@/permissions';
 
 export default function HelpTicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -96,6 +98,28 @@ export default function HelpTicketDetailPage() {
         <p className="mt-4 text-body-sm whitespace-pre-wrap">{ticket.message}</p>
         <SupportAttachmentList attachments={ticket.attachments} />
       </Card>
+
+      {ticket.reportContext && can(user, 'support:view-all-tickets') && (
+        <Card className="mb-4 border-warning/30 bg-warning-muted/20">
+          <h2 className="mb-2 text-label uppercase tracking-wide">Жалоба на сообщение</h2>
+          <dl className="space-y-2 text-body-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-text-muted">Причина</dt>
+              <dd>{MESSAGE_REPORT_REASON_LABELS[ticket.reportContext.reason]}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-text-muted">Сообщение</dt>
+              <dd className="font-mono text-caption">{ticket.reportContext.messageId}</dd>
+            </div>
+          </dl>
+          <Link
+            to={`/chat/${ticket.reportContext.conversationId}?msg=${ticket.reportContext.messageId}`}
+            className="mt-3 inline-flex min-h-11 items-center text-body-sm font-medium text-brand"
+          >
+            Открыть в чате
+          </Link>
+        </Card>
+      )}
 
       {ticket.adminReply && (
         <section className="mb-4" aria-labelledby="reply-heading">

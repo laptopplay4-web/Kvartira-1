@@ -33,6 +33,7 @@ import type {
   SupportTicket,
   SupportTicketAttachment,
   SupportTicketCategory,
+  SupportTicketReportContext,
   SupportTicketStatus,
   PublicLandingData,
   PublicDirectionDetail,
@@ -209,7 +210,12 @@ export interface ChatApi {
     userId: string,
     input: EditMessageInput,
   ): Promise<Message>;
-  deleteMessage(conversationId: string, messageId: string, userId: string): Promise<Message>;
+  deleteMessage(
+    conversationId: string,
+    messageId: string,
+    userId: string,
+    options?: { scope?: 'me' | 'everyone' },
+  ): Promise<Message>;
   markAsRead(conversationId: string, userId: string): Promise<void>;
   setOpenConversation(userId: string, conversationId: string | null): Promise<void>;
   createConversation(userId: string, input: CreateConversationInput): Promise<Conversation>;
@@ -477,6 +483,7 @@ export interface CreateSupportTicketInput {
   message: string;
   category: SupportTicketCategory;
   attachments?: Omit<SupportTicketAttachment, 'id'>[];
+  reportContext?: SupportTicketReportContext;
 }
 
 export interface UploadSupportAttachmentInput {

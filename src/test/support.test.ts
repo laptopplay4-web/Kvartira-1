@@ -241,6 +241,58 @@ describe('mock support api', () => {
       api.replyToTicket(otherTicket.id, { text: 'Попытка ответа от ученика здесь' }, student.id),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
+
+  it('creates message report ticket with reportContext and notifies admins', async () => {
+    const ticket = await api.createTicket(
+      {
+        subject: 'Жалоба на сообщение: Спам',
+        message: 'Причина: Спам\nЧат: conv-1\nСообщение: msg-report-1',
+        category: 'chat',
+        reportContext: {
+          conversationId: 'conv-1',
+          messageId: 'msg-report-1',
+          reason: 'spam',
+        },
+      },
+      student.id,
+    );
+    expect(ticket.reportContext?.messageId).toBe('msg-report-1');
+    expect(ticket.reportContext?.reason).toBe('spam');
+    expect(db.notifications.some((n) => n.userId === admin.id && n.link?.includes(ticket.id))).toBe(
+      true,
+    );
+  });
+
+  it('rejects duplicate open report for the same message', async () => {
+    await api.createTicket(
+      {
+        subject: 'Жалоба на сообщение: Спам',
+        message: 'Причина: Спам\nЧат: conv-1\nСообщение: msg-dup',
+        category: 'chat',
+        reportContext: {
+          conversationId: 'conv-1',
+          messageId: 'msg-dup',
+          reason: 'spam',
+        },
+      },
+      student.id,
+    );
+    await expect(
+      api.createTicket(
+        {
+          subject: 'Жалоба на сообщение: Спам',
+          message: 'Причина: Спам\nЧат: conv-1\nСообщение: msg-dup',
+          category: 'chat',
+          reportContext: {
+            conversationId: 'conv-1',
+            messageId: 'msg-dup',
+            reason: 'spam',
+          },
+        },
+        student.id,
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
 });
 
 describe('support permissions', () => {

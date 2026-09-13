@@ -664,11 +664,9 @@ export const initialSecuritySessions: SecuritySessionRecord[] = [
 ];
 
 import {
-  LEGAL_COMMUNICATION_CONSENT_TEXT,
   LEGAL_GUARDIAN_CONSENT_TEXT,
   LEGAL_PERSONAL_DATA_CONSENT_TEXT,
   LEGAL_PRIVACY_POLICY_TEXT,
-  LEGAL_PUBLICATION_CONSENT_TEXT,
   LEGAL_SCHOOL_RULES_TEXT,
   LEGAL_TERMS_OF_SERVICE_TEXT,
 } from '@/services/legal/documentTexts';
@@ -679,12 +677,24 @@ export const initialLegalDocuments: LegalDocument[] = [
     type: 'privacy_policy',
     title: 'Политика конфиденциальности',
     content: LEGAL_PRIVACY_POLICY_TEXT,
-    currentVersion: '2.0',
-    effectiveAt: format(addDays(today, -14), 'yyyy-MM-dd'),
+    currentVersion: '3.1',
+    effectiveAt: format(today, 'yyyy-MM-dd'),
     requiresConsent: true,
     purpose: 'service',
     required: true,
     versionHistory: [
+      {
+        version: '3.1',
+        effectiveAt: format(today, 'yyyy-MM-dd'),
+        changeSummary:
+          'Чат = закрытый учебный процесс; публикация вне PWA; права без optional-отзыва.',
+      },
+      {
+        version: '3.0',
+        effectiveAt: format(addDays(today, -1), 'yyyy-MM-dd'),
+        changeSummary:
+          'Полный текст под PWA «Квартира»: QR-регистрация, занятия, чат, ДЗ, cookie, права субъекта.',
+      },
       {
         version: '2.0',
         effectiveAt: format(addDays(today, -14), 'yyyy-MM-dd'),
@@ -702,12 +712,22 @@ export const initialLegalDocuments: LegalDocument[] = [
     type: 'personal_data',
     title: 'Согласие на обработку персональных данных',
     content: LEGAL_PERSONAL_DATA_CONSENT_TEXT,
-    currentVersion: '1.0',
-    effectiveAt: format(addDays(today, -180), 'yyyy-MM-dd'),
+    currentVersion: '2.1',
+    effectiveAt: format(today, 'yyyy-MM-dd'),
     requiresConsent: true,
     purpose: 'service',
     required: true,
     versionHistory: [
+      {
+        version: '2.1',
+        effectiveAt: format(today, 'yyyy-MM-dd'),
+        changeSummary: 'Сервисные уведомления и чат-вложения в цель service.',
+      },
+      {
+        version: '2.0',
+        effectiveAt: format(addDays(today, -1), 'yyyy-MM-dd'),
+        changeSummary: 'Детализированы цели service под функции приложения.',
+      },
       {
         version: '1.0',
         effectiveAt: format(addDays(today, -180), 'yyyy-MM-dd'),
@@ -720,12 +740,22 @@ export const initialLegalDocuments: LegalDocument[] = [
     type: 'terms_of_service',
     title: 'Пользовательское соглашение',
     content: LEGAL_TERMS_OF_SERVICE_TEXT,
-    currentVersion: '1.0',
-    effectiveAt: format(addDays(today, -180), 'yyyy-MM-dd'),
+    currentVersion: '3.0',
+    effectiveAt: format(today, 'yyyy-MM-dd'),
     requiresConsent: true,
     purpose: 'service',
     required: true,
     versionHistory: [
+      {
+        version: '3.0',
+        effectiveAt: format(today, 'yyyy-MM-dd'),
+        changeSummary: 'Раздел «Пользовательский контент»: гарантии, жалобы, 3 раб. дня.',
+      },
+      {
+        version: '2.0',
+        effectiveAt: format(addDays(today, -1), 'yyyy-MM-dd'),
+        changeSummary: 'Оферта под QR-регистрацию, роли и функции PWA.',
+      },
       {
         version: '1.0',
         effectiveAt: format(addDays(today, -180), 'yyyy-MM-dd'),
@@ -738,46 +768,20 @@ export const initialLegalDocuments: LegalDocument[] = [
     type: 'school_rules',
     title: 'Правила школы',
     content: LEGAL_SCHOOL_RULES_TEXT,
-    currentVersion: '1.0',
-    effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
+    currentVersion: '2.1',
+    effectiveAt: format(today, 'yyyy-MM-dd'),
     requiresConsent: false,
     versionHistory: [
       {
-        version: '1.0',
-        effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
-        changeSummary: 'Первая публикуемая версия.',
+        version: '2.1',
+        effectiveAt: format(today, 'yyyy-MM-dd'),
+        changeSummary: 'Публикация вне чатов — отдельно через администрацию Школы.',
       },
-    ],
-  },
-  {
-    id: 'legal-communication',
-    type: 'personal_data',
-    title: 'Согласие на уведомления и рассылки',
-    content: LEGAL_COMMUNICATION_CONSENT_TEXT,
-    currentVersion: '1.0',
-    effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
-    requiresConsent: true,
-    purpose: 'communication',
-    required: false,
-    versionHistory: [
       {
-        version: '1.0',
-        effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
-        changeSummary: 'Первая публикуемая версия.',
+        version: '2.0',
+        effectiveAt: format(addDays(today, -1), 'yyyy-MM-dd'),
+        changeSummary: 'Правила согласованы с записью/отменой через приложение.',
       },
-    ],
-  },
-  {
-    id: 'legal-publication',
-    type: 'personal_data',
-    title: 'Согласие на публикацию фото и видео',
-    content: LEGAL_PUBLICATION_CONSENT_TEXT,
-    currentVersion: '1.0',
-    effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
-    requiresConsent: true,
-    purpose: 'publication',
-    required: false,
-    versionHistory: [
       {
         version: '1.0',
         effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
@@ -790,12 +794,22 @@ export const initialLegalDocuments: LegalDocument[] = [
     type: 'personal_data',
     title: 'Согласие законного представителя',
     content: LEGAL_GUARDIAN_CONSENT_TEXT,
-    currentVersion: '1.0',
-    effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
+    currentVersion: '2.1',
+    effectiveAt: format(today, 'yyyy-MM-dd'),
     requiresConsent: true,
     purpose: 'minor_guardian',
     required: false,
     versionHistory: [
+      {
+        version: '2.1',
+        effectiveAt: format(today, 'yyyy-MM-dd'),
+        changeSummary: 'Без optional-согласий communication/publication в PWA.',
+      },
+      {
+        version: '2.0',
+        effectiveAt: format(addDays(today, -1), 'yyyy-MM-dd'),
+        changeSummary: 'Связь с Политикой и согласием service при регистрации несовершеннолетнего.',
+      },
       {
         version: '1.0',
         effectiveAt: format(addDays(today, -90), 'yyyy-MM-dd'),
@@ -834,16 +848,6 @@ export const initialUserConsents: UserConsent[] = [
     documentTitle: 'Пользовательское соглашение',
     version: '1.0',
     purpose: 'service',
-    acceptedAt: new Date(Date.now() - 86400000 * 150).toISOString(),
-  },
-  {
-    id: 'consent-communication',
-    userId: 'user-student',
-    documentId: 'legal-communication',
-    documentType: 'personal_data',
-    documentTitle: 'Согласие на уведомления и рассылки',
-    version: '1.0',
-    purpose: 'communication',
     acceptedAt: new Date(Date.now() - 86400000 * 150).toISOString(),
   },
   {

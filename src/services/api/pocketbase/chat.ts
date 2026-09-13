@@ -57,7 +57,15 @@ import {
   normalizeMessageText,
   sortConversationsWithPins,
 } from '@/services/chat/helpers';
-import { canDeleteMessage, canEditMessage, canPinMessage, toggleReactionList } from '@/services/chat/messages';
+import {
+  canDeleteMessage,
+  canDeleteMessageForMe,
+  canEditMessage,
+  canPinMessage,
+  isMessageHiddenForUser,
+  toggleReactionList,
+  withUserHidden,
+} from '@/services/chat/messages';
 import {
   getLocalPinnedAtMap,
   setLocalConversationPinned,
@@ -243,7 +251,12 @@ function enrichConversation(
   members: ConversationMember[],
 ): Conversation {
   const member = getConversationMember(conv.id, userId, members);
-  const convMessages = messages.filter((m) => m.conversationId === conv.id && !m.deletedAt);
+  const convMessages = messages.filter(
+    (m) =>
+      m.conversationId === conv.id &&
+      !m.deletedAt &&
+      !isMessageHiddenForUser(m, userId),
+  );
   const unreadCount = computeUnreadCount(conv.id, userId, convMessages, member);
   const lastMessage = [...convMessages]
     .sort((a, b) => compareIsoDates(a.createdAt, b.createdAt))
@@ -483,7 +496,7 @@ export const pocketbaseChatApi: ChatApi = {
       const hasMore = result.items.length > limit;
       const page = hasMore ? result.items.slice(0, limit) : result.items;
       const messages = (await resolveMessages(page.map(mapMessageRecord).reverse()))
-        .filter((m) => !m.deletedAt)
+        .filter((m) => !m.deletedAt && !isMessageHiddenForUser(m, userId))
         .sort((a, b) => compareIsoDates(a.createdAt, b.createdAt) || a.id.localeCompare(b.id));
       const nextCursor = hasMore ? messages[0]?.id : undefined;
       return { messages, nextCursor, hasMore };
@@ -498,6 +511,9 @@ export const pocketbaseChatApi: ChatApi = {
         const record = await pb.collection('messages').getOne(messageId);
         const message = await resolveMessage(mapMessageRecord(record));
         if (message.conversationId !== conversationId) {
+          throw new ApiError('Сообщение не найдено', 'NOT_FOUND', 404);
+        }
+        if (isMessageHiddenForUser(message, userId)) {
           throw new ApiError('Сообщение не найдено', 'NOT_FOUND', 404);
         }
         return message;
@@ -621,16 +637,43 @@ export const pocketbaseChatApi: ChatApi = {
     });
   },
 
-  async deleteMessage(conversationId, messageId, userId) {
+  async deleteMessage(conversationId, messageId, userId, options) {
     return withPbError(async () => {
-      const { user, conversation } = await assertConversationAccess(conversationId, userId);
-      const msg = await pocketbaseChatApi.getMessage(conversationId, messageId, userId);
+      const { user, conversation, members } = await assertConversationAccess(conversationId, userId);
+      const pb = getPocketBase();
+      let msg: Message;
+      try {
+        const record = await pb.collection('messages').getOne(messageId);
+        msg = await resolveMessage(mapMessageRecord(record));
+      } catch (error) {
+        if (error instanceof ClientResponseError && error.status === 404) {
+          throw new ApiError('Сообщение не найдено', 'NOT_FOUND', 404);
+        }
+        throw error;
+      }
+      if (msg.conversationId !== conversationId) {
+        throw new ApiError('Сообщение не найдено', 'NOT_FOUND', 404);
+      }
+
+      const scope = options?.scope ?? 'everyone';
+
+      if (scope === 'me') {
+        if (!canDeleteMessageForMe(user, msg, conversation, members)) {
+          throw new ApiError('Нет прав на удаление', 'FORBIDDEN', 403);
+        }
+        const updated = withUserHidden(msg, userId);
+        const record = await pb.collection('messages').update(messageId, {
+          hiddenForUserIds: updated.hiddenForUserIds ?? [],
+        });
+        const mapped = await resolveMessage(mapMessageRecord(record));
+        chatRealtimeService.emit({ type: 'message.updated', conversationId, message: mapped });
+        return mapped;
+      }
 
       if (!canDeleteMessage(user, msg, conversation)) {
         throw new ApiError('Нет прав на удаление', 'FORBIDDEN', 403);
       }
 
-      const pb = getPocketBase();
       const snapshot = { ...msg, deletedAt: new Date().toISOString() };
       await pb.collection('messages').delete(messageId);
       chatRealtimeService.emit({ type: 'message.deleted', conversationId, message: snapshot });
@@ -847,6 +890,7 @@ export const pocketbaseChatApi: ChatApi = {
       for (const record of records) {
         const msg = await resolveMessage(mapMessageRecord(record));
         if (!convIds.has(msg.conversationId)) continue;
+        if (isMessageHiddenForUser(msg, userId)) continue;
         if (!matchesMessageSearch(msg, q)) continue;
         const conv = conversations.find((c) => c.id === msg.conversationId);
         if (!conv) continue;

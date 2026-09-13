@@ -145,9 +145,12 @@ export const pocketbaseAuthApi: AuthApi = {
           directionIds: normalizeDirectionIds(directionIds),
         },
         {
+          // Header (normalized by PB to x_registration_invite) + query backup
+          // so browser CORS preflight cannot drop the invite.
           headers: {
             [REGISTRATION_INVITE_HEADER]: normalizedInvite,
           },
+          invite: normalizedInvite,
         },
       );
       return pocketbaseAuthApi.login(normalizedPhone, password);

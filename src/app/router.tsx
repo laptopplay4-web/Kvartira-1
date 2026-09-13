@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout, AdminRoute, GuestRoute, ProtectedRoute } from './layouts';
 import { RouteErrorPage } from './RouteErrorPage';
+import { CookieConsentHost } from '@/components/legal/CookieConsentHost';
 
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
@@ -47,6 +48,7 @@ const LegalConsentsPage = lazy(() => import('@/pages/profile/LegalConsentsPage')
 export const appRoutes = [
   {
     errorElement: <RouteErrorPage />,
+    element: <CookieConsentHost />,
     children: [
   { path: '/directions/:id', element: <DirectionDetailPage /> },
   { path: '/teachers/:id', element: <TeacherDetailPage /> },

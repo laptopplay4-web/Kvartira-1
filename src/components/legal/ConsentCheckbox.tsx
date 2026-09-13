@@ -1,12 +1,17 @@
 import { Link } from 'react-router-dom';
 import type { LegalDocument } from '@/types';
 import { CONSENT_PURPOSE_DESCRIPTIONS } from '@/services/legal/constants';
+import { cn } from '@/utils';
 
 interface ConsentCheckboxProps {
   document: LegalDocument;
   checked: boolean;
   onChange: (checked: boolean) => void;
   required?: boolean;
+  /** Override link/label text (e.g. оферта). */
+  title?: string;
+  /** Highlight when submit attempted without accepting. */
+  invalid?: boolean;
 }
 
 /**
@@ -18,17 +23,30 @@ export function ConsentCheckbox({
   checked,
   onChange,
   required = false,
+  title,
+  invalid = false,
 }: ConsentCheckboxProps) {
   const description = document.purpose
     ? CONSENT_PURPOSE_DESCRIPTIONS[document.purpose]
     : undefined;
+  const label = title?.trim() || document.title;
 
   return (
-    <label className="flex items-start gap-3 rounded-xl border border-border-subtle bg-surface-elevated/60 p-3 text-body-sm">
+    <label
+      data-invalid={invalid || undefined}
+      className={cn(
+        'flex items-start gap-3 rounded-xl border bg-surface-elevated/60 p-3 text-body-sm transition-colors',
+        invalid ? 'border-danger' : 'border-border-subtle',
+      )}
+    >
       <input
         type="checkbox"
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-subtle text-brand focus-ring"
+        className={cn(
+          'mt-0.5 h-4 w-4 shrink-0 rounded text-brand focus-ring',
+          invalid ? 'border-danger' : 'border-border-subtle',
+        )}
         checked={checked}
+        aria-invalid={invalid}
         onChange={(e) => onChange(e.target.checked)}
       />
       <span className="min-w-0">
@@ -39,7 +57,7 @@ export function ConsentCheckbox({
             target="_blank"
             onClick={(e) => e.stopPropagation()}
           >
-            {document.title}
+            {label}
           </Link>
           {required ? (
             <span className="ml-1 text-text-muted">— обязательно</span>

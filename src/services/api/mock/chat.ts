@@ -43,7 +43,15 @@ import {
   normalizeMessageText,
   sortConversationsWithPins,
 } from '@/services/chat/helpers';
-import { canDeleteMessage, canEditMessage, canPinMessage, toggleReactionList } from '@/services/chat/messages';
+import {
+  canDeleteMessage,
+  canDeleteMessageForMe,
+  canEditMessage,
+  canPinMessage,
+  isMessageHiddenForUser,
+  toggleReactionList,
+  withUserHidden,
+} from '@/services/chat/messages';
 import {
   MESSAGE_MAX_LENGTH,
   MESSAGE_PAGE_SIZE,
@@ -138,7 +146,12 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
 
   function enrichConversation(conv: Conversation, userId: string): Conversation {
     const member = getConversationMember(conv.id, userId, db.conversationMembers);
-    const convMessages = db.messages.filter((m) => m.conversationId === conv.id && !m.deletedAt);
+    const convMessages = db.messages.filter(
+      (m) =>
+        m.conversationId === conv.id &&
+        !m.deletedAt &&
+        !isMessageHiddenForUser(m, userId),
+    );
     const unreadCount = computeUnreadCount(conv.id, userId, convMessages, member);
     const lastMessage = [...convMessages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
     return {
@@ -267,7 +280,12 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       assertConversationAccess(conversationId, userId);
       const limit = params.limit ?? MESSAGE_PAGE_SIZE;
       const sorted = db.messages
-        .filter((m) => m.conversationId === conversationId && !m.deletedAt)
+        .filter(
+          (m) =>
+            m.conversationId === conversationId &&
+            !m.deletedAt &&
+            !isMessageHiddenForUser(m, userId),
+        )
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
       let slice = sorted;
@@ -287,7 +305,11 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
     async getMessage(conversationId, messageId, userId) {
       await delay();
       assertConversationAccess(conversationId, userId);
-      return getMessageOrThrow(conversationId, messageId);
+      const msg = getMessageOrThrow(conversationId, messageId);
+      if (isMessageHiddenForUser(msg, userId)) {
+        throw new ApiError('Сообщение не найдено', 'NOT_FOUND', 404);
+      }
+      return msg;
     },
 
     async sendMessage(conversationId, userId, text, options: SendMessageOptions = {}) {
@@ -384,11 +406,23 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       return msg;
     },
 
-    async deleteMessage(conversationId, messageId, userId) {
+    async deleteMessage(conversationId, messageId, userId, options) {
       await delay(80);
       const user = getUserById(userId);
       const conv = assertConversationAccess(conversationId, userId);
       const msg = getMessageOrThrow(conversationId, messageId);
+      const scope = options?.scope ?? 'everyone';
+
+      if (scope === 'me') {
+        if (!canDeleteMessageForMe(user, msg, conv, db.conversationMembers)) {
+          throw new ApiError('Нет прав на удаление', 'FORBIDDEN', 403);
+        }
+        const updated = withUserHidden(msg, userId);
+        const idx = db.messages.findIndex((m) => m.id === messageId);
+        if (idx >= 0) db.messages[idx] = updated;
+        chatRealtimeService.emit({ type: 'message.updated', conversationId, message: updated });
+        return updated;
+      }
 
       if (!canDeleteMessage(user, msg, conv)) {
         throw new ApiError('Нет прав на удаление', 'FORBIDDEN', 403);
@@ -612,6 +646,7 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       const results: MessageSearchResult[] = [];
       for (const msg of db.messages) {
         if (!convIds.has(msg.conversationId)) continue;
+        if (isMessageHiddenForUser(msg, userId)) continue;
         if (!matchesMessageSearch(msg, q)) continue;
         const conv = conversations.find((c) => c.id === msg.conversationId)!;
         const sender = db.users.find((u) => u.id === msg.senderId);

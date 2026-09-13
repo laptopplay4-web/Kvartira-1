@@ -12,6 +12,8 @@ import {
   getGuardianConsentDocument,
   getOptionalConsentDocuments,
   getPendingConsents,
+  getRegistrationConsentTitle,
+  getRegistrationRequiredDocuments,
   getRequiredConsentDocuments,
   hasCurrentConsent,
   sortDocumentsByType,
@@ -79,18 +81,52 @@ describe('legal helpers', () => {
   it('returns pending consents for student', () => {
     const studentConsents = initialUserConsents.filter((c) => c.userId === student.id);
     const pending = getPendingConsents(initialLegalDocuments, studentConsents);
-    expect(pending).toHaveLength(1);
-    expect(pending[0]?.id).toBe('legal-privacy');
+    // Seed consents are on older versions — all service docs need re-accept.
+    expect(pending.map((d) => d.id).sort()).toEqual(
+      ['legal-personal-data', 'legal-privacy', 'legal-terms'].sort(),
+    );
   });
 
   it('counts pending consents', () => {
     const studentConsents = initialUserConsents.filter((c) => c.userId === student.id);
-    expect(countPendingConsents(initialLegalDocuments, studentConsents)).toBe(1);
+    expect(countPendingConsents(initialLegalDocuments, studentConsents)).toBe(3);
   });
 
   it('bumps legal version', () => {
     expect(bumpLegalVersion('1.0')).toBe('1.1');
     expect(bumpLegalVersion('2.0')).toBe('2.1');
+  });
+
+  it('lists registration required docs with titles even if required flag is wrongly false', () => {
+    const broken = initialLegalDocuments.map((doc) =>
+      doc.purpose === 'service' ? { ...doc, required: false as const } : doc,
+    );
+    const required = getRequiredConsentDocuments(broken);
+    expect(required.map((d) => d.id).sort()).toEqual(
+      ['legal-personal-data', 'legal-privacy', 'legal-terms'].sort(),
+    );
+
+    const registration = getRegistrationRequiredDocuments(broken);
+    expect(registration.length).toBeGreaterThanOrEqual(3);
+    expect(
+      registration.map((d) => getRegistrationConsentTitle(d)).some((t) => t.includes('персональных')),
+    ).toBe(true);
+    expect(
+      registration.map((d) => getRegistrationConsentTitle(d)).some((t) => t.includes('пользовательским соглашением')),
+    ).toBe(true);
+    expect(
+      registration.map((d) => getRegistrationConsentTitle(d)).every((t) => !t.includes('оферт')),
+    ).toBe(true);
+  });
+
+  it('falls back by type when purpose metadata is missing', () => {
+    const stripped = initialLegalDocuments
+      .filter((d) =>
+        ['legal-personal-data', 'legal-terms', 'legal-privacy'].includes(d.id),
+      )
+      .map(({ purpose: _p, required: _r, ...doc }) => doc);
+    const registration = getRegistrationRequiredDocuments(stripped);
+    expect(registration).toHaveLength(3);
   });
 });
 
@@ -121,6 +157,8 @@ describe('legal api', () => {
 
   it('accepts document and updates pending list', async () => {
     await api.acceptDocument('legal-privacy', student.id);
+    await api.acceptDocument('legal-personal-data', student.id);
+    await api.acceptDocument('legal-terms', student.id);
     const pending = await api.getPendingConsents(student.id);
     expect(pending).toHaveLength(0);
   });
@@ -161,15 +199,10 @@ describe('legal api', () => {
     expect(pending.every((doc) => doc.purpose === 'service')).toBe(true);
   });
 
-  it('revokes an optional consent but refuses to revoke the service one', async () => {
+  it('refuses to revoke a service consent', async () => {
     const freshDb = createTestDb();
     freshDb.userConsents = [];
     const freshApi = createMockLegalApi(freshDb, async () => {});
-
-    const optional = getOptionalConsentDocuments(initialLegalDocuments)[0];
-    const accepted = await freshApi.acceptDocument(optional.id, otherStudent.id);
-    const revoked = await freshApi.revokeConsent(accepted.id, otherStudent.id);
-    expect(revoked.revokedAt).toBeTruthy();
 
     const serviceDoc = getRequiredConsentDocuments(initialLegalDocuments)[0];
     const serviceConsent = await freshApi.acceptDocument(serviceDoc.id, otherStudent.id);
@@ -178,17 +211,14 @@ describe('legal api', () => {
     ).rejects.toBeInstanceOf(ApiError);
   });
 
-  it('splits required, optional and guardian documents by purpose', () => {
+  it('splits required and guardian documents; optional list is empty', () => {
     const required = getRequiredConsentDocuments(initialLegalDocuments);
     const optional = getOptionalConsentDocuments(initialLegalDocuments);
     const guardian = getGuardianConsentDocument(initialLegalDocuments);
 
     expect(required.every((doc) => doc.purpose === 'service')).toBe(true);
-    expect(optional.every((doc) => doc.purpose === 'communication' || doc.purpose === 'publication')).toBe(
-      true,
-    );
+    expect(optional).toEqual([]);
     expect(guardian?.purpose).toBe('minor_guardian');
-    expect(optional.some((doc) => doc.id === guardian?.id)).toBe(false);
   });
 
   it('ships full template texts marked for lawyer review', () => {
@@ -196,6 +226,14 @@ describe('legal api', () => {
       expect(doc.content).toContain('Шаблон. Проверить у юриста');
       expect(doc.content.length).toBeGreaterThan(200);
     }
+    const privacy = initialLegalDocuments.find((d) => d.id === 'legal-privacy')!;
+    expect(privacy.content).toContain('QR');
+    expect(privacy.content).toContain('cookie');
+    expect(privacy.currentVersion).toBe('3.1');
+    const terms = initialLegalDocuments.find((d) => d.id === 'legal-terms')!;
+    expect(terms.title).toContain('Пользовательское соглашение');
+    expect(terms.content).toContain('Пользовательский контент');
+    expect(terms.content).toContain('Пожаловаться');
   });
 
   it('rejects accept for non-consent document', async () => {
@@ -214,7 +252,7 @@ describe('legal api', () => {
       admin.id,
     );
     expect(updated.title).toBe('Обновлённые правила школы');
-    expect(updated.currentVersion).toBe('1.0');
+    expect(updated.currentVersion).toBe('2.1');
   });
 
   it('rejects update for non-admin', async () => {
@@ -231,12 +269,12 @@ describe('legal api', () => {
         content: 'Обновлённая политика конфиденциальности для демо.',
         changeSummary: 'Уточнены сроки хранения данных.',
         effectiveAt: '2026-09-01',
-        version: '2.1',
+        version: '3.2',
       },
       admin.id,
     );
-    expect(published.currentVersion).toBe('2.1');
-    expect(published.versionHistory[0]?.version).toBe('2.1');
+    expect(published.currentVersion).toBe('3.2');
+    expect(published.versionHistory[0]?.version).toBe('3.2');
     const pending = await api.getPendingConsents(student.id);
     expect(pending.some((doc) => doc.id === 'legal-privacy')).toBe(true);
   });
@@ -249,7 +287,7 @@ describe('legal api', () => {
           content: 'Текст пользовательского соглашения для демо.',
           changeSummary: 'Без изменений по сути.',
           effectiveAt: '2026-09-01',
-          version: '1.0',
+          version: '3.0',
         },
         admin.id,
       ),

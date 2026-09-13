@@ -169,6 +169,22 @@ describe('registration invite wiring', () => {
     expect(inviteHook).toContain('/api/kvartira/registration-invite/validate');
     expect(inviteHook).toContain('stripInviteFromSchoolSettingsRecord');
     expect(inviteLib).toContain('X-Registration-Invite');
+    expect(inviteLib).toContain('x_registration_invite');
+    expect(inviteLib).toContain('query.invite');
+    expect(inviteLib).toContain('findFirstRecordByFilter');
+    expect(inviteLib).toContain('id != ""');
+    expect(inviteLib).toContain('decodeJsonField');
+    expect(inviteLib).toContain('String.fromCharCode');
+    expect(inviteLib).not.toContain("findRecordsByFilter('school_settings', ''");
+  });
+
+  it('PB auth adapter sends invite as header and query on register', () => {
+    const authAdapter = readFileSync(
+      resolve(process.cwd(), 'src/services/api/pocketbase/auth.ts'),
+      'utf8',
+    );
+    expect(authAdapter).toContain('REGISTRATION_INVITE_HEADER');
+    expect(authAdapter).toContain('invite: normalizedInvite');
   });
 
   it('RegisterPage gates on invite validation', () => {

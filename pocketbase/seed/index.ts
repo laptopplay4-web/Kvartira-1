@@ -5,6 +5,7 @@
  */
 
 import { PbClient } from './pbClient';
+import { ensureLegalDocuments } from './ensureLegal';
 import { runSeed } from './run';
 
 function env(name: string, fallback?: string): string {
@@ -26,15 +27,20 @@ async function main(): Promise<void> {
   const result = await runSeed(client, { force });
 
   if (result.skipped) {
-    console.log('[pb:seed] Demo data already present — skipped (use --force after clearing pb_data).');
-    return;
+    console.log('[pb:seed] Demo data already present — skipped full seed (use --force after clearing pb_data).');
+  } else {
+    console.log('[pb:seed] Done. Records created:');
+    for (const [collection, count] of Object.entries(result.counts)) {
+      console.log(`  ${collection}: ${count}`);
+    }
+    console.log('[pb:seed] Demo login: +79001234567 / student123');
   }
 
-  console.log('[pb:seed] Done. Records created:');
-  for (const [collection, count] of Object.entries(result.counts)) {
-    console.log(`  ${collection}: ${count}`);
-  }
-  console.log('[pb:seed] Demo login: +79001234567 / student123');
+  // Always sync legal texts — registration needs them even when seed was skipped.
+  const legal = await ensureLegalDocuments(client);
+  console.log(
+    `[pb:seed] legal_documents: created ${legal.created}, updated ${legal.updated}`,
+  );
 }
 
 main().catch((err: unknown) => {

@@ -44,11 +44,6 @@ export function PublicLandingContent({ data }: PublicLandingContentProps) {
           >
             Войти
           </Link>
-          <Link to="/register" className="hidden sm:block">
-            <Button size="sm" variant="secondary">
-              QR-регистрация
-            </Button>
-          </Link>
         </div>
       </header>
 
@@ -62,8 +57,8 @@ export function PublicLandingContent({ data }: PublicLandingContentProps) {
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-body text-text-secondary">{school.about}</p>
           <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link to="/register">
-              <Button size="lg">Записаться по QR в школе</Button>
+            <Link to="/login">
+              <Button size="lg">Войти</Button>
             </Link>
             <a href="#directions">
               <Button size="lg" variant="secondary">
@@ -190,11 +185,8 @@ export function PublicLandingContent({ data }: PublicLandingContentProps) {
           <SectionHeading title="О школе" subtitle="Контакты, ссылки и как нас найти" />
           <Card className="mx-auto max-w-2xl" padding="lg">
             <SchoolAboutContent school={school} hideHeader />
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link to="/register" className="flex-1">
-                <Button className="w-full">Регистрация по QR</Button>
-              </Link>
-              <Link to="/login" className="flex-1">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Link to="/login" className="sm:min-w-[12rem]">
                 <Button className="w-full" variant="secondary">
                   Войти
                 </Button>

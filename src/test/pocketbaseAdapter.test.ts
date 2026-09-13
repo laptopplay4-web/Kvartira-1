@@ -989,6 +989,7 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('assertLegalDocumentUpdate');
     expect(lib).toContain('requiresConsent');
     expect(lib).toContain("set('type'");
+    expect(lib).toContain('isUsersAuth(auth)');
   });
 
   it('mapSecuritySessionRecord, mapLoginHistoryRecord and mapSecurityAlertRecord map relations', () => {

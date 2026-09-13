@@ -2,9 +2,6 @@ export const MESSAGE_MAX_LENGTH = 4000;
 export const MESSAGE_PAGE_SIZE = 50;
 export const LAST_MESSAGE_PREVIEW_LENGTH = 60;
 
-/** Own messages can be edited only within this window after send. */
-export const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000;
-
 export const QUICK_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
 
 export const MAX_ATTACHMENTS_PER_MESSAGE = 10;

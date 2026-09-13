@@ -74,21 +74,64 @@ export function countPendingConsents(
 /** Documents a person must accept before the account works at all. */
 export function getRequiredConsentDocuments(documents: LegalDocument[]): LegalDocument[] {
   return sortDocumentsByType(
-    documents.filter(
-      (doc) => doc.requiresConsent && (doc.required ?? isRequiredConsentPurpose(doc.purpose)),
-    ),
+    documents.filter((doc) => {
+      if (!doc.requiresConsent) return false;
+      if (doc.purpose === 'minor_guardian') return false;
+      // Prefer purpose: service docs are always required (ignore bad `required: false` from PB).
+      if (isRequiredConsentPurpose(doc.purpose)) return true;
+      return doc.required === true;
+    }),
   );
 }
 
-/** Documents a person may decline and still use the app. */
-export function getOptionalConsentDocuments(documents: LegalDocument[]): LegalDocument[] {
-  const required = new Set(getRequiredConsentDocuments(documents).map((doc) => doc.id));
-  return sortDocumentsByType(
-    documents.filter(
-      (doc) =>
-        doc.requiresConsent && !required.has(doc.id) && doc.purpose !== 'minor_guardian',
-    ),
-  );
+/**
+ * Required checkboxes on `/register`: ПДн + оферта + политика.
+ * Falls back by document `type` when purpose/required metadata is missing (PB).
+ */
+export function getRegistrationRequiredDocuments(
+  documents: LegalDocument[],
+): LegalDocument[] {
+  const fromFlags = getRequiredConsentDocuments(documents);
+  if (fromFlags.length > 0) return fromFlags;
+
+  const pick = (predicate: (doc: LegalDocument) => boolean) =>
+    documents.find((doc) => doc.requiresConsent && predicate(doc));
+
+  const personalData =
+    pick((d) => d.type === 'personal_data' && d.purpose === 'service') ??
+    pick(
+      (d) =>
+        d.type === 'personal_data' &&
+        d.purpose !== 'communication' &&
+        d.purpose !== 'publication' &&
+        d.purpose !== 'minor_guardian',
+    );
+
+  const terms = pick((d) => d.type === 'terms_of_service');
+  const privacy = pick((d) => d.type === 'privacy_policy');
+
+  return [personalData, terms, privacy].filter((doc): doc is LegalDocument => !!doc);
+}
+
+/** Labels for registration checkboxes (152-ФЗ wording). */
+export function getRegistrationConsentTitle(document: LegalDocument): string {
+  if (
+    document.type === 'personal_data' &&
+    document.purpose !== 'communication' &&
+    document.purpose !== 'publication' &&
+    document.purpose !== 'minor_guardian'
+  ) {
+    return 'Согласие на обработку персональных данных';
+  }
+  if (document.type === 'terms_of_service') {
+    return 'Согласие с пользовательским соглашением';
+  }
+  return document.title;
+}
+
+/** Documents a person may decline and still use the app — none in current model. */
+export function getOptionalConsentDocuments(_documents: LegalDocument[]): LegalDocument[] {
+  return [];
 }
 
 export function getGuardianConsentDocument(

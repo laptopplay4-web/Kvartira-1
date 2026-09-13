@@ -35,7 +35,8 @@ interface MessageListProps {
   onRetryMessage?: (message: Message) => void;
   onReply?: (message: Message) => void;
   onEdit?: (message: Message) => void;
-  onDelete?: (message: Message) => void;
+  onDelete?: (message: Message, scope: 'me' | 'everyone') => void;
+  onReport?: (message: Message) => void;
   onForward?: (message: Message) => void;
   onReact?: (message: Message, emoji: string) => void;
   onPin?: (message: Message) => void;
@@ -68,6 +69,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     onReply,
     onEdit,
     onDelete,
+    onReport,
     onForward,
     onReact,
     onPin,
@@ -346,6 +348,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                   onReply={onReply}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onReport={onReport}
                   onForward={onForward}
                   onReact={onReact}
                   onPin={onPin}

@@ -524,6 +524,7 @@ export interface PbMessageRecord extends RecordModel {
   text: string;
   editedAt?: string;
   deletedAt?: string;
+  hiddenForUserIds?: string[] | null;
   status: MessageStatus;
   readBy?: string[];
   attachments?: MessageAttachment[];
@@ -553,6 +554,9 @@ export function mapMessageRecord(record: PbMessageRecord | RecordModel): Message
 
   const deletedAt = normalizePbDateTime(r.deletedAt);
   if (deletedAt) message.deletedAt = deletedAt;
+
+  const hiddenIds = asIdList(r.hiddenForUserIds);
+  if (hiddenIds.length > 0) message.hiddenForUserIds = hiddenIds;
 
   if (Array.isArray(r.attachments) && r.attachments.length > 0) {
     message.attachments = r.attachments;
@@ -653,6 +657,7 @@ export interface PbSupportTicketRecord extends RecordModel {
   status: SupportTicketStatus;
   attachments?: SupportTicketAttachment[];
   adminReply?: SupportTicketReply | null;
+  reportContext?: SupportTicket['reportContext'] | null;
 }
 
 export function mapSupportTicketRecord(record: PbSupportTicketRecord | RecordModel): SupportTicket {
@@ -671,6 +676,10 @@ export function mapSupportTicketRecord(record: PbSupportTicketRecord | RecordMod
 
   if (r.adminReply && typeof r.adminReply === 'object') {
     ticket.adminReply = r.adminReply;
+  }
+
+  if (r.reportContext && typeof r.reportContext === 'object') {
+    ticket.reportContext = r.reportContext as SupportTicket['reportContext'];
   }
 
   return ticket;
@@ -700,9 +709,10 @@ export function mapLegalDocumentRecord(
     currentVersion: r.currentVersion,
     effectiveAt: normalizePbDate(r.effectiveAt),
     requiresConsent: Boolean(r.requiresConsent),
-    required: Boolean(r.required),
     versionHistory: Array.isArray(r.versionHistory) ? r.versionHistory : [],
   };
+  // Do not coerce missing `required` to false — helpers fall back to purpose.
+  if (typeof r.required === 'boolean') document.required = r.required;
   if (r.purpose) document.purpose = r.purpose;
   return document;
 }

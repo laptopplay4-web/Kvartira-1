@@ -197,6 +197,7 @@ export const pocketbaseSupportApi: SupportApi = {
         status: 'open',
         attachments,
         adminReply: null,
+        reportContext: input.reportContext ?? null,
       });
 
       await linkStoredFilesToContext(
@@ -204,7 +205,23 @@ export const pocketbaseSupportApi: SupportApi = {
         record.id,
       );
 
-      return resolveSupportTicket(mapSupportTicketRecord(record));
+      const ticket = await resolveSupportTicket(mapSupportTicketRecord(record));
+
+      if (input.reportContext) {
+        const admins = await pb.collection('users').getFullList({
+          filter: 'role = "admin"',
+        });
+        for (const admin of admins) {
+          await pushSupportNotification(
+            admin.id,
+            'Жалоба на сообщение в чате',
+            ticket.subject,
+            `/profile/help/${ticket.id}`,
+          );
+        }
+      }
+
+      return ticket;
     });
   },
 

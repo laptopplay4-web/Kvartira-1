@@ -47,21 +47,13 @@ export class PbClient {
   }
 
   async createRecord(collection: string, body: Record<string, unknown>): Promise<PbRecord> {
-    const form = new FormData();
-    for (const [key, value] of Object.entries(body)) {
-      if (value === null || value === undefined) continue;
-      if (typeof value === 'boolean') {
-        form.append(key, value ? 'true' : 'false');
-      } else if (typeof value === 'object') {
-        form.append(key, JSON.stringify(value));
-      } else {
-        form.append(key, String(value));
-      }
-    }
     const res = await fetch(`${this.baseUrl}/api/collections/${collection}/records`, {
       method: 'POST',
-      headers: { Authorization: this.token },
-      body: form,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: this.token,
+      },
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       throw new Error(`Create ${collection} failed (${res.status}): ${await res.text()}`);
@@ -86,5 +78,24 @@ export class PbClient {
       throw new Error(`Update ${collection}/${id} failed (${res.status}): ${await res.text()}`);
     }
     return (await res.json()) as PbRecord;
+  }
+
+  async listRecords(
+    collection: string,
+    options: { filter?: string; perPage?: number } = {},
+  ): Promise<PbRecord[]> {
+    const params = new URLSearchParams({
+      page: '1',
+      perPage: String(options.perPage ?? 50),
+    });
+    if (options.filter) params.set('filter', options.filter);
+    const res = await fetch(`${this.baseUrl}/api/collections/${collection}/records?${params}`, {
+      headers: { Authorization: this.token },
+    });
+    if (!res.ok) {
+      throw new Error(`List ${collection} failed (${res.status}): ${await res.text()}`);
+    }
+    const data = (await res.json()) as { items: PbRecord[] };
+    return data.items ?? [];
   }
 }

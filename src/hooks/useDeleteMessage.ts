@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
+import type { DeleteMessageScope } from '@/services/chat/messages';
 import type { Message } from '@/types';
 
 export function useDeleteMessage() {
@@ -10,11 +11,13 @@ export function useDeleteMessage() {
       conversationId,
       messageId,
       userId,
+      scope = 'everyone',
     }: {
       conversationId: string;
       messageId: string;
       userId: string;
-    }) => api.chat.deleteMessage(conversationId, messageId, userId),
+      scope?: DeleteMessageScope;
+    }) => api.chat.deleteMessage(conversationId, messageId, userId, { scope }),
     onMutate: async ({ conversationId, userId, messageId }) => {
       await queryClient.cancelQueries({ queryKey: ['messages', conversationId, userId] });
       const previous = queryClient.getQueryData(['messages', conversationId, userId]);

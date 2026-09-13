@@ -16,7 +16,7 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 | `lesson_history` | `LessonHistoryEntry` | lesson, action, user |
 | `conversations` | `Conversation` | type, title, participantIds, metadata, avatarUrl (text, `pbfile:` ref) |
 | `conversation_members` | `ConversationMember` | conversation, user, role, muted |
-| `messages` | `Message` | conversation, sender, text, attachments (json) |
+| `messages` | `Message` | conversation, sender, text, attachments (json), `hiddenForUserIds` (json) |
 | `events` | `SchoolEvent` | type, date, registeredUserIds |
 | `event_registrations` | `EventRegistration` | event, user, application |
 | `assignments` | `Assignment` | teacher, group, contentBlocks (json) |

@@ -5,7 +5,6 @@ import { BackLink } from '@/components/ui/BackLink';
 import { format } from 'date-fns';
 import { api } from '@/services/api';
 import { LEGAL_DOCUMENT_TYPE_LABELS } from '@/services/legal/constants';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -46,7 +45,8 @@ export default function LegalDocumentsPage() {
       <main className="page-container max-w-2xl py-8">
         <h1 className="text-h1">Документы</h1>
         <p className="mt-2 text-body-sm text-text-secondary">
-          Юридические документы школы. Тексты требуют проверки перед публикацией.
+          Политика, согласия и правила школы «Квартира» для этого приложения. Перед публикацией
+          в production тексты нужно проверить у юриста.
         </p>
 
         {isLoading && (
@@ -82,14 +82,6 @@ export default function LegalDocumentsPage() {
                 </Card>
               </Link>
             ))}
-          </div>
-        )}
-
-        {!user && (
-          <div className="mt-8 text-center">
-            <Link to="/register">
-              <Button>Зарегистрироваться</Button>
-            </Link>
           </div>
         )}
       </main>

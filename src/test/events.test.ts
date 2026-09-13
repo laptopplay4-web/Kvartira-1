@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mockEventsApi, resetMockDatabase } from '@/services/api/mock';
-import { canManageEvents, canViewSchoolEvent } from '@/services/events/access';
+import { mockEventsApi, resetMockDatabase, clearMockEventRoster } from '@/services/api/mock';
+import { canManageEvents, canRegisterForEvents, canViewSchoolEvent } from '@/services/events/access';
+import { isUserRegisteredForEvent } from '@/services/events/registration';
 import {
   normalizeCompetitionApplication,
   normalizeEventInput,
@@ -209,6 +210,14 @@ describe('canManageEvents', () => {
   });
 });
 
+describe('canRegisterForEvents', () => {
+  it('allows only students', () => {
+    expect(canRegisterForEvents({ role: 'student' })).toBe(true);
+    expect(canRegisterForEvents({ role: 'teacher' })).toBe(false);
+    expect(canRegisterForEvents({ role: 'admin' })).toBe(false);
+  });
+});
+
 describe('canViewSchoolEvent', () => {
   it('hides invited events from users who are not on the list', () => {
     const invited = {
@@ -243,5 +252,364 @@ describe('normalizeEventInput', () => {
       location: 'Зал',
       imageUrl: undefined,
     });
+  });
+});
+
+describe('event registration count + staff notify + participants', () => {
+  beforeEach(() => resetMockDatabase());
+
+  it('register creates registration, updates count, notifies staff', async () => {
+    const { mockNotificationsApi } = await import('@/services/api/mock');
+    const beforeAdmin = (await mockNotificationsApi.getNotifications('user-admin')).filter(
+      (n) => n.type === 'event',
+    ).length;
+    const beforeTeacher = (await mockNotificationsApi.getNotifications('user-teacher-1')).filter(
+      (n) => n.type === 'event',
+    ).length;
+
+    const event = await mockEventsApi.register('event-2', 'user-student');
+    expect(event.registeredCount).toBe(1);
+    expect(event.isRegistered).toBe(true);
+
+    const registration = await mockEventsApi.getRegistration('event-2', 'user-student');
+    expect(registration?.userId).toBe('user-student');
+
+    const adminNotifs = await mockNotificationsApi.getNotifications('user-admin');
+    const teacherNotifs = await mockNotificationsApi.getNotifications('user-teacher-1');
+    expect(
+      adminNotifs.filter(
+        (n) =>
+          n.type === 'event' &&
+          n.title === 'Новая запись на мероприятие' &&
+          n.link?.startsWith('/events/event-2'),
+      ).length,
+    ).toBe(beforeAdmin + 1);
+    expect(
+      teacherNotifs.filter(
+        (n) =>
+          n.type === 'event' &&
+          n.title === 'Новая запись на мероприятие' &&
+          n.link?.startsWith('/events/event-2'),
+      ).length,
+    ).toBe(beforeTeacher + 1);
+    expect(
+      adminNotifs.some(
+        (n) => n.link === '/events/event-2?p=user-student&c=join',
+      ),
+    ).toBe(true);
+  });
+
+  it('createEvent notifies students (not staff) for events badge', async () => {
+    const { mockNotificationsApi } = await import('@/services/api/mock');
+    const beforeStudent = (await mockNotificationsApi.getNotifications('user-student')).filter(
+      (n) => n.type === 'event',
+    ).length;
+    const beforeAdmin = (await mockNotificationsApi.getNotifications('user-admin')).filter(
+      (n) => n.type === 'event',
+    ).length;
+
+    const created = await mockEventsApi.createEvent(
+      {
+        title: 'Открытый урок',
+        description: 'Приходите все',
+        type: 'masterclass',
+        date: '2026-12-20',
+        startTime: '16:00',
+        location: 'Зал',
+      },
+      'user-admin',
+    );
+
+    const studentNotifs = await mockNotificationsApi.getNotifications('user-student');
+    const newOnes = studentNotifs.filter(
+      (n) => n.type === 'event' && n.link === `/events/${created.id}`,
+    );
+    expect(newOnes).toHaveLength(1);
+    expect(newOnes[0]?.title).toBe('Новое мероприятие');
+    expect(studentNotifs.filter((n) => n.type === 'event').length).toBe(beforeStudent + 1);
+    const adminNotifs = await mockNotificationsApi.getNotifications('user-admin');
+    expect(
+      adminNotifs.filter((n) => n.type === 'event' && n.link === `/events/${created.id}`).length,
+    ).toBe(beforeAdmin);
+  });
+
+  it('invited createEvent notifies only invited students', async () => {
+    const { mockNotificationsApi } = await import('@/services/api/mock');
+    const created = await mockEventsApi.createEvent(
+      {
+        title: 'Закрытый вечер',
+        description: 'По приглашению',
+        type: 'invited',
+        date: '2026-12-21',
+        startTime: '19:00',
+        location: 'Зал',
+        invitedUserIds: ['user-student'],
+      },
+      'user-admin',
+    );
+
+    const studentNotifs = await mockNotificationsApi.getNotifications('user-student');
+    expect(
+      studentNotifs.some((n) => n.type === 'event' && n.link === `/events/${created.id}`),
+    ).toBe(true);
+
+    const other = await mockNotificationsApi.getNotifications('user-student-2');
+    expect(other.some((n) => n.type === 'event' && n.link === `/events/${created.id}`)).toBe(
+      false,
+    );
+  });
+
+  it('student sees registeredCount not inflated roster', async () => {
+    await mockEventsApi.register('event-2', 'user-student');
+    const event = await mockEventsApi.getEvent('event-2', 'user-student');
+    expect(event.registeredCount).toBe(1);
+    expect(event.registeredUserIds).toEqual(['user-student']);
+    expect(event.isRegistered).toBe(true);
+  });
+
+  it('register response keeps isRegistered for immediate CTA switch', async () => {
+    const event = await mockEventsApi.register('event-2', 'user-student');
+    expect(event.isRegistered).toBe(true);
+    expect(isUserRegisteredForEvent(event, 'user-student')).toBe(true);
+  });
+
+  it('staff can list participants; student cannot', async () => {
+    await mockEventsApi.register('event-2', 'user-student');
+    const participants = await mockEventsApi.getEventParticipants('event-2', 'user-admin');
+    expect(participants.some((u) => u.id === 'user-student')).toBe(true);
+    const asTeacher = await mockEventsApi.getEventParticipants('event-2', 'user-teacher-1');
+    expect(asTeacher.some((u) => u.id === 'user-student')).toBe(true);
+    await expect(
+      mockEventsApi.getEventParticipants('event-2', 'user-student'),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('lists participants from registrations even if roster empty', async () => {
+    await mockEventsApi.register('event-2', 'user-student');
+    clearMockEventRoster('event-2');
+    const participants = await mockEventsApi.getEventParticipants('event-2', 'user-admin');
+    expect(participants.map((u) => u.id)).toContain('user-student');
+  });
+
+  it('denies teacher and admin from registering', async () => {
+    await expect(mockEventsApi.register('event-2', 'user-teacher-1')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(mockEventsApi.register('event-2', 'user-admin')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('unregister frees seat and notifies staff', async () => {
+    const { mockNotificationsApi } = await import('@/services/api/mock');
+    await mockEventsApi.register('event-2', 'user-student');
+    const before = (await mockNotificationsApi.getNotifications('user-admin')).filter(
+      (n) => n.type === 'event' && n.link?.startsWith('/events/event-2'),
+    ).length;
+
+    const event = await mockEventsApi.unregister('event-2', 'user-student');
+    expect(event.registeredCount).toBe(0);
+    expect(event.isRegistered).toBe(false);
+    expect(await mockEventsApi.getRegistration('event-2', 'user-student')).toBeNull();
+
+    const adminNotifs = await mockNotificationsApi.getNotifications('user-admin');
+    const cancelNotifs = adminNotifs.filter(
+      (n) =>
+        n.type === 'event' &&
+        n.link === '/events/event-2?p=user-student&c=leave' &&
+        n.title === 'Отмена участия в мероприятии',
+    );
+    expect(cancelNotifs.length).toBeGreaterThanOrEqual(1);
+    expect(
+      adminNotifs.filter((n) => n.type === 'event' && n.link?.startsWith('/events/event-2'))
+        .length,
+    ).toBe(before + 1);
+  });
+
+  it('staff can remove participant; student cannot', async () => {
+    const { mockNotificationsApi } = await import('@/services/api/mock');
+    await mockEventsApi.register('event-2', 'user-student');
+
+    await expect(
+      mockEventsApi.removeEventParticipant('event-2', 'user-student', 'user-student'),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const event = await mockEventsApi.removeEventParticipant(
+      'event-2',
+      'user-student',
+      'user-admin',
+    );
+    expect(event.registeredCount).toBe(0);
+    expect(await mockEventsApi.getRegistration('event-2', 'user-student')).toBeNull();
+    expect(
+      (await mockEventsApi.getEventParticipants('event-2', 'user-admin')).some(
+        (u) => u.id === 'user-student',
+      ),
+    ).toBe(false);
+
+    const adminNotifs = await mockNotificationsApi.getNotifications('user-admin');
+    expect(
+      adminNotifs.some(
+        (n) =>
+          n.type === 'event' &&
+          n.link === '/events/event-2?p=user-student&c=leave' &&
+          n.title === 'Участник удалён с мероприятия',
+      ),
+    ).toBe(true);
+  });
+
+  it('denies teacher unregister (students only)', async () => {
+    await expect(mockEventsApi.unregister('event-2', 'user-teacher-1')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+});
+
+describe('event unread helpers', () => {
+  it('counts nav badge after tab seen and per-event +N', async () => {
+    const {
+      countUnreadEventParticipationsForNav,
+      countUnreadForEvent,
+      markEventsTabSeen,
+      eventIdFromNotificationLink,
+    } = await import('@/services/events/unread');
+
+    expect(eventIdFromNotificationLink('/events/event-2')).toBe('event-2');
+    expect(eventIdFromNotificationLink('/events/event-2?p=u1&c=leave')).toBe('event-2');
+
+    const notifications = [
+      {
+        id: '1',
+        read: false,
+        type: 'event' as const,
+        link: '/events/event-2',
+        createdAt: '2026-09-12T10:00:00.000Z',
+      },
+      {
+        id: '2',
+        read: false,
+        type: 'event' as const,
+        link: '/events/event-2',
+        createdAt: '2026-09-12T11:00:00.000Z',
+      },
+      {
+        id: '3',
+        read: false,
+        type: 'event' as const,
+        link: '/events/event-1',
+        createdAt: '2026-09-12T12:00:00.000Z',
+      },
+    ];
+
+    expect(countUnreadForEvent(notifications, 'event-2')).toBe(2);
+    expect(countUnreadEventParticipationsForNav(notifications, 'user-admin')).toBe(3);
+
+    markEventsTabSeen('user-admin', '2026-09-12T11:30:00.000Z');
+    expect(countUnreadEventParticipationsForNav(notifications, 'user-admin')).toBe(1);
+    expect(countUnreadForEvent(notifications, 'event-2')).toBe(2);
+
+    // Ученик: бейдж не сбрасывается визитом вкладки — только markAsRead на деталке.
+    expect(
+      countUnreadEventParticipationsForNav(notifications, 'user-student', {
+        ignoreTabSeen: true,
+      }),
+    ).toBe(3);
+  });
+
+  it('card highlight clears on detail open; participants badge stays until read', async () => {
+    const {
+      countUnreadForEvent,
+      markEventCardSeen,
+      shouldHighlightEventCard,
+    } = await import('@/services/events/unread');
+
+    const notifications = [
+      {
+        id: '1',
+        read: false,
+        type: 'event' as const,
+        link: '/events/event-2',
+        createdAt: '2026-09-12T10:00:00.000Z',
+      },
+      {
+        id: '2',
+        read: false,
+        type: 'event' as const,
+        link: '/events/event-2',
+        createdAt: '2026-09-12T11:00:00.000Z',
+      },
+    ];
+
+    expect(shouldHighlightEventCard(notifications, 'user-admin', 'event-2')).toBe(true);
+    expect(countUnreadForEvent(notifications, 'event-2')).toBe(2);
+
+    markEventCardSeen('user-admin', 'event-2', '2026-09-12T11:30:00.000Z');
+    expect(shouldHighlightEventCard(notifications, 'user-admin', 'event-2')).toBe(false);
+    expect(countUnreadForEvent(notifications, 'event-2')).toBe(2);
+  });
+
+  it('summarizes join/leave deltas and participant ids from notify links', async () => {
+    const {
+      summarizeUnreadParticipationDelta,
+      getUnreadParticipationParticipantIds,
+      parseEventParticipationLink,
+      eventParticipationNotifyLink,
+    } = await import('@/services/events/unread');
+
+    expect(eventParticipationNotifyLink('event-2', 'user-a', 'join')).toBe(
+      '/events/event-2?p=user-a&c=join',
+    );
+    expect(parseEventParticipationLink('/events/event-2?p=user-b&c=leave')).toEqual({
+      eventId: 'event-2',
+      participantId: 'user-b',
+      change: 'leave',
+    });
+
+    const notifications = [
+      {
+        id: '1',
+        read: false,
+        type: 'event' as const,
+        title: 'Новая запись на мероприятие',
+        link: '/events/event-2?p=user-a&c=join',
+        createdAt: '2026-09-12T10:00:00.000Z',
+      },
+      {
+        id: '2',
+        read: false,
+        type: 'event' as const,
+        title: 'Новая запись на мероприятие',
+        link: '/events/event-2?p=user-c&c=join',
+        createdAt: '2026-09-12T10:05:00.000Z',
+      },
+      {
+        id: '3',
+        read: false,
+        type: 'event' as const,
+        title: 'Отмена участия в мероприятии',
+        link: '/events/event-2?p=user-b&c=leave',
+        createdAt: '2026-09-12T11:00:00.000Z',
+      },
+      {
+        id: '4',
+        read: false,
+        type: 'event' as const,
+        title: 'Новое мероприятие',
+        link: '/events/event-2',
+        createdAt: '2026-09-12T12:00:00.000Z',
+      },
+    ];
+
+    expect(summarizeUnreadParticipationDelta(notifications, 'event-2')).toEqual({
+      joins: 2,
+      leaves: 1,
+    });
+    expect(getUnreadParticipationParticipantIds(notifications, 'event-2', 'join')).toEqual([
+      'user-a',
+      'user-c',
+    ]);
+    expect(getUnreadParticipationParticipantIds(notifications, 'event-2', 'leave')).toEqual([
+      'user-b',
+    ]);
   });
 });

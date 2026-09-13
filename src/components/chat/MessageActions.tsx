@@ -28,6 +28,56 @@ interface MessageActionsProps {
 const MORE_EMOJIS = ['🔥', '👏', '🎉', '💯', '👀', '🙌', '😎', '🤔', '😭', '😡', '🤝', '✅'];
 
 const PANEL_WIDTH = 280;
+const PANEL_ESTIMATED_HEIGHT = 320;
+const EDGE_GAP = 12;
+/** Extra bottom inset: composer / home indicator when BottomNav hidden in /chat/:id */
+const BOTTOM_EXTRA = 24;
+
+function readSafeInsetBottom(): number {
+  if (typeof window === 'undefined' || typeof getComputedStyle === 'undefined') return 0;
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue('--spacing-safe-bottom')
+    .trim();
+  if (raw.endsWith('px')) {
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function computePanelCoords(
+  anchor: DOMRect,
+  panelHeight: number,
+  isOwnMessage: boolean,
+): { top: number; left: number; placeAbove: boolean } {
+  const minTop = EDGE_GAP;
+  const maxBottom = window.innerHeight - EDGE_GAP - readSafeInsetBottom() - BOTTOM_EXTRA;
+  const gap = 10;
+
+  const spaceBelow = maxBottom - (anchor.bottom + gap);
+  const spaceAbove = anchor.top - gap - minTop;
+  const fitsBelow = spaceBelow >= panelHeight;
+  const fitsAbove = spaceAbove >= panelHeight;
+  const placeAbove = !fitsBelow && (fitsAbove || spaceAbove > spaceBelow);
+
+  const left = Math.min(
+    window.innerWidth - PANEL_WIDTH - EDGE_GAP,
+    Math.max(EDGE_GAP, isOwnMessage ? anchor.right - PANEL_WIDTH : anchor.left),
+  );
+
+  if (placeAbove) {
+    // With `-translate-y-full`, `top` is the bottom edge of the panel.
+    let top = anchor.top - gap;
+    if (top - panelHeight < minTop) top = minTop + panelHeight;
+    if (top > maxBottom) top = maxBottom;
+    return { top, left, placeAbove: true };
+  }
+
+  let top = anchor.bottom + gap;
+  if (top + panelHeight > maxBottom) top = maxBottom - panelHeight;
+  if (top < minTop) top = minTop;
+  return { top, left, placeAbove: false };
+}
 
 export function MessageActions({
   message,
@@ -135,18 +185,20 @@ export function MessageActions({
       setCoords(null);
       return;
     }
-    const rect = anchorRef.current.getBoundingClientRect();
-    const estimatedHeight = 320;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const placeAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
-    const left = Math.min(
-      window.innerWidth - PANEL_WIDTH - 12,
-      Math.max(12, isOwn ? rect.right - PANEL_WIDTH : rect.left),
-    );
-    const top = placeAbove
-      ? Math.max(12, rect.top - 12)
-      : Math.min(window.innerHeight - 24, rect.bottom + 10);
-    setCoords({ top, left, placeAbove });
+
+    const place = (height: number) => {
+      const rect = anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setCoords(computePanelCoords(rect, height, isOwn));
+    };
+
+    place(panelRef.current?.offsetHeight || PANEL_ESTIMATED_HEIGHT);
+
+    const raf = requestAnimationFrame(() => {
+      const measured = panelRef.current?.offsetHeight;
+      if (measured && measured > 0) place(measured);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [open, anchorRef, isOwn, items.length, moreReactions]);
 
   useEffect(() => {
@@ -188,7 +240,7 @@ export function MessageActions({
         role="dialog"
         aria-label="Действия с сообщением"
         className={cn(
-          'pointer-events-auto absolute w-[min(280px,calc(100vw-24px))] overflow-hidden glass-popup',
+          'pointer-events-auto absolute w-[min(280px,calc(100vw-24px))] max-h-[min(70dvh,calc(100dvh-48px))] overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-none glass-popup',
           'motion-safe:animate-fade-in',
           coords.placeAbove && 'origin-bottom -translate-y-full',
         )}

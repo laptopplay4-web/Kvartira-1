@@ -57,11 +57,17 @@ export function StudentPickerList({
     onChange([...new Set([...selectedIds, ...ids])]);
   };
 
-  const hasActiveFilter = directionFilter !== 'all' || query.trim().length > 0;
-  const showSelectAll = mode === 'multiple' && hasActiveFilter && filteredStudents.length > 0;
+  const clearFiltered = () => {
+    if (mode !== 'multiple') return;
+    const filteredIds = new Set(filteredStudents.map((student) => student.id));
+    onChange(selectedIds.filter((id) => !filteredIds.has(id)));
+  };
+
+  const showSelectAll = mode === 'multiple' && filteredStudents.length > 0;
   const allFilteredSelected =
     filteredStudents.length > 0 &&
     filteredStudents.every((student) => selectedIds.includes(student.id));
+  const someFilteredSelected = filteredStudents.some((student) => selectedIds.includes(student.id));
 
   const emptyMessage =
     students.length === 0
@@ -130,7 +136,12 @@ export function StudentPickerList({
       </div>
 
       {showSelectAll && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-1">
+          {someFilteredSelected && (
+            <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={clearFiltered}>
+              Снять всех
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -143,7 +154,7 @@ export function StudentPickerList({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+      <div className="popup-scroll min-h-0 flex-1 space-y-1">
         {filteredStudents.length > 0 ? (
           filteredStudents.map((student) => {
             const selected = selectedIds.includes(student.id);

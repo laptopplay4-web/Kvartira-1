@@ -181,6 +181,8 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).not.toMatch(/hide\.apply\s*\(/);
     // Superuser Admin UI must not hit hide (otherwise enrich fails / fields vanish).
     expect(hook).toContain('isUsersAuth');
+    expect(hook).toContain('joinAdminToAllGroupChats');
+    expect(hook).toContain('onRecordAfterUpdateSuccess');
   });
 
   it('userToPbRecord round-trips through mapUserRecord', () => {
@@ -326,7 +328,8 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       response: { message: 'Something went wrong while processing your request.' },
     } as never);
     const apiError = mapPocketBaseError(pbError);
-    expect(apiError.message).toContain('Не удалось войти');
+    expect(apiError.message).toContain('Не удалось выполнить запрос');
+    expect(apiError.message).not.toContain('войти');
     expect(apiError.code).toBe('SERVER_ERROR');
   });
 
@@ -370,6 +373,8 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(client.events.getEvents).toBe(pocketbaseEventsApi.getEvents);
     expect(client.chat.getConversations).toBe(pocketbaseChatApi.getConversations);
     expect(client.assignments.getAssignments).toBe(pocketbaseAssignmentsApi.getAssignments);
+    expect(client.assignments.updateAssignment).toBe(pocketbaseAssignmentsApi.updateAssignment);
+    expect(client.assignments.deleteAssignment).toBe(pocketbaseAssignmentsApi.deleteAssignment);
     expect(client.assignmentGroups.getGroups).toBe(pocketbaseAssignmentGroupsApi.getGroups);
     expect(client.public.getLandingData).toBe(pocketbasePublicApi.getLandingData);
     expect(client.support.getTickets).toBe(pocketbaseSupportApi.getTickets);
@@ -412,9 +417,30 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       location: 'Зал',
       imageUrl: 'https://example.com/e.jpg',
       maxParticipants: 50,
+      registeredCount: 1,
       registeredUserIds: ['user-1'],
     });
     expect(event.invitedUserIds).toBeUndefined();
+  });
+
+  it('mapEventRecord prefers registeredCount field over roster length', () => {
+    const event = mapEventRecord({
+      id: 'event-2',
+      collectionId: 'events',
+      collectionName: 'events',
+      created: '',
+      updated: '',
+      title: 'МК',
+      description: 'Джаз',
+      type: 'masterclass',
+      date: '2026-12-01',
+      startTime: '15:00',
+      location: 'Студия',
+      maxParticipants: 12,
+      registeredCount: 1,
+      registeredUserIds: ['user-1', 'hidden', 'hidden'],
+    } as Parameters<typeof mapEventRecord>[0]);
+    expect(event.registeredCount).toBe(1);
   });
 
   it('mapEventRegistrationRecord maps event, user and application', () => {
@@ -457,9 +483,32 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).toContain('onRecordAfterCreateSuccess');
     expect(hook).toContain('onRecordAfterDeleteSuccess');
     expect(hook).toContain('event_registrations');
+    expect(hook).toContain('registeredCount');
+    expect(hook).toContain('notifyStaffEventRegistration');
+    expect(hook).toContain('notifyStaffEventUnregistration');
+    expect(hook).toContain('stashUnregistrationNotify');
+    expect(hook).toContain('takeUnregistrationNotify');
+    expect(hook).toContain('purgeEventDependents');
+    expect(hook).toContain('onRecordDeleteRequest');
     expect(lib).toContain('assertRegistrationCapacity');
+    expect(lib).toContain('assertRegistrationCreate');
     expect(lib).toContain('syncRegisteredUserIds');
+    expect(lib).toContain('notifyStaffEventRegistration');
+    expect(lib).toContain('notifyStaffEventUnregistration');
+    expect(lib).toContain('stashUnregistrationNotify');
+    expect(lib).toContain('c=leave');
+    expect(lib).toContain('notifyStudentsNewEvent');
+    expect(lib).toContain('purgeEventDependents');
+    expect(lib).toContain('registeredCount');
     expect(lib).toContain('Мест больше нет');
+
+    const adapter = readFileSync(
+      resolve(ROOT, 'src/services/api/pocketbase/events.ts'),
+      'utf8',
+    );
+    expect(adapter).toContain('notifyStudentsNewEventFromClient');
+    expect(adapter).toContain('removeEventParticipant');
+    expect(adapter).toContain('event_registrations');
   });
 
   it('lessons hooks lock participant fields and hide teacherNotes from students', () => {
@@ -621,9 +670,13 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).toContain('messages');
     expect(hook).toContain('conversation_members');
     expect(hook).toContain('assertConversationPinUpdate');
+    expect(hook).toContain('joinAdminsToGroupConversation');
     expect(lib).toContain('syncConversationLastMessage');
+    expect(lib).toMatch(/findRecordsByFilter\(\s*'messages'[\s\S]*?'-created'/);
     expect(lib).toContain('syncReadReceipts');
     expect(lib).toContain('assertConversationPinUpdate');
+    expect(lib).toContain('joinAdminsToGroupConversation');
+    expect(lib).toContain('joinAdminToAllGroupChats');
   });
 
   it('mapAssignmentRecord maps group, dates and content blocks', () => {
@@ -662,7 +715,7 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       collectionName: 'assignment_groups',
       created: '2026-08-01 10:00:00.000Z',
       updated: '2026-08-01 10:00:00.000Z',
-      name: 'Общее задание',
+      name: 'Все ученики',
       teacher: 'user-teacher-1',
       kind: 'general',
       members: ['user-student', { id: 'user-student-2' }],
@@ -705,16 +758,40 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     );
 
     expect(hook).toContain('onRecordCreateRequest');
+    expect(hook).toContain('onRecordAfterCreateSuccess');
     expect(hook).toContain('onRecordUpdateRequest');
     expect(hook).toContain('assignments');
     expect(hook).toContain('assignment_groups');
+    expect(hook).toContain('notifyAssignmentCreated');
     expect(lib).toContain('assertAssignmentCreate');
     expect(lib).toContain('assertAssignmentUpdate');
+    expect(lib).toContain('notifyAssignmentCreated');
+    expect(lib).toContain('createNotificationForUser');
+    expect(lib).toContain("'assignment'");
+    expect(lib).toContain("role === 'teacher'");
+    expect(lib).toContain("record.set('teacher', original.get('teacher'))");
+    expect(lib).not.toContain('Assignments are immutable after create');
     expect(lib).toContain('assertAssignmentGroupCreate');
+    expect(lib).toContain('Общая группа уже существует');
     expect(lib).toContain('assertAssignmentGroupDelete');
     expect(lib).toContain('purgeAssignmentsForGroup');
     expect(lib).toContain('Общую группу нельзя удалить');
     expect(lib).toContain('Укажите группу получателей');
+  });
+
+  it('pocketbase groups resolve sentinel grp-general to real general group', () => {
+    const source = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/groups.ts'), 'utf8');
+    expect(source).toContain('ensureGeneralAssignmentGroup');
+    expect(source).toContain('resolveAssignmentGroupIdForWrite');
+    expect(source).toContain('isKindGeneralGroup');
+    expect(source).toContain('reassignAssignmentsThenDelete');
+    const assignments = readFileSync(
+      resolve(ROOT, 'src/services/api/pocketbase/assignments.ts'),
+      'utf8',
+    );
+    expect(assignments).toContain('resolveAssignmentGroupIdForWrite');
+    expect(assignments).toContain('mapAssignmentRecord');
+    expect(assignments).not.toContain("existing.get('teacher')");
   });
 
   it('mapHelpArticleRecord and mapSupportTicketRecord map relations and json fields', () => {
@@ -1030,20 +1107,50 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       pushEnabled: true,
     });
     expect(prefs).toEqual({ userId: 'user-student', pushEnabled: true });
+
+    // Optional bool after 1791276800 — false/null must map to false (not blank crash).
+    expect(
+      mapNotificationPreferencesRecord({
+        id: 'prefs-off',
+        collectionId: 'notification_preferences',
+        collectionName: 'notification_preferences',
+        created: '',
+        updated: '',
+        user: 'user-student',
+        pushEnabled: false,
+      }).pushEnabled,
+    ).toBe(false);
+    expect(
+      mapNotificationPreferencesRecord({
+        id: 'prefs-null',
+        collectionId: 'notification_preferences',
+        collectionName: 'notification_preferences',
+        created: '',
+        updated: '',
+        user: 'user-student',
+        pushEnabled: undefined as unknown as boolean,
+      }).pushEnabled,
+    ).toBe(false);
   });
 
   it('notifications hooks lock content fields and preferences user on update', () => {
     const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/notifications.pb.js'), 'utf8');
     const lib = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraNotifications.js'), 'utf8');
+    const adapter = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/notifications.ts'), 'utf8');
 
     expect(hook).toContain('notifications');
     expect(hook).toContain('notification_preferences');
     expect(hook).toContain('onRecordCreateRequest');
     expect(hook).toContain('onRecordUpdateRequest');
     expect(lib).toContain('assertNotificationCreate');
+    expect(lib).toContain("type === 'event'");
     expect(lib).toContain('assertNotificationUpdate');
     expect(lib).toContain('assertNotificationPreferencesCreate');
     expect(lib).toContain('assertNotificationPreferencesUpdate');
+    // Preferences update only locks `user`; does not clear pushEnabled.
+    expect(lib).toContain("e.record.set('user'");
+    expect(lib).not.toContain("set('pushEnabled'");
+    expect(adapter).toContain('pushEnabled: updated.pushEnabled === true');
   });
 
   it('mapPocketBaseError maps invalid old password to INVALID_CREDENTIALS', () => {

@@ -234,6 +234,7 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
       imageUrl: event.imageUrl ?? '',
       ...(event.maxParticipants ? { maxParticipants: event.maxParticipants } : {}),
       registeredUserIds: ids.remapIds(event.registeredUserIds ?? []),
+      registeredCount: event.registeredUserIds?.length ?? event.registeredCount ?? 0,
       invitedUserIds: ids.remapIds(event.invitedUserIds ?? []),
     });
     ids.set(event.id, rec.id);

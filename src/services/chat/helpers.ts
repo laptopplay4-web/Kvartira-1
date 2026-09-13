@@ -1,6 +1,13 @@
-import type { Conversation, ConversationMember, Message, User } from '@/types';
+import type {
+  Conversation,
+  ConversationLastMessage,
+  ConversationMember,
+  Message,
+  User,
+} from '@/types';
 import { formatUserName } from '@/utils';
 import { compareIsoDates } from '@/utils/dates';
+import { getAttachmentsPreviewLabel, isSyntheticMediaCaption } from './attachments';
 import { LAST_MESSAGE_PREVIEW_LENGTH, MESSAGE_SEARCH_MIN_LENGTH } from './constants';
 import { getMessageDisplayText } from './messages';
 import { isSchoolWideConversation } from './schoolWide';
@@ -11,11 +18,11 @@ export function sortConversations(conversations: Conversation[]): Conversation[]
   return [...conversations].sort((a, b) => {
     const aTime = a.lastMessageAt ?? a.createdAt;
     const bTime = b.lastMessageAt ?? b.createdAt;
-    return bTime.localeCompare(aTime);
+    return compareIsoDates(bTime, aTime);
   });
 }
 
-/** Pinned (for current user) first, then by last message time. */
+/** Pinned (for current user) first — newest pin at the very top — then by last message. */
 export function sortConversationsWithPins(
   conversations: Conversation[],
   members: ConversationMember[],
@@ -35,11 +42,64 @@ export function sortConversationsWithPins(
     const bPin = pinAt.get(b.id) ?? b.viewerPinnedAt ?? undefined;
     if (aPin && !bPin) return -1;
     if (!aPin && bPin) return 1;
-    if (aPin && bPin) return bPin.localeCompare(aPin);
+    if (aPin && bPin) {
+      // Newer pin first so a just-pinned chat always lands at position 0
+      const byPin = compareIsoDates(bPin, aPin);
+      if (byPin !== 0) return byPin;
+      // Same pin time — still prefer fresher activity inside the pin block
+    }
     const aTime = a.lastMessageAt ?? a.createdAt;
     const bTime = b.lastMessageAt ?? b.createdAt;
-    return bTime.localeCompare(aTime);
+    return compareIsoDates(bTime, aTime);
   });
+}
+
+/** Preview row for conversation list from a message payload. */
+export function conversationPreviewFromMessage(message: Message): ConversationLastMessage {
+  const text =
+    message.text && !isSyntheticMediaCaption(message.text, message.attachments)
+      ? message.text
+      : getAttachmentsPreviewLabel(message.attachments) || message.text || 'Вложение';
+  return {
+    id: message.id,
+    text,
+    senderId: message.senderId,
+    createdAt: message.createdAt,
+  };
+}
+
+/**
+ * Messenger-style list bump: update last message + re-sort.
+ * Pinned chats stay above unpinned; among unpinned, newest activity rises to top.
+ * Ignores stale (older) events so out-of-order realtime cannot shuffle the list.
+ */
+export function bumpConversationInList(
+  conversations: Conversation[],
+  conversationId: string,
+  patch: {
+    lastMessageAt: string;
+    lastMessage: ConversationLastMessage;
+    unreadDelta?: number;
+  },
+  currentUserId: string,
+): Conversation[] {
+  let touched = false;
+  const next = conversations.map((c) => {
+    if (c.id !== conversationId) return c;
+    const prevAt = c.lastMessageAt ?? c.createdAt;
+    if (compareIsoDates(patch.lastMessageAt, prevAt) < 0) return c;
+    touched = true;
+    const unreadDelta = patch.unreadDelta ?? 0;
+    return {
+      ...c,
+      lastMessageAt: patch.lastMessageAt,
+      updatedAt: patch.lastMessageAt,
+      lastMessage: patch.lastMessage,
+      unreadCount: Math.max(0, (c.unreadCount ?? 0) + unreadDelta),
+    };
+  });
+  if (!touched) return conversations;
+  return sortConversationsWithPins(next, [], currentUserId);
 }
 
 export function truncatePreview(text: string, max = LAST_MESSAGE_PREVIEW_LENGTH): string {
@@ -131,20 +191,25 @@ export function filterConversations(
   }
 
   const q = search.trim().toLowerCase();
-  if (!q) return sortConversations(result);
-
-  return sortConversations(
-    result.filter((conv) => {
+  if (q) {
+    result = result.filter((conv) => {
       const title = getConversationDisplayTitle(conv, currentUserId, users).toLowerCase();
       if (title.includes(q)) return true;
       return conv.participantIds.some((id) => {
         const u = users.find((user) => user.id === id);
         if (!u) return false;
         const name = formatUserName(u).toLowerCase();
-        return name.includes(q) || u.firstName.toLowerCase().includes(q) || u.lastName.toLowerCase().includes(q);
+        return (
+          name.includes(q) ||
+          u.firstName.toLowerCase().includes(q) ||
+          u.lastName.toLowerCase().includes(q)
+        );
       });
-    }),
-  );
+    });
+  }
+
+  // Keep viewer pins first — never fall back to last-message-only sort.
+  return sortConversationsWithPins(result, [], currentUserId);
 }
 
 export function computeUnreadCount(

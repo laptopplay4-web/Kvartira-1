@@ -47,7 +47,7 @@ export function MobileHeader({
             className={headerNavLinkClass}
             aria-label={
               assignmentsBadge > 0
-                ? `Домашние задания, ${assignmentsBadge} материалов`
+                ? `Домашние задания, ${assignmentsBadge} непрочитанных`
                 : 'Домашние задания'
             }
           >

@@ -59,7 +59,7 @@ import {
 } from '@/services/chat/helpers';
 import { canDeleteMessage, canEditMessage, canPinMessage, toggleReactionList } from '@/services/chat/messages';
 import {
-  getLocalPinnedConversationIds,
+  getLocalPinnedAtMap,
   setLocalConversationPinned,
 } from '@/services/chat/listPins';
 import {
@@ -69,6 +69,10 @@ import {
   SCHOOL_WIDE_CHAT_DEFAULT_TITLE,
 } from '@/services/chat/constants';
 import { detectAttachmentType, validateAttachment, validateMessageContent } from '@/services/chat/validation';
+import {
+  getAttachmentsPreviewLabel,
+  isSyntheticMediaCaption,
+} from '@/services/chat/attachments';
 import { chatRealtimeService } from '@/services/chat/realtime';
 import { findConversationForLesson } from '@/services/lessons/helpers';
 import type {
@@ -156,6 +160,41 @@ async function ensureSchoolWideMembershipPb(userId: string, conversations: Conve
   }
 }
 
+/** Join admin into every non-personal chat (idempotent). */
+async function ensureAdminGroupMembershipPb(
+  userId: string,
+  conversations: Conversation[],
+): Promise<void> {
+  const pb = getPocketBase();
+  const members = await loadUserMembers(userId);
+  for (const conv of conversations) {
+    if (conv.type === 'personal') continue;
+    if (members.some((m) => m.conversationId === conv.id && m.userId === userId)) continue;
+    try {
+      await pb.collection('conversation_members').create({
+        conversation: conv.id,
+        user: userId,
+        role: 'member',
+        muted: false,
+      });
+      if (!conv.participantIds.includes(userId)) {
+        const nextIds = [...conv.participantIds, userId];
+        await pb.collection('conversations').update(conv.id, { participantIds: nextIds });
+        conv.participantIds = nextIds;
+      }
+      members.push({
+        conversationId: conv.id,
+        userId,
+        role: 'member',
+        joinedAt: new Date().toISOString(),
+        muted: false,
+      });
+    } catch {
+      /* race / already member — ignore */
+    }
+  }
+}
+
 async function loadMessagesForConversations(conversationIds: string[]): Promise<Message[]> {
   if (conversationIds.length === 0) return [];
   const pb = getPocketBase();
@@ -187,6 +226,9 @@ async function assertConversationAccess(
     throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
   }
   const conversation = await loadConversationOrThrow(conversationId);
+  if (user.role === 'admin' && conversation.type !== 'personal') {
+    await ensureAdminGroupMembershipPb(userId, [conversation]);
+  }
   const members = await loadMembers(conversationId);
   if (!canAccessConversation(user, conversation, members)) {
     throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
@@ -206,9 +248,8 @@ function enrichConversation(
   const lastMessage = [...convMessages]
     .sort((a, b) => compareIsoDates(a.createdAt, b.createdAt))
     .at(-1);
-  const localPins = getLocalPinnedConversationIds(userId);
-  const viewerPinnedAt =
-    member?.pinnedAt ?? (localPins.includes(conv.id) ? new Date(0).toISOString() : null);
+  const localPinAt = getLocalPinnedAtMap(userId);
+  const viewerPinnedAt = member?.pinnedAt ?? localPinAt.get(conv.id) ?? null;
 
   return {
     ...conv,
@@ -218,7 +259,12 @@ function enrichConversation(
     lastMessage: lastMessage
       ? {
           id: lastMessage.id,
-          text: lastMessage.text || lastMessage.attachments?.[0]?.filename || 'Вложение',
+          text:
+            lastMessage.text && !isSyntheticMediaCaption(lastMessage.text, lastMessage.attachments)
+              ? lastMessage.text
+              : getAttachmentsPreviewLabel(lastMessage.attachments) ||
+                lastMessage.text ||
+                'Вложение',
           senderId: lastMessage.senderId,
           createdAt: lastMessage.createdAt,
         }
@@ -361,6 +407,9 @@ export const pocketbaseChatApi: ChatApi = {
       });
       const conversations = records.map(mapConversationRecord);
       await ensureSchoolWideMembershipPb(userId, conversations);
+      if (user.role === 'admin') {
+        await ensureAdminGroupMembershipPb(userId, conversations);
+      }
       const userMembers = await loadUserMembers(userId);
       const accessible = conversations.filter((c) => canAccessConversation(user, c, userMembers));
       const messages = await loadMessagesForConversations(accessible.map((c) => c.id));
@@ -511,7 +560,7 @@ export const pocketbaseChatApi: ChatApi = {
       const body: Record<string, unknown> = {
         conversation: conversationId,
         sender: userId,
-        text: normalized || attachments[0]?.filename || 'Вложение',
+        text: normalized || getAttachmentsPreviewLabel(attachments),
         status: 'sent',
         readBy: [userId],
         messageType: 'user',
@@ -681,10 +730,28 @@ export const pocketbaseChatApi: ChatApi = {
         }
       }
 
+      // Admin is always a participant of every group chat (hooks also enforce).
+      let autoAdminIds: string[] = [];
+      if (input.type !== 'personal') {
+        try {
+          const adminRecords = await pb.collection('users').getFullList({
+            filter: 'role = "admin"',
+            fields: 'id',
+          });
+          autoAdminIds = adminRecords.map((r) => r.id);
+          uniqueParticipants = [...new Set([...uniqueParticipants, ...autoAdminIds])];
+        } catch {
+          /* directory RBAC — fall through; hooks + getConversations ensure */
+        }
+      }
+
       // School-wide: skip per-user getOne (directory RBAC can 403 on some roles and
       // N serial requests hang the create modal). IDs already come from list/client.
+      // Auto-added admins: skip getOne (same RBAC risk); membership created below / by hook.
       if (!input.allUsers) {
+        const skipValidate = new Set(autoAdminIds);
         for (const participantId of uniqueParticipants) {
+          if (skipValidate.has(participantId)) continue;
           await getRequesterUser(participantId);
         }
       }
@@ -1013,11 +1080,13 @@ export const pocketbaseChatApi: ChatApi = {
       if (!memberRecord) throw new ApiError('Участник не найден', 'NOT_FOUND', 404);
       const pb = getPocketBase();
       try {
+        const now = new Date().toISOString();
         const record = await pb.collection('conversation_members').update(memberRecord.id, {
-          pinnedAt: pinned ? new Date().toISOString() : '',
+          // Always bump pinnedAt so the chat jumps to position 0
+          pinnedAt: pinned ? now : '',
         });
         const member = mapConversationMemberRecord(record);
-        member.pinnedAt = pinned ? member.pinnedAt ?? new Date().toISOString() : null;
+        member.pinnedAt = pinned ? member.pinnedAt || now : null;
         return member;
       } catch {
         const member = mapConversationMemberRecord(memberRecord);
@@ -1105,6 +1174,7 @@ export const pocketbaseChatApi: ChatApi = {
         mimeType: stored.mimeType,
         size: stored.size,
         url: stored.url,
+        ...(input.kind ? { kind: input.kind } : {}),
       };
       return attachment;
     });

@@ -56,6 +56,12 @@
   --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
   --mobile-header-height: 3.5rem;
   --bottom-nav-height: calc(3.5rem + var(--spacing-safe-bottom));
+
+  /* Desktop popup reading widths — override via Tailwind max-w-* on Modal/Sheet */
+  --popup-max-sm: 24rem;
+  --popup-max-md: 28rem;
+  --popup-max-lg: 32rem;
+  --popup-max-h: 52rem;
 }
 
 @layer base {
@@ -269,14 +275,40 @@
 
   .scrollbar-none::-webkit-scrollbar {
     display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /**
+   * Scroll container for popups (Modal / Sheet / nested lists):
+   * vertical only, no visible scrollbar, no horizontal pan.
+   */
+  .popup-scroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .popup-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   .glass-card {
     @apply rounded-xl border border-white/10 bg-surface-elevated/60 shadow-lg backdrop-blur-md backdrop-saturate-150;
   }
 
+  /**
+   * Visual chrome only — do NOT set max-width here.
+   * Width comes from Modal/Sheet (max-w-*), otherwise @apply max-w-full
+   * wins the cascade and stretches popups across the desktop viewport.
+   */
   .glass-popup {
-    @apply rounded-2xl border border-white/15 bg-surface-elevated/55 shadow-2xl shadow-black/40 backdrop-blur-xl backdrop-saturate-150 ring-1 ring-white/10;
+    @apply min-w-0 rounded-2xl border border-white/15 bg-surface-elevated/55 shadow-2xl shadow-black/40 backdrop-blur-xl backdrop-saturate-150 ring-1 ring-white/10;
   }
 
   .glass-scrim {

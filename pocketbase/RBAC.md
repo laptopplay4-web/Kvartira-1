@@ -47,7 +47,7 @@ ROADMAP **1.4** · миграция `pb_migrations/1788326400_kvartira_rbac_rule
 | `conversation_members` | member · self · admin | auth | self · admin | self · owner/admin of conv · admin |
 | `messages` | conv member · admin | member | sender · admin | sender · admin |
 | `events` | public (adapter hides `invited`) | teacher · admin | teacher · admin | teacher · admin |
-| `event_registrations` | own · admin | own · admin | own · admin | own · admin |
+| `event_registrations` | own · teacher · admin | student own | own · admin | own · teacher · admin |
 | `assignments` | group members · general · teacher · admin | teacher · admin | teacher · admin | teacher · admin |
 | `assignment_groups` | members · general · teacher · admin | teacher · admin | owner teacher · admin | owner teacher · admin |
 | `help_articles` | public (`support:view-faq`) | admin (`support:manage-faq`) | admin | admin |
@@ -61,7 +61,7 @@ ROADMAP **1.4** · миграция `pb_migrations/1788326400_kvartira_rbac_rule
 | `notification_preferences` | own · admin | own · admin | own · admin | admin |
 | `school_settings` | public | admin (`admin:school-settings`) | admin | admin |
 | `public_news` | public | admin | admin | admin |
-| `kvartira_files` | owner · chat/assignment/ticket participants · admin | auth (owner=self) | owner · admin (contextId only) | owner · admin |
+| `kvartira_files` | owner · assignment via `@collection.assignments.group.kind\|name\|members` · chat/support · school/event · admin | auth (owner=self) | owner · admin (contextId only) | owner · admin |
 | `audit_logs` | admin | null (hooks) | null | null |
 
 ## IDOR на фазе 2

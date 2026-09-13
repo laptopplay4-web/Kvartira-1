@@ -128,17 +128,10 @@ export default function AccountSettingsPage() {
         <Card className="space-y-2 p-4">
           <h2 className="text-body-sm font-medium">Телефон</h2>
           <p className="text-body-sm">{phoneDisplay}</p>
-          <p className="text-caption text-text-muted">
-            Номер задаётся при регистрации. Изменить его в приложении нельзя.
-          </p>
         </Card>
 
         <Card className="space-y-3 border-danger/20 p-4">
           <h2 className="text-body-sm font-medium text-danger">Удаление аккаунта</h2>
-          <p className="text-caption text-text-muted">
-            Аккаунт и связанные данные будут удалены безвозвратно. Журнал согласий и служебные записи,
-            которые закон требует хранить, могут остаться без привязки к имени.
-          </p>
           {deleteError && (
             <p className="text-caption text-danger" role="alert">
               {deleteError}
@@ -163,12 +156,7 @@ export default function AccountSettingsPage() {
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         title="Удалить аккаунт?"
-        description={
-          <>
-            Аккаунт и связанные данные будут удалены. Журнал согласий и служебные записи, которые
-            закон требует хранить, могут остаться без привязки к имени. Это действие нельзя отменить.
-          </>
-        }
+        description="Это действие нельзя отменить."
         confirmLabel="Удалить навсегда"
         tone="destructive"
         loading={deleteMutation.isPending}

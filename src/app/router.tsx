@@ -26,6 +26,7 @@ const SecurityPage = lazy(() => import('@/pages/profile/SecurityPage'));
 const AssignmentsPage = lazy(() => import('@/pages/assignments/AssignmentsPage'));
 const AssignmentDetailPage = lazy(() => import('@/pages/assignments/AssignmentDetailPage'));
 const CreateAssignmentPage = lazy(() => import('@/pages/assignments/CreateAssignmentPage'));
+const EditAssignmentPage = lazy(() => import('@/pages/assignments/EditAssignmentPage'));
 const AssignmentGroupsPage = lazy(() => import('@/pages/assignments/AssignmentGroupsPage'));
 const AssignmentGroupDetailPage = lazy(() => import('@/pages/assignments/AssignmentGroupDetailPage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
@@ -98,6 +99,7 @@ export const appRoutes = [
           { path: '/assignments/groups', element: <AssignmentGroupsPage /> },
           { path: '/assignments/groups/:id', element: <AssignmentGroupDetailPage /> },
           { path: '/assignments/create', element: <CreateAssignmentPage /> },
+          { path: '/assignments/:id/edit', element: <EditAssignmentPage /> },
           { path: '/assignments/:id', element: <AssignmentDetailPage /> },
           { path: '/notifications', element: <NotificationsPage /> },
           {

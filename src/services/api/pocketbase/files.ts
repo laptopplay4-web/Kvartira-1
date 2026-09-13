@@ -11,7 +11,7 @@ import { getPocketBase } from '@/services/api/pocketbase/client';
 
 export const PB_FILE_URL_PREFIX = 'pbfile:';
 
-export type StoredFilePurpose = 'chat' | 'assignment' | 'support' | 'avatar' | 'school';
+export type StoredFilePurpose = 'chat' | 'assignment' | 'support' | 'avatar' | 'school' | 'event';
 
 export interface UploadStoredFileInput {
   userId: string;

@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { mockChatApi, resetMockDatabase } from '@/services/api/mock';
 import { ApiError } from '@/services/api/types';
 import {
+  bumpConversationInList,
   filterConversations,
   orderPinnedMessagesNewestFirst,
   resolvePinnedIndexForViewport,
+  sortConversationsWithPins,
 } from '@/services/chat/helpers';
-import type { Message } from '@/types';
+import type { Conversation, Message } from '@/types';
 import { users } from '@/mocks/seed';
 
 describe('chat access', () => {
@@ -30,6 +32,19 @@ describe('chat access', () => {
 
   it('admin does not access personal chats without membership', async () => {
     await expect(mockChatApi.getConversation('conv-1', 'user-admin')).rejects.toThrow(ApiError);
+  });
+
+  it('admin sees all group chats and is a member', async () => {
+    const list = await mockChatApi.getConversations('user-admin');
+    const groups = list.filter((c) => c.type !== 'personal');
+    expect(groups.length).toBeGreaterThan(0);
+    expect(groups.some((c) => c.id === 'conv-2')).toBe(true);
+    expect(groups.every((c) => c.participantIds.includes('user-admin'))).toBe(true);
+
+    const study = await mockChatApi.getConversation('conv-2', 'user-admin');
+    expect(study.id).toBe('conv-2');
+    const members = await mockChatApi.getMembers('conv-2', 'user-admin');
+    expect(members.some((m) => m.userId === 'user-admin')).toBe(true);
   });
 
   it('user can read own conversation messages', async () => {
@@ -156,6 +171,22 @@ describe('group creation', () => {
     });
     expect(conv.title).toBe('Новая группа');
     expect(conv.participantIds).toContain('user-teacher-1');
+    expect(conv.participantIds).toContain('user-admin');
+  });
+
+  it('admin is auto-added to group created by teacher', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Класс А',
+      participantIds: ['user-student'],
+    });
+    expect(conv.participantIds).toContain('user-admin');
+
+    const adminList = await mockChatApi.getConversations('user-admin');
+    expect(adminList.some((c) => c.id === conv.id)).toBe(true);
+
+    const members = await mockChatApi.getMembers(conv.id, 'user-admin');
+    expect(members.some((m) => m.userId === 'user-admin')).toBe(true);
   });
 
   it('student cannot create group', async () => {
@@ -595,7 +626,224 @@ describe('message reactions and forward', () => {
     const member = await mockChatApi.pinConversation('conv-1', 'user-student', true);
     expect(member.pinnedAt).toBeTruthy();
     const list = await mockChatApi.getConversations('user-student');
-    expect(list[0]?.viewerPinnedAt || list.find((c) => c.id === 'conv-1')?.viewerPinnedAt).toBeTruthy();
+    expect(list[0]?.id).toBe('conv-1');
+    expect(list[0]?.viewerPinnedAt).toBeTruthy();
+  });
+
+  it('sortConversationsWithPins puts newly pinned chat first', () => {
+    const list = [
+      {
+        id: 'a',
+        type: 'personal' as const,
+        title: 'A',
+        participantIds: ['u1', 'u2'],
+        createdAt: '2026-01-01T10:00:00.000Z',
+        updatedAt: '2026-01-01T12:00:00.000Z',
+        lastMessageAt: '2026-01-01T12:00:00.000Z',
+        unreadCount: 0,
+      },
+      {
+        id: 'b',
+        type: 'personal' as const,
+        title: 'B',
+        participantIds: ['u1', 'u3'],
+        createdAt: '2026-01-01T09:00:00.000Z',
+        updatedAt: '2026-01-01T11:00:00.000Z',
+        lastMessageAt: '2026-01-01T11:00:00.000Z',
+        unreadCount: 0,
+        viewerPinnedAt: '2026-01-01T13:00:00.000Z',
+      },
+      {
+        id: 'c',
+        type: 'personal' as const,
+        title: 'C',
+        participantIds: ['u1', 'u4'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T10:00:00.000Z',
+        lastMessageAt: '2026-01-01T10:00:00.000Z',
+        unreadCount: 0,
+        viewerPinnedAt: '2026-01-01T12:00:00.000Z',
+      },
+    ];
+    const sorted = sortConversationsWithPins(list, [], 'u1');
+    expect(sorted.map((c) => c.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('filterConversations keeps pinned chats first', () => {
+    const list = [
+      {
+        id: 'hot',
+        type: 'personal' as const,
+        title: 'Hot',
+        participantIds: ['user-student', 'user-teacher-1'],
+        createdAt: '2026-01-01T10:00:00.000Z',
+        updatedAt: '2026-01-01T15:00:00.000Z',
+        lastMessageAt: '2026-01-01T15:00:00.000Z',
+        unreadCount: 0,
+      },
+      {
+        id: 'pin',
+        type: 'personal' as const,
+        title: 'Pinned',
+        participantIds: ['user-student', 'user-teacher-1'],
+        createdAt: '2026-01-01T09:00:00.000Z',
+        updatedAt: '2026-01-01T10:00:00.000Z',
+        lastMessageAt: '2026-01-01T10:00:00.000Z',
+        unreadCount: 0,
+        viewerPinnedAt: '2026-01-01T16:00:00.000Z',
+      },
+    ];
+    const filtered = filterConversations(list, {
+      currentUserId: 'user-student',
+      users,
+      filter: 'all',
+    });
+    expect(filtered.map((c) => c.id)).toEqual(['pin', 'hot']);
+  });
+
+  it('sortConversationsWithPins orders unpinned by lastMessageAt desc', () => {
+    const list: Conversation[] = [
+      {
+        id: 'old',
+        type: 'personal',
+        title: 'Old',
+        participantIds: ['u1', 'u2'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T10:00:00.000Z',
+        lastMessageAt: '2026-01-01T10:00:00.000Z',
+        unreadCount: 0,
+      },
+      {
+        id: 'new',
+        type: 'personal',
+        title: 'New',
+        participantIds: ['u1', 'u3'],
+        createdAt: '2026-01-01T09:00:00.000Z',
+        updatedAt: '2026-01-01T12:00:00.000Z',
+        lastMessageAt: '2026-01-01T12:00:00.000Z',
+        unreadCount: 0,
+      },
+      {
+        id: 'mid',
+        type: 'personal',
+        title: 'Mid',
+        participantIds: ['u1', 'u4'],
+        createdAt: '2026-01-01T08:30:00.000Z',
+        updatedAt: '2026-01-01T11:00:00.000Z',
+        lastMessageAt: '2026-01-01T11:00:00.000Z',
+        unreadCount: 0,
+      },
+    ];
+    expect(sortConversationsWithPins(list, [], 'u1').map((c) => c.id)).toEqual([
+      'new',
+      'mid',
+      'old',
+    ]);
+  });
+
+  it('bumpConversationInList raises chat above others but below pins', () => {
+    const list: Conversation[] = [
+      {
+        id: 'pin',
+        type: 'personal',
+        title: 'Pinned',
+        participantIds: ['u1', 'u2'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T09:00:00.000Z',
+        lastMessageAt: '2026-01-01T09:00:00.000Z',
+        unreadCount: 0,
+        viewerPinnedAt: '2026-01-01T16:00:00.000Z',
+      },
+      {
+        id: 'top',
+        type: 'personal',
+        title: 'Was top',
+        participantIds: ['u1', 'u3'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T15:00:00.000Z',
+        lastMessageAt: '2026-01-01T15:00:00.000Z',
+        unreadCount: 0,
+      },
+      {
+        id: 'cold',
+        type: 'personal',
+        title: 'Cold',
+        participantIds: ['u1', 'u4'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T10:00:00.000Z',
+        lastMessageAt: '2026-01-01T10:00:00.000Z',
+        unreadCount: 0,
+      },
+    ];
+    const bumped = bumpConversationInList(
+      list,
+      'cold',
+      {
+        lastMessageAt: '2026-01-01T16:00:00.000Z',
+        lastMessage: {
+          id: 'msg-x',
+          text: 'Hello',
+          senderId: 'u4',
+          createdAt: '2026-01-01T16:00:00.000Z',
+        },
+        unreadDelta: 1,
+      },
+      'u1',
+    );
+    expect(bumped.map((c) => c.id)).toEqual(['pin', 'cold', 'top']);
+    expect(bumped.find((c) => c.id === 'cold')?.unreadCount).toBe(1);
+  });
+
+  it('bumpConversationInList ignores stale older timestamps', () => {
+    const list: Conversation[] = [
+      {
+        id: 'a',
+        type: 'personal',
+        title: 'A',
+        participantIds: ['u1', 'u2'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T15:00:00.000Z',
+        lastMessageAt: '2026-01-01T15:00:00.000Z',
+        unreadCount: 0,
+      },
+    ];
+    const same = bumpConversationInList(
+      list,
+      'a',
+      {
+        lastMessageAt: '2026-01-01T14:00:00.000Z',
+        lastMessage: {
+          id: 'old',
+          text: 'stale',
+          senderId: 'u2',
+          createdAt: '2026-01-01T14:00:00.000Z',
+        },
+      },
+      'u1',
+    );
+    expect(same).toBe(list);
+  });
+
+  it('sendMessage moves conversation to top of list', async () => {
+    const before = await mockChatApi.getConversations('user-student');
+    expect(before[0]?.id).not.toBe('conv-5');
+    await mockChatApi.sendMessage('conv-5', 'user-student', 'Bump me', {
+      suppressNotification: true,
+    });
+    const after = await mockChatApi.getConversations('user-student');
+    expect(after[0]?.id).toBe('conv-5');
+    expect(after[0]?.lastMessage?.text).toBe('Bump me');
+  });
+
+  it('sendMessage keeps pinned conversation above bumped unpinned', async () => {
+    await mockChatApi.pinConversation('conv-1', 'user-student', true);
+    await mockChatApi.sendMessage('conv-5', 'user-student', 'Fresh', {
+      suppressNotification: true,
+    });
+    const list = await mockChatApi.getConversations('user-student');
+    expect(list[0]?.id).toBe('conv-1');
+    expect(list[0]?.viewerPinnedAt).toBeTruthy();
+    expect(list[1]?.id).toBe('conv-5');
   });
 });
 
@@ -772,6 +1020,82 @@ describe('attachments', () => {
         size: 100,
       }),
     ).rejects.toThrow(ApiError);
+  });
+
+  it('preserves voice kind on upload', async () => {
+    const att = await mockChatApi.uploadAttachment('conv-1', 'user-student', {
+      filename: 'voice-1.webm',
+      mimeType: 'audio/webm',
+      size: 2048,
+      kind: 'voice',
+    });
+    expect(att.kind).toBe('voice');
+    expect(att.type).toBe('audio');
+  });
+
+  it('detects voice attachments via kind and legacy filename', async () => {
+    const { isVoiceAttachment } = await import('@/services/chat/attachments');
+    expect(
+      isVoiceAttachment({
+        id: 'a1',
+        type: 'audio',
+        filename: 'song.mp3',
+        mimeType: 'audio/mpeg',
+        size: 1,
+        kind: 'voice',
+      }),
+    ).toBe(true);
+    expect(
+      isVoiceAttachment({
+        id: 'a2',
+        type: 'audio',
+        filename: 'voice-123.webm',
+        mimeType: 'audio/webm',
+        size: 1,
+      }),
+    ).toBe(true);
+    expect(
+      isVoiceAttachment({
+        id: 'a3',
+        type: 'audio',
+        filename: 'lesson.mp3',
+        mimeType: 'audio/mpeg',
+        size: 1,
+        kind: 'file',
+      }),
+    ).toBe(false);
+  });
+
+  it('hides filename captions under media in display text', async () => {
+    const { getMessageDisplayText } = await import('@/services/chat/messages');
+    const { getAttachmentsPreviewLabel } = await import('@/services/chat/attachments');
+    const photo = {
+      id: 'm1',
+      conversationId: 'c1',
+      senderId: 'u1',
+      text: 'result_обложка.jpg',
+      createdAt: new Date().toISOString(),
+      status: 'sent' as const,
+      readBy: [],
+      attachments: [
+        {
+          id: 'a1',
+          type: 'image' as const,
+          filename: 'result_обложка.jpg',
+          mimeType: 'image/jpeg',
+          size: 10,
+        },
+      ],
+      messageType: 'user' as const,
+    };
+    expect(getMessageDisplayText(photo)).toBe('');
+    expect(getAttachmentsPreviewLabel(photo.attachments)).toBe('Фото');
+    expect(
+      getMessageDisplayText({
+        ...photo,
+        text: 'смотри',
+      }),
+    ).toBe('смотри');
   });
 });
 

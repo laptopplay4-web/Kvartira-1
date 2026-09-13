@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { BookOpen } from 'lucide-react';
 import { api } from '@/services/api';
 import { getRecentAssignmentsForHome } from '@/services/assignments/helpers';
+import { getUnreadAssignmentIds } from '@/services/assignments/unread';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatUserName } from '@/utils';
+import { cn, formatUserName } from '@/utils';
 
 interface HomeAssignmentsBlockProps {
   studentId: string;
@@ -24,6 +25,22 @@ export function HomeAssignmentsBlock({ studentId, requesterId }: HomeAssignments
     queryKey: ['assignments', studentId, 'student'],
     queryFn: () => api.assignments.getAssignments({ requesterId }),
   });
+
+  const { data: notifications, isFetched: notificationsFetched } = useQuery({
+    queryKey: ['notifications', requesterId],
+    queryFn: () => api.notifications.getNotifications(requesterId),
+  });
+
+  const unreadIds =
+    assignments && notificationsFetched
+      ? getUnreadAssignmentIds(
+          assignments.map((a) => a.id),
+          requesterId,
+          notifications ?? [],
+          new Map(assignments.map((a) => [a.title, a.id])),
+          { seed: true },
+        )
+      : new Set<string>();
 
   const { data: teachers } = useQuery({
     queryKey: ['teachers'],
@@ -57,18 +74,37 @@ export function HomeAssignmentsBlock({ studentId, requesterId }: HomeAssignments
         </div>
       ) : recent.length > 0 ? (
         <div className="space-y-3">
-          {recent.map((assignment) => (
-            <Link key={assignment.id} to={`/assignments/${assignment.id}`}>
-              <Card interactive>
-                <h3 className="text-h3">{assignment.title}</h3>
-                <div className="mt-2 flex flex-wrap gap-3 text-caption text-text-muted">
-                  {getTeacherName(assignment.teacherId) && (
-                    <span>{getTeacherName(assignment.teacherId)}</span>
+          {recent.map((assignment) => {
+            const unread = unreadIds.has(assignment.id);
+            return (
+              <Link key={assignment.id} to={`/assignments/${assignment.id}`}>
+                <Card
+                  interactive
+                  className={cn(
+                    unread &&
+                      'border-brand/30 bg-brand-muted/30 shadow-[inset_3px_0_0_0_var(--color-brand)]',
                   )}
-                </div>
-              </Card>
-            </Link>
-          ))}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className={cn('text-h3', unread && 'text-text-primary')}>
+                      {assignment.title}
+                    </h3>
+                    {unread && (
+                      <span
+                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand motion-safe:animate-pulse"
+                        aria-label="Непрочитано"
+                      />
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-3 text-caption text-text-muted">
+                    {getTeacherName(assignment.teacherId) && (
+                      <span>{getTeacherName(assignment.teacherId)}</span>
+                    )}
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       ) : assignments ? (
         <EmptyState

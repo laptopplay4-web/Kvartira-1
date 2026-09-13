@@ -4,13 +4,14 @@ import { BookOpen, Plus, Users } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
 import { actsAsTeacher, can } from '@/permissions';
+import { getUnreadAssignmentIds } from '@/services/assignments/unread';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { getAssignmentGroupLabel } from '@/services/assignments/groups/helpers';
-import { formatUserName } from '@/utils';
+import { cn, formatUserName } from '@/utils';
 
 export default function AssignmentsPage() {
   const user = useCurrentUser()!;
@@ -19,6 +20,23 @@ export default function AssignmentsPage() {
     queryKey: ['assignments', user.id, user.role],
     queryFn: () => api.assignments.getAssignments({ requesterId: user.id }),
   });
+
+  const { data: notifications, isFetched: notificationsFetched } = useQuery({
+    queryKey: ['notifications', user.id],
+    queryFn: () => api.notifications.getNotifications(user.id),
+    enabled: user.role === 'student',
+  });
+
+  const unreadIds =
+    user.role === 'student' && assignments && notificationsFetched
+      ? getUnreadAssignmentIds(
+          assignments.map((a) => a.id),
+          user.id,
+          notifications ?? [],
+          new Map(assignments.map((a) => [a.title, a.id])),
+          { seed: true },
+        )
+      : new Set<string>();
 
   const { data: groups } = useQuery({
     queryKey: ['assignment-groups', user.id],
@@ -90,25 +108,44 @@ export default function AssignmentsPage() {
         </div>
       ) : assignments && assignments.length > 0 ? (
         <div className="space-y-4">
-          {assignments.map((assignment) => (
-            <Link key={assignment.id} to={`/assignments/${assignment.id}`}>
-              <Card interactive>
-                <h2 className="text-h3">{assignment.title}</h2>
-                <p className="mt-1 line-clamp-2 text-body-sm text-text-secondary">
-                  {assignment.description}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-3 text-caption text-text-muted">
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" aria-hidden />
-                    {getGroupName(assignment.groupId)}
-                  </span>
-                  {user.role === 'student' && (
-                    <span>{getTeacherName(assignment.teacherId)}</span>
+          {assignments.map((assignment) => {
+            const unread = unreadIds.has(assignment.id);
+            return (
+              <Link key={assignment.id} to={`/assignments/${assignment.id}`}>
+                <Card
+                  interactive
+                  className={cn(
+                    unread &&
+                      'border-brand/30 bg-brand-muted/30 shadow-[inset_3px_0_0_0_var(--color-brand)]',
                   )}
-                </div>
-              </Card>
-            </Link>
-          ))}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h2 className={cn('text-h3', unread && 'text-text-primary')}>
+                      {assignment.title}
+                    </h2>
+                    {unread && (
+                      <span
+                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand motion-safe:animate-pulse"
+                        aria-label="Непрочитано"
+                      />
+                    )}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-body-sm text-text-secondary">
+                    {assignment.description}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-3 text-caption text-text-muted">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" aria-hidden />
+                      {getGroupName(assignment.groupId)}
+                    </span>
+                    {user.role === 'student' && (
+                      <span>{getTeacherName(assignment.teacherId)}</span>
+                    )}
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       ) : (
         <EmptyState

@@ -11,9 +11,16 @@ import {
   recordInstallPromptDismissal,
   wasInstallPromptDismissedRecently,
 } from '@/services/pwa/helpers';
+import {
+  initPortraitOrientationLock,
+  lockPortraitOrientation,
+  PORTRAIT_ORIENTATION_LOCK,
+} from '@/services/pwa/orientation';
 import { PwaInstallBanner } from '@/components/ui/PwaInstallBanner';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { renderHook } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 describe('pwa helpers', () => {
   beforeEach(() => {
@@ -84,6 +91,68 @@ describe('pwa helpers', () => {
     );
     recordInstallPromptDismissal();
     expect(canShowInstallBanner(true)).toBe(false);
+  });
+});
+
+describe('portrait orientation lock', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('locks portrait when Screen Orientation API supports lock', async () => {
+    const lock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.screen, 'orientation', {
+      configurable: true,
+      value: { lock, type: 'portrait-primary', angle: 0 },
+    });
+
+    await expect(lockPortraitOrientation()).resolves.toBe(true);
+    expect(lock).toHaveBeenCalledWith(PORTRAIT_ORIENTATION_LOCK);
+  });
+
+  it('returns false when lock is unsupported or rejected', async () => {
+    Object.defineProperty(window.screen, 'orientation', {
+      configurable: true,
+      value: { type: 'portrait-primary', angle: 0 },
+    });
+    await expect(lockPortraitOrientation()).resolves.toBe(false);
+
+    const lock = vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError'));
+    Object.defineProperty(window.screen, 'orientation', {
+      configurable: true,
+      value: { lock, type: 'landscape-primary', angle: 90 },
+    });
+    await expect(lockPortraitOrientation()).resolves.toBe(false);
+  });
+
+  it('initPortraitOrientationLock retries on visibility and pageshow', async () => {
+    const lock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.screen, 'orientation', {
+      configurable: true,
+      value: { lock, type: 'portrait-primary', angle: 0 },
+    });
+
+    initPortraitOrientationLock();
+    await Promise.resolve();
+    expect(lock).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await Promise.resolve();
+    expect(lock).toHaveBeenCalledTimes(2);
+
+    window.dispatchEvent(new Event('pageshow'));
+    await Promise.resolve();
+    expect(lock).toHaveBeenCalledTimes(3);
+  });
+
+  it('declares portrait orientation in PWA manifest config', () => {
+    const configPath = path.resolve(process.cwd(), 'vite.config.ts');
+    const source = readFileSync(configPath, 'utf8');
+    expect(source).toMatch(/orientation:\s*['"]portrait['"]/);
   });
 });
 

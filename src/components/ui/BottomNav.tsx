@@ -15,14 +15,15 @@ interface NavItem {
 
 interface BottomNavProps {
   chatBadge?: number;
+  eventsBadge?: number;
 }
 
-export function BottomNav({ chatBadge = 0 }: BottomNavProps) {
+export function BottomNav({ chatBadge = 0, eventsBadge = 0 }: BottomNavProps) {
   const items: NavItem[] = [
     { to: '/home', label: 'Главная', icon: Home },
     { to: '/lessons', label: 'Занятия', icon: Calendar },
     { to: '/chat', label: 'Чат', icon: MessageCircle, badge: chatBadge },
-    { to: '/events', label: 'События', icon: Sparkles },
+    { to: '/events', label: 'События', icon: Sparkles, badge: eventsBadge },
     { to: '/profile', label: 'Профиль', icon: User },
   ];
 
@@ -62,7 +63,7 @@ export function BottomNav({ chatBadge = 0 }: BottomNavProps) {
   );
 }
 
-export function SidebarNav({ chatBadge = 0 }: BottomNavProps) {
+export function SidebarNav({ chatBadge = 0, eventsBadge = 0 }: BottomNavProps) {
   const user = useCurrentUser();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -71,7 +72,7 @@ export function SidebarNav({ chatBadge = 0 }: BottomNavProps) {
     { to: '/home', label: 'Главная', icon: Home },
     { to: '/lessons', label: 'Занятия', icon: Calendar },
     { to: '/chat', label: 'Чат', icon: MessageCircle, badge: chatBadge },
-    { to: '/events', label: 'События', icon: Sparkles },
+    { to: '/events', label: 'События', icon: Sparkles, badge: eventsBadge },
     { to: '/profile', label: 'Профиль', icon: User },
   ];
 

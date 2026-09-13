@@ -27,10 +27,12 @@ export function toPublicEvent(event: SchoolEvent, now = new Date()): PublicEvent
   if (event.type === 'invited') return null;
   if (isSlotInPast(event.date, event.startTime, now)) return null;
 
+  const taken =
+    typeof event.registeredCount === 'number'
+      ? event.registeredCount
+      : event.registeredUserIds.length;
   const spotsLeft =
-    event.maxParticipants != null
-      ? Math.max(0, event.maxParticipants - event.registeredUserIds.length)
-      : undefined;
+    event.maxParticipants != null ? Math.max(0, event.maxParticipants - taken) : undefined;
 
   return {
     id: event.id,

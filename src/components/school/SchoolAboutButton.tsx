@@ -39,7 +39,7 @@ export function SchoolAboutButton({ className }: SchoolAboutButtonProps) {
         О школе
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="О школе" className="max-w-lg">
+      <Modal open={open} onClose={() => setOpen(false)} title="О школе" size="lg">
         {isLoading && (
           <div className="space-y-3">
             <Skeleton className="h-6 w-2/3 rounded-lg" />

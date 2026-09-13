@@ -152,7 +152,7 @@ describe('MobileHeader assignments icon', () => {
   it('shows assignments badge when pending > 0', () => {
     renderWithProviders(<MobileHeader showAssignments assignmentsBadge={2} notifBadge={0} />);
 
-    expect(screen.getByRole('link', { name: /Домашние задания, 2 материалов/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Домашние задания, 2 непрочитанных/ })).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
   });
 });

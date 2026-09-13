@@ -11,15 +11,16 @@ describe('event rosters are not public', () => {
   const hook = read('pocketbase/pb_hooks/events.pb.js');
 
   it('redacts participant id lists for everyone but staff', () => {
-    expect(hook).toContain("onRecordEnrich");
-    expect(hook).toContain("redact('registeredUserIds')");
-    expect(hook).toContain("redact('invitedUserIds')");
+    expect(hook).toContain('onRecordEnrich');
+    expect(hook).toContain("role === 'admin' || role === 'teacher'");
+    expect(hook).toContain("e.record.set('registeredUserIds'");
+    expect(hook).toContain("'invitedUserIds'");
   });
 
   it('keeps the seat count and the self-check working', () => {
-    // The UI reads `.length` for free seats and `.includes(me)` for the badge,
-    // so ids are replaced one-for-one instead of being dropped.
-    expect(hook).toContain("raw.map((id) => (viewerId && String(id) === viewerId ? viewerId : 'hidden'))");
+    // Capacity UI uses registeredCount; isRegistered via own id only in roster.
+    expect(hook).toContain("e.record.set('registeredCount', count)");
+    expect(hook).toContain('isRegistered && viewerId ? [viewerId] : []');
   });
 });
 

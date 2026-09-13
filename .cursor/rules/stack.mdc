@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.133 Avatar VK crop + black lightbox · 2026-09-12
+Версия: 1.156 Chat list last-message sort · 2026-09-13
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -137,6 +137,8 @@ kvartira/
 │   │       ├── messages.ts      # canEditMessage, canDeleteMessage, read receipts
 │   │       ├── validation.ts    # attachment + message server-side validation rules
 │   │       ├── attachments.ts   # file size formatting, type detection
+│   │       ├── schoolWide.ts    # ensureSchoolWideMembership
+│   │       ├── adminGroups.ts   # ensureAdminGroupMembership (admin ↔ all groups)
 │   │       ├── realtime.ts      # ChatRealtimeService — mock emitter | PB subscriptions
 │   │       ├── realtimePocketbase.ts
 │   │       └── realtimeMappers.ts
@@ -166,6 +168,7 @@ kvartira/
 | `src/services/api/types.ts` | Контракты AuthApi, LessonsApi, AvailabilityApi, ChatApi, … |
 | `src/services/api/mock/index.ts` | Mock DB, booking lock, availability CRUD |
 | `src/services/api/pocketbase/chat.ts` | PocketBase ChatApi (фаза 2.4) |
+| `src/services/chat/adminGroups.ts` | Admin ↔ все группы: ensure membership + create-time merge |
 | `src/services/api/pocketbase/assignments.ts` | PocketBase AssignmentsApi (группы + content blocks) |
 | `src/services/api/pocketbase/groups.ts` | PocketBase AssignmentGroupsApi |
 | `src/services/api/pocketbase/public.ts` | PocketBase PublicApi (landing, directions, teachers) |
@@ -195,7 +198,9 @@ kvartira/
 | `src/stores/authStore.ts` | Сессия, login, demoLogin, `syncSession`, `queryClient.clear()` |
 | `src/hooks/useAuthSessionSync.ts` | PB realtime + focus: автообновление роли/профиля без relogin |
 | `src/app/queryClient.ts` | Singleton QueryClient для Provider и auth cache isolation |
-| `src/config/features.ts` | Feature flags (`PROGRESS_FEATURE_ENABLED`, `isProgressFeatureEnabled`) |
+| `src/pages/assignments/CreateAssignmentPage.tsx` | `AssignmentFormPage` — create/edit 2-step wizard |
+| `src/pages/assignments/EditAssignmentPage.tsx` | Edit route wrapper → `AssignmentFormPage mode=edit` |
+| `src/components/assignments/AssignmentContentEditor.tsx` | Скрепка + immediate file picker |
 | `src/mocks/seed.ts` | Demo users, lessons, chats, events |
 | `src/app/layouts.tsx` | App shell, ProtectedRoute/GuestRoute hydration gate, AdminRoute |
 | `src/components/ui/Logo.tsx` | Логотип `/assets/logo.png` |
@@ -232,7 +237,7 @@ kvartira/
 | `src/hooks/useEditMessage.ts` | Optimistic edit + rollback |
 | `src/hooks/useDeleteMessage.ts` | Soft-delete optimistic |
 | `src/hooks/useMarkPassiveNotificationsOnLeave.ts` | Leave `/notifications` → mark passive as read (urgent keep) |
-| `src/test/chat.test.ts` | 55 tests: access, send, edit, delete, reply, search, group, school-wide, mute, pin, attachments, realtime, IDOR |
+| `src/test/chat.test.ts` | 80+ tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR |
 
 ---
 
@@ -355,7 +360,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 
 **Drafts:** `localStorage` key `chatDraft:{conversationId}`.
 
-**Permissions:** `chat:read|send|create|manage_members|delete|delete_message|pin_message`; student без `chat:create`/`chat:delete`; teacher с `chat:delete`; admin без membership не видит personal chats.
+**Permissions:** `chat:read|send|create|manage_members|delete|delete_message|pin_message`; student без `chat:create`/`chat:delete`; teacher с `chat:delete`; admin без membership не видит personal chats; admin всегда участник всех групп (`ensureAdminGroupMembership`).
 
 **Cache isolation:** `queryClient.clear()` (`src/app/queryClient.ts`) on login/logout/demoLogin.
 
@@ -377,7 +382,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 
 - Tokens: `src/styles/globals.css` (`@theme`).
 - Brand: `#00796b` (из логотипа), тёмный фон, DM Sans + Playfair Display.
-- UI: Button, Input, Card, Badge, Avatar, Logo, BottomNav, SidebarNav, MobileHeader, LessonCard, MessageBubble, Modal, Skeleton, EmptyState, ErrorState, AdminPageHeader, BackLink.
+- UI: Button, Input, Card, Badge, Avatar, Logo, BottomNav, SidebarNav, MobileHeader, LessonCard, MessageBubble, Modal (`size`), Sheet (`size`), Skeleton, EmptyState, ErrorState, AdminPageHeader, BackLink.
 
 ---
 
@@ -425,41 +430,41 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `slots.test.ts` | calculateSlots, slotsConflict, past slots, boundaries |
 | `availability.test.ts` | validation, period form, planningPeriod slots, permissions, exceptions, mock save (29 tests) |
 | `calendar.test.ts` | date ranges, IDOR filters, booking/reschedule/cancel → calendar data |
-| `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput (15 tests) |
-| `chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, mute, pin, attachments, realtime, pagination, IDOR, notifications, cache isolation |
+| `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput, register count/notify/participants/unread (21 tests) |
+| `chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort by lastMessage, attachments, realtime, pagination, IDOR, notifications, cache isolation |
 | `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; admin as teacher; progress block (skipped when UI hidden, §85) |
 | `nav.test.tsx` | MobileHeader assignments + bell + «О школе»; SidebarNav без notifications + «О школе»; aria-current; admin active; BottomNav brand (15 tests) |
 | `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back + outline style (6 tests) |
 | `routes.test.ts` | основные маршруты (+ `/assignments/create`) |
 | `routes.test.tsx` | admin shell: redirect, AppLayout, nav links, student block, shared users cache, EmptyState, role toggle (13 tests) |
 | `offline.test.tsx` | BookLessonLink offline; AvailabilityPage save disabled offline (4 tests) |
-| `assignments.test.ts` | access, groups CRUD/delete, member helpers (empty phone), content validation, home helpers (30 tests) |
+| `assignments.test.ts` | access, manage, groups CRUD/delete, create/update/delete IDOR, member helpers, content validation, home helpers (36 tests) |
 | `progress.test.ts` | access, helpers, summary, achievements, auto-unlock, teacher goals/skills CRUD, attendance (32 tests) |
 | `support.test.ts` | access, FAQ filter/CRUD, validation, tickets search/filters, attachments, IDOR, notifications, permissions (31 tests) |
 | `public.test.ts` | public helpers, API, detail pages, no phone on teachers, event filtering (8 tests) |
 | `security.test.ts` | access, password change, multi-device sessions, resolveSecuritySessions, fingerprint, login notifications, IDOR (21 tests) |
 | `userPreview.test.tsx` | direction helpers, modal name/role/directions, trigger, photo lightbox (5 tests) |
 | `legal.test.ts` | access, helpers, pending consents, accept, public docs, permissions, CMS update/publish, IDOR (21 tests) |
-| `pwa.test.tsx` | helpers, banner, usePwaInstall hook (8 tests) |
-| `notificationPreferences.test.ts` | preferences API, helpers, validation, delivery, passive/urgent markAllAsRead (11 tests) |
+| `pwa.test.tsx` | helpers, banner, usePwaInstall, portrait orientation lock + manifest (12 tests) |
+| `notificationPreferences.test.ts` | preferences, leave-read, chronological sort, event inbox hide (17 tests) |
 | `profile.test.ts` | profile validation, update name, avatar upload/remove, crop helpers, mime infer, displayable src guard (19 tests) |
 | `audioPlayer.test.tsx` | formatAudioDuration, speed cycle, seek ratio, AudioPlayer UI (10 tests) |
 | `adminUsers.test.ts` | canChangeUserRole student↔teacher, mock updateUserRole, IDOR, notification, phone privacy sanitize (8 tests) |
 | `directions.test.ts` | admin CRUD, register directionIds, teacher urgent setup, profile multi-select (9 tests) |
-| `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md + user cascade delete + avatar fields + role lock hook + session fingerprint (18 tests) |
+| `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md + user cascade delete + avatar fields + role lock hook + session fingerprint + assignment staff write + events count/image + pushEnabled bool (25 tests) |
 | `pocketbaseAuth.test.ts` | phone login hooks, findRecordsByFilter return value, login side-effects isolation, PhoneInput on auth pages, no demo shortcuts (9 tests) |
 | `pocketbaseRbac.test.ts` | PB RBAC migration + kvmartiraRbac.js + RBAC.md coverage (8 tests) |
 | `pocketbaseSeed.test.ts` | PB seed script files, collections coverage, docs (5 tests) |
-| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/groups/public/progress/support/legal/security/notifications/schoolSettings/files/realtime, createApiClient pocketbase mode, other-user avatar resolve, missing phone default (51 tests) |
+| `pocketbaseAdapter.test.ts` | PB adapter: mappers, errors, lessons/availability/events/chat/assignments/groups/public/progress/support/legal/security/notifications/schoolSettings/files/realtime, createApiClient pocketbase mode, other-user avatar resolve, missing phone default, prefs pushEnabled false (54 tests) |
 | `chatRealtime.test.ts` | PB subscription → ChatRealtimeEvent mappers (2 tests) |
-| `webPush.test.ts` | push helpers, subscription API, delivery gating (6 tests) |
+| `webPush.test.ts` | push helpers, SW no-hang, subscription API, delivery gating (8 tests) |
 | `authSessionSync.test.ts` | refreshSession API, syncSession cache clear, PB subscribe hook, route hydration guard (6 tests) |
 | `bootstrapSession.test.ts` | resolveBootstrapSession zustand + pocketbase_auth fallback (3 tests) |
 | `authSessionStorage.test.ts` | sanitize persisted session/user, invalid role rejection (4 tests) |
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 608 passed (47 files); booking cancel past-slot flake вне scope.
+**Итого:** 678 passed (47 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -475,8 +480,8 @@ services/chat/{access,messages,validation,realtime,helpers}
 | RBAC | ✅ |
 | Home dashboard | ✅ student/teacher P0+P1; admin видит teacher UI, хаб `/admin` 2026-09-03 (§112) |
 | Lessons + booking + reschedule/cancel | ✅ усилено (v1.1) |
-| Chat | ✅ v1.5 (edit/delete/reply, attachments, realtime abstraction, group mgmt, mute, pin, search, drafts, typing) |
-| Events | ✅ |
+| Chat | ✅ v1.5 + list last-message bump (§156) |
+| Events | ✅ + participation badges / participants / photo file §140 |
 | Profile + Settings + Availability | ✅ |
 | Calendar (day/week/month, Student/Teacher/Admin) | ✅ v1.3 |
 | Notifications | ✅ |
@@ -585,6 +590,24 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Notifications auto-read on leave | ✅ 2026-09-12, см. §129 |
 | Multi-device security sessions | ✅ 2026-09-12, см. §130 |
 | User preview modal (tap user) | ✅ 2026-09-12, см. §131; lightbox фото ✅ §132; VK crop + чёрный фон ✅ §133 |
+| Assignments UX (select-all, 2-step, edit/delete) | ✅ 2026-09-12, см. §135 |
+| Assignments unread badge + list mark | ✅ 2026-09-12, см. §137 |
+| Assignment photo materials | ✅ 2026-09-12, см. §138 |
+| Assignment notify inbox hide + push | ✅ 2026-09-12, см. §139 |
+| Events participation UX (badges, roster, photo file) | ✅ 2026-09-12, см. §140 |
+| Events staff roster + student-only register | ✅ 2026-09-12, см. §141 |
+| Student new-event badge on Events tab | ✅ 2026-09-12, см. §142 |
+| Events join/leave badges + roster highlight | ✅ 2026-09-12, см. §144 |
+| Events leave notify stash (PB −N fix) | ✅ 2026-09-12, см. §145 |
+| Chat media UX (actions clamp, voice/MP3, video, lightbox) | ✅ 2026-09-12, см. §146 |
+| Popup scroll (no bar, no horizontal) | ✅ 2026-09-12, см. §147 |
+| Push toggle fix (prefs + SW hang + PB bool) | ✅ 2026-09-12, см. §148 |
+| Portrait orientation lock (PWA) | ✅ 2026-09-12, см. §149 |
+| Admin ↔ all group chats (member) | ✅ 2026-09-12, см. §150 |
+| QR registration → account form | ✅ 2026-09-12, см. §151 |
+| Desktop popup sizing (Modal/Sheet) | ✅ 2026-09-12, см. §152 |
+| UI helper copy cleanup | ✅ 2026-09-12, см. §153 |
+| Chat list last-message sort | ✅ 2026-09-13, см. §156 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1394,10 +1417,10 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 |------|----------|
 | MVP + этап 2 (mock) | ✅ |
 | Текущая фаза | **6** — Deploy; параллельно Figma Q&A (§126) |
-| Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять» |
+| Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | 608 passed (47 files); §132 preview photo lightbox |
+| Тесты | 678 (47 files); booking cancel flake вне scope; §156 chat list sort |
 
 ### Фазы (кратко)
 
@@ -1419,7 +1442,495 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2532 nodes, 2705 edges, 382 communities (graphify update 2026-09-12 post-§131).
+**Graphify stats:** 2715 nodes, 2975 edges, 418 communities (post-§156).
+
+---
+
+## 156. Chat list — last-message sort (2026-09-13)
+
+**Scope:** незакреплённые чаты поднимаются вверх по последнему сообщению; закреплённые остаются сверху как раньше.
+
+**Graphify:** `bumpConversationInList()` → `useSendMessage` / `useChatRealtime` → `sortConversationsWithPins` → `ConversationList` FLIP.
+
+### Behavior (✅)
+
+- Domain: `bumpConversationInList` + `conversationPreviewFromMessage` — bump + re-sort; stale timestamps игнорируются.
+- Optimistic: send и realtime `message.created` сразу двигают чат в кэше списка.
+- Pinned: блок закрепов не меняется (порядок по `pinnedAt`); новый activity у unpinned — над остальными unpinned.
+- UI: FLIP-анимация строк (`useConversationListFlip`, respects `prefers-reduced-motion`).
+- PB: `syncConversationLastMessage` сортирует по `-created` (не по `-id`).
+
+### Deploy
+
+Обновить `pb_hooks` (`kvartiraChat.js`) + фронт; **перезапуск PocketBase**.
+
+### Tests
+
+`chat.test.ts` +5 (sort / bump / send → top / pin stays); adapter `-created` assert; suite **678** (47 files). typecheck ✅.
+
+**Graphify stats:** 2715 nodes, 2975 edges, 418 communities.
+
+---
+
+## 155. Assignment student media + MP3 controls (2026-09-12)
+
+**Scope:** ученик не видел фото в ДЗ (`pbfile:`); у MP3 в материалах — убрать громкость и скорость.
+
+**Graphify:** `AssignmentContentView()` → `AudioPlayer`; `FILE_ACCESS` → `kvartira_files` · `resolveStoredFileUrl`.
+
+### Fix (✅)
+
+- `FILE_ACCESS`: school-wide group по `name = "Все ученики"` (как у assignments list).
+- Миграция `1791363200_kvartira_assignment_files_schoolwide.js`.
+- `AssignmentContentView`: `showVolume={false}` `showSpeed={false}` на voice.
+
+### Deploy
+
+Миграция + `pb_hooks/lib/kvartiraRbac.js` + фронт; перезапуск PocketBase.
+
+### Follow-up (2026-09-12)
+
+`1791363200` недостаточно: join `@collection.assignment_groups.id ?= @collection.assignments.group` не пускал учеников.
+Миграция **`1791450000_kvartira_assignment_files_group_nested.js`**: `@collection.assignments.group.kind|name|members` (как ASSIGNMENT_ACCESS).
+
+**Graphify stats:** 2710 nodes, 2966 edges, 416 communities.
+
+---
+
+## 153. UI helper copy cleanup (2026-09-12)
+
+**Scope:** убрать лишние поясняющие подписи в настройках, направлениях, админке и создании общего чата — без смены логики.
+
+**Graphify:** `SystemSettingsPage()` / `AccountSettingsPage()` / `ProfileDirectionsPage()` / `AdminDirectionsPage()` / `CreateChatModal()`.
+
+### Removed (✅)
+
+- Push: `PUSH_NOTIFICATIONS_HINT` + caption под toggle.
+- Аккаунт: caption про неизменяемость телефона; длинный текст удаления (в диалоге оставлено «Это действие нельзя отменить.»).
+- Направления (профиль): `(по желанию)`, hint «Необязательно…», page-hint для admin «если ведёте…».
+- Админ `/admin/directions`: «Каталог направлений школы…».
+- Админ `/admin/legal`: «Управление текстами и версиями…».
+- Общий чат: хвост «Число общих чатов не ограничено».
+
+### Tests
+
+typecheck ✅; suite без изменений copy-assert.
+
+**Graphify stats:** 2707 nodes, 2960 edges, 415 communities.
+
+---
+
+## 152. Desktop popup sizing (2026-09-12)
+
+**Scope:** на desktop все всплывающие окна (Modal / Sheet) растягивались на всю ширину viewport — неудобно читать.
+
+**Graphify:** `Modal()` / `Sheet()` → `.glass-popup` → `--popup-max-*` tokens.
+
+### Root cause (✅)
+
+- `.glass-popup` содержал `@apply max-w-full` (§147) — правило в каскаде перебивало `max-w-md` / `max-w-lg` на панели → `width: 100%` экрана.
+
+### Fix (✅)
+
+- `.glass-popup`: убран `max-w-full` (оставлен `min-w-0` для overflow).
+- Токены `@theme`: `--popup-max-sm|md|lg`, `--popup-max-h` (52rem).
+- `Modal` / `Sheet`: prop `size` (`sm`|`md`|`lg`); desktop `sm:items-center` + `sm:p-6`; высота `sm:max-h-[min(90dvh,var(--popup-max-h))]`.
+- **Sticky footer:** prop `footer` — кнопки всегда видны; тело скроллится (`flex` + `overflow-hidden` на панели).
+- EventForm / Legal / FAQ / Competition / CreateChat / ConfirmDialog / LessonDetail и др. — actions в `footer` (submit через `form=`).
+- Sheet: drag-handle только mobile; centered dialog на desktop.
+- Consumers: `size` вместо ad-hoc `max-w-*` (preview sm, forms/lists lg).
+
+### Tests
+
+typecheck ✅; suite **670** passed (47 files); booking cancel flake вне scope.
+
+**Graphify stats:** 2708 nodes, 2961 edges, 415 communities.
+
+---
+
+## 151. QR invite → registration form (2026-09-12)
+
+**Scope:** сканирование школьного QR открывало gate («зарегистрируйтесь через QR»), а не форму создания аккаунта.
+
+**Graphify:** `ensurePrintableRegistrationInvite()` → `getRegistrationInvite` (mock/PB) → `buildRegistrationInviteUrl` → `RegisterPage` validate.
+
+### Root cause (✅)
+
+- В QR попадал публичный seed-токен из репозитория.
+- PocketBase `validate` вне `KVARTIRA_DEV=1` помечает seed как `valid: false` → `RegistrationInviteGate` вместо формы.
+
+### Fix (✅)
+
+- Domain: `ensurePrintableRegistrationInvite` / `isSeedRegistrationInviteToken` — missing/seed → случайный токен.
+- `getRegistrationInvite` (mock + PB): при выдаче QR автоматически ротирует seed и сохраняет в `school_settings`.
+- Gate: отдельный copy при недействительном `?invite=` vs отсутствии токена.
+- Admin QR page: уточнение, что ссылка ведёт на форму создания аккаунта.
+
+### Deploy
+
+Выложить фронт; открыть `/admin/registration-qr` (seed заменится) → **перепечатать** QR на стенде. Перезапуск PB не обязателен (без новых hooks/миграций).
+
+### Tests
+
+`registrationInvite.test.ts` +1 (printable replace) → **13**; suite **667** (47 files). typecheck ✅.
+
+**Graphify stats:** 2703 nodes, 2955 edges, 415 communities.
+
+---
+
+## 150. Admin group chat membership (2026-09-12)
+
+**Scope:** администратор видит все групповые чаты и всегда является их участником (личные — без изменений, IDOR).
+
+**Graphify:** `ensureAdminGroupMembership()` → mock/PB `createConversation` / `getConversations`; `joinAdminsToGroupConversation` / `joinAdminToAllGroupChats` → `kvartiraChat.js`.
+
+### Behavior (✅)
+
+- Domain: `services/chat/adminGroups.ts` — `ensureAdminGroupMembership`, `withAdminsInParticipants` (только `type !== personal`).
+- Create group (mock + PB): все `role=admin` добавляются в `participantIds` + membership.
+- `getConversations` / `assertConversationAccess` для admin: idempotent ensure membership во всех группах (в т.ч. legacy / deep link).
+- PB hooks: after create conversation → join all admins; after user role→admin → join all groups.
+- Personal chats: admin без membership по-прежнему не видит (тест сохранён).
+- Seed: `conv-2` включает `user-admin`.
+
+### Deploy
+
+Обновить `pb_hooks` (`chat.pb.js`, `users.pb.js`, `kvartiraChat.js`) + фронт; **перезапуск PocketBase** (без новой миграции).
+
+### Tests
+
+`chat.test.ts` +2 (list membership, create auto-add); adapter/users hook assertions → **666** (47 files). typecheck ✅.
+
+**Graphify stats:** 2701 nodes, 2949 edges, 415 communities.
+
+---
+
+## 149. Portrait orientation lock (2026-09-12)
+
+**Scope:** при включённом автоповороте на телефоне приложение остаётся в портрете (PWA shell).
+
+**Graphify:** `initPortraitOrientationLock()` → `lockPortraitOrientation()` → `main.tsx`; VitePWA `manifest.orientation`.
+
+### Behavior (✅)
+
+- Web App Manifest: `orientation: "portrait"` — OS-level lock для установленного PWA (standalone).
+- Screen Orientation API: `screen.orientation.lock('portrait')` best-effort на старте + повтор при `visibilitychange` / `pageshow` / `orientationchange`.
+- Отказ API (обычная вкладка браузера) глотается — без throw / без UI-шума.
+- Побочный фикс typecheck: `mapNotificationPreferencesRecord` — `pushEnabled` читается как `unknown` (сравнение с `1` / `'true'`).
+
+### Tests
+
+`pwa.test.tsx` +4 (lock success/fail, init retries, manifest assert) → **12** в файле; suite **~664**. typecheck ✅.
+
+**Graphify stats:** 2688 nodes, 2932 edges, 413 communities.
+
+---
+
+## 148. Push toggle fix (2026-09-12)
+
+**Scope:** переключатель push в «Настройки → Система» не реагировал — preference не сохранялся / UI зависал.
+
+**Graphify:** `SystemSettingsPage()` → `useWebPush()` → `getServiceWorkerRegistration()` / `NotificationsApi.updatePreferences`.
+
+### Root cause (✅)
+
+- Включение: preference обновлялся только после успешного `enablePush()`; без VAPID / при отказе — toggle «молчал».
+- Выключение: `navigator.serviceWorker.ready` **никогда не резолвится** без SW (Vite dev) → `busy` навсегда, toggle disabled.
+- PB: `notification_preferences.pushEnabled` required bool — `false` как blank.
+
+### Fix (✅)
+
+- Preference-first + optimistic React Query; subscribe/unsubscribe best-effort (`subscribed` | `unavailable` | `failed`).
+- `getServiceWorkerRegistration()` — `getRegistration` + timeout, без hang на `.ready`.
+- Сообщения: VAPID / SW / permission раздельно.
+- Миграция `1791276800_kvartira_push_enabled_bool.js` — `pushEnabled` optional (паттерн `login_history.success`).
+- PB adapter: `pushEnabled: updated.pushEnabled === true`; hooks prefs не трогают `pushEnabled` (только lock `user`).
+- **Re-enable без F5:** preference не ждёт SW; toggle не блокируется `webPushBusy`; без `invalidateQueries` (только `onSuccess` setQueryData); gen-lock enable/disable; retry subscribe.
+
+### Deploy
+
+1. Выложить миграцию `1791276800_kvartira_push_enabled_bool.js` + фронт.
+2. **Migrate + перезапуск PocketBase** (иначе OFF → «cannot be blank»).
+3. Для реальных push на телефон — `VITE_VAPID_PUBLIC_KEY` (+ private/relay).
+
+### Tests
+
+`webPush` (8); `notificationPreferences` (17); schema (25); adapter prefs false/null + wiring; typecheck ✅; suite **~660** (booking flake вне scope).
+
+**Graphify stats:** 2674 nodes, 2916 edges, 400 communities (topology unchanged).
+
+---
+
+## 147. Popup scroll polish (2026-09-12)
+
+**Scope:** во всех всплывающих окнах (mobile + desktop) — без полосы скролла справа; только вертикальная прокрутка; текст не уходит за края / нет горизонтального pan.
+
+**Graphify:** `Modal()` / `Sheet()` → `globals.css` `.popup-scroll` / `.scrollbar-none`; nested lists в EventForm / ConversationSettings / pickers.
+
+### Behavior (✅)
+
+- `Modal` / `Sheet`: `overflow-x-hidden` + `overflow-y-auto` + `scrollbar-none` + `overscroll-contain`; контент `min-w-0` + `break-words` / `overflow-wrap: anywhere`.
+- `.popup-scroll` utility — вложенные списки в модалках без видимого scrollbar.
+- `glass-popup`: `min-w-0 max-w-full`.
+- Точечно: EventFormModal, ConversationSettings, ForwardMessageModal, StudentPickerList, PromoteToTeacherModal, MessageActions, ConversationActions, DropdownMenu, Toast, ConfirmDialog, LessonDetail reschedule dates.
+
+### Tests
+
+typecheck ✅; suite **657 passed** (booking cancel flake вне scope).
+
+**Graphify stats:** 2667 nodes, 2907 edges, 399 communities.
+
+---
+
+## 146. Chat media UX (2026-09-12)
+
+**Scope:** long-press меню у нижних сообщений; имена вложений; голосовые/MP3 как в VK; inline-видео; закрытие фото по фону.
+
+**Graphify:** `MessageActions` → clamp; `AttachmentList` / `AudioPlayer` / `ChatVoicePlayback` → `ChatPage`; `ImageViewer` backdrop.
+
+### Behavior (✅)
+
+- `MessageActions`: измерение высоты панели + clamp/`placeAbove` — «Удалить» всегда в viewport.
+- Имена: image/video/voice скрыты в UI; PDF и MP3 — имя остаётся (`filename` в API не трогаем).
+- `MessageAttachment.kind`: `voice` | `file`; upload voice с `kind: 'voice'`; fallback `voice-*` filename.
+- Голосовые: без title/download/volume/speed на плеере; скорость — `ChatVoiceSpeedBar` при play; exclusive playback; speed в `sessionStorage` per chat.
+- MP3: title + download; без volume/speed.
+- Видео: `<video controls playsInline>` в пузыре + download без имени.
+- `ImageViewer`: тап по пустому месту → close; тап по фото/кнопкам — нет.
+
+### Tests
+
+`audioPlayer` flags; chat attachment voice kind + `isVoiceAttachment`; typecheck ✅.
+
+**Graphify stats:** 2658 nodes, 2889 edges, 399 communities.
+
+---
+
+## 145. Events leave notify stash — PB −N fix (2026-09-12)
+
+**Scope:** бейдж `−N` не появлялся — после delete регистрации PB отдавал пустые `event`/`user`, leave-notify не создавался.
+
+**Graphify:** `stashUnregistrationNotify` → `onRecordDeleteRequest` → `takeUnregistrationNotify` → `notifyStaffEventUnregistration`.
+
+### Fix (✅)
+
+- `DeleteRequest` (`event_registrations`): stash `eventId` / `studentId` / auth (role) — auth есть только на `*Request`.
+- `AfterDeleteSuccess`: sync count + notify из stash (`?p=&c=leave`).
+- UI: `-N` через `var(--color-danger)`; на списке событий бейджи inline рядом с иконкой.
+
+### Deploy
+
+Обновить `pb_hooks` (`events.pb.js`, `kvartiraEvents.js`) + фронт; **перезапуск PB**.
+
+### Tests
+
+adapter hook assertions + events unread; typecheck ✅.
+
+**Graphify stats:** 2643 nodes, 2865 edges, 399 communities.
+
+---
+
+## 144. Events join/leave badges + roster highlight (2026-09-12)
+
+**Scope:** staff `+N` / `−N` на карточке и иконке участников; в Sheet новые зелёные, отменившие красные до закрытия.
+
+**Graphify:** `summarizeUnreadParticipationDelta` → EventsPage / EventDetailPage; `EventParticipantsSheet` → mark on close.
+
+### Behavior (✅)
+
+- Notify link: `/events/:id?p=:userId&c=join|leave` (mock + PB hooks).
+- Карточка / иконка: `+joins` (brand) и `−leaves` (red) вместе.
+- Sheet: joined → green; left ghost → red; close → `markAsRead` → только активные участники.
+
+### Deploy
+
+`pb_hooks` (`kvartiraEvents.js`) + фронт; перезапуск PB.
+
+### Tests
+
+`events` delta helpers + notify link; typecheck ✅.
+
+**Graphify stats:** 2640 nodes, 2861 edges, 399 communities.
+
+---
+
+## 142. Student new-event badge (2026-09-12)
+
+**Scope:** ученики видят бейдж на «События» при создании нового мероприятия (как staff при записи).
+
+**Graphify:** `createEvent` → `notifyStudentsNewEvent` → `countUnreadEventParticipationsForNav` → BottomNav.
+
+### Behavior (✅)
+
+- Mock/PB: create event → `type: event` notify всем ученикам (invited → только invited).
+- Не в inbox колокольчика; бейдж + `+N` + mark read на деталке / tab seen.
+- AppLayout: eventsBadge для всех ролей.
+
+### Deploy
+
+Обновить `pb_hooks` (`events.pb.js`, `kvartiraEvents.js`) + фронт; перезапуск PB (без новой миграции).
+
+**Graphify stats:** 2604 nodes, 2799 edges, 397 communities.
+
+---
+
+## 141. Events staff roster + student-only register (2026-09-12)
+
+**Scope:** фикс «Что-то пошло не так» у участников; teacher/admin не записываются; кнопка «Вы участвуете».
+
+**Graphify:** `getEventParticipants` → `registeredUserIds` + staff listRule; `canRegisterForEvents` → EventDetailPage.
+
+### Behavior (✅)
+
+- Участники: roster с `events.registeredUserIds` (fallback `event_registrations`); ErrorState с текстом ошибки.
+- Миграция `1791104000_*`: list/view teacher|admin|own; create только student.
+- Hook `assertRegistrationCreate` + FE `canRegisterForEvents` — только ученики.
+- UI: staff без CTA; ученик после записи — disabled secondary «Вы участвуете» (без отмены из UI).
+
+### Deploy
+
+Миграции `1791017600_*` + `1791104000_*` + `pb_hooks` + фронт; перезапуск PB.
+
+### Tests
+
+`events` staff deny + teacher participants; schema + adapter hook; typecheck ✅.
+
+**Graphify stats:** 2602 nodes, 2796 edges, 397 communities.
+
+---
+
+## 140. Events participation — badges, roster, photo file (2026-09-12)
+
+**Scope:** запись на мероприятие → notify teacher+admin; бейдж «События» + `+N` в списке (не колокольчик); список участников; фикс мест; фото файлом.
+
+**Graphify:** `EventsApi.register` → `notifyStaffEventRegistration` → `events/unread` → `BottomNav`/`EventsPage`; `getEventParticipants` → `EventParticipantsSheet`; `registeredCount` sync.
+
+### Behavior (✅)
+
+- `registeredCount` + enrich без `'hidden'`-инфляции; UI `N / max` мест.
+- Mock/PB: регистрация всегда в `event_registrations`; staff notify `type: event` (вне inbox).
+- Nav badge = unread новее `lastEventsTabSeenAt`; `+N` на карточке до открытия деталки.
+- Staff: иконка Participants → Sheet; форма — file picker → `kvartira_files` purpose `event`.
+
+### Deploy
+
+Миграция `1791017600_kvartira_events_count_image.js` + `pb_hooks` (`events.pb.js`, `kvartiraEvents.js`, `kvartiraFiles.js`) + фронт; перезапуск PB.
+
+### Tests
+
+`events` +6; `notificationPreferences` event hide; schema + adapter; securityHardening enrich; suite **637** (booking flake вне scope). typecheck ✅.
+
+**Graphify stats:** 2598 nodes, 2792 edges, 396 communities.
+
+---
+
+## 139. Assignment notify — hide inbox, keep push (2026-09-12)
+
+**Scope:** ДЗ не в вкладке «Уведомления» / колокольчике; бейдж книги + Web Push при новом ДЗ.
+
+**Graphify:** `showsInNotificationsInbox` → `NotificationsPage` / `AppLayout`; `notifyAssignmentCreated` → `createNotificationForUser` → push relay.
+
+### Behavior (✅)
+
+- Inbox + bell: filter `type !== assignment`.
+- Book badge: unread assignment notifications (без изменений).
+- Mock create → `tryPushNotification` (push outbox).
+- PB: `onRecordAfterCreateSuccess` → notify members → push hook (клиентский create notifications убран).
+
+### Deploy
+
+Перезапуск PB с обновлёнными `pb_hooks` (`assignments.pb.js`, `kvartiraAssignments.js`). Нужны `WEB_PUSH_RELAY_URL` + подписка пользователя в настройках.
+
+---
+
+## 138. Assignment photo materials (2026-09-12)
+
+**Scope:** тип материала `image` (Фото) в ДЗ — скрепка → JPEG/PNG/WebP/GIF; просмотр + lightbox.
+
+**Graphify:** `AssignmentContentEditor` / `AssignmentContentView` → `validateAssignmentContentFile('image')` → `ImageViewer`.
+
+### Behavior (✅)
+
+- Скрепка: пункт «Фото» рядом с текстом/MP3/PDF/видео.
+- Preview в редакторе; в детали — картинка + полноэкранный просмотр (галерея всех фото задания).
+- Без миграции PB (`contentBlocks` JSON).
+
+### Tests
+
+`assignments` image validation +1. typecheck ✅.
+
+---
+
+## 137. Assignments unread — badge + list mark (2026-09-12)
+
+**Scope:** непрочитанное ДЗ как уведомление; бейдж книги = число непрочитанных; открытие ДЗ снимает пометку.
+
+**Graphify:** `useMarkAssignmentViewed()` → `AssignmentsPage` / `AppLayout` → `countUnreadAssignments` → `notificationRequiresAction(type=assignment)`.
+
+### Behavior (✅)
+
+- Бейдж `BookOpen`: unique unread `type: assignment` (не все ДЗ в списке).
+- Список / Home: inset + pulse dot как у уведомлений.
+- Открытие `/assignments/:id` → `markAsRead` связанных уведомлений.
+- Leave `/notifications` / «Прочитать все» **не** сбрасывают assignment.
+
+### Tests
+
+`assignments` unread helpers +2; `notificationPreferences` assignment leave-read; suite **~624** (47 files). typecheck ✅.
+
+---
+
+## 136. Notifications chronological sort (2026-09-12)
+
+**Scope:** список уведомлений строго по `createdAt` (новые сверху).
+
+**Root cause:** PB `getNotifications` сортировал по `-id` (не время).
+
+**Fix:** `sortNotificationsChronologically` — mock + PB + UI; tie-break по `id`.
+
+**Tests:** `notificationPreferences` +2 → **15**. typecheck ✅.
+
+---
+
+## 135. Assignments UX — select-all, 2-step wizard, edit/delete (2026-09-12)
+
+**Scope:** вкладка ДЗ — «Выбрать всех» в пикере; мастер создания 2 шага со скрепкой; edit/delete для staff.
+
+**Graphify:** `AssignmentFormPage` → `AssignmentContentEditor` / `StudentPickerList` → `AssignmentsApi.update|delete` → mock/PB; `assertAssignmentUpdate`.
+
+### UX (✅)
+
+- `StudentPickerList`: «Выбрать всех» всегда (в т.ч. вкладка «Все») + «Снять всех».
+- Материалы: скрепка → Sheet/Dropdown (Текст/MP3/PDF/Видео); файлы сразу через system picker.
+- Мастер: шаг 1 название/описание/группа → шаг 2 материалы; create + `/assignments/:id/edit`.
+- Detail: «Изменить» / «Удалить» (`ConfirmDialog`); без уведомлений при правке.
+
+### API + PB (✅)
+
+- `canManageAssignment` = `assignments:create`.
+- `updateAssignment` / `deleteAssignment` (mock + PB).
+- Хук `assertAssignmentUpdate`: teacher|admin, lock `teacher`.
+- Миграция `1790844800_kvartira_assignment_staff_write.js` — update/delete для любого teacher|admin.
+
+### Tests
+
+`assignments.test.ts` 36; schema +1; adapter update/delete wiring; routes `/create` + `/:id/edit` → **619** (47 files). typecheck ✅.
+
+**Deploy:** миграция `1790844800_*` + `pb_hooks` (`kvartiraAssignments.js`, `kvartiraRbac.js`) + фронт; перезапуск PB.
+
+**Graphify stats:** 2548 nodes, 2722 edges, 388 communities.
+
+---
+
+## 134. Notifications leave-read AppLayout fix (2026-09-12)
+
+**Scope:** баг — при переходе с `/notifications` пассивные не помечались прочитанными.
+
+**Root cause:** хук был в `NotificationsPage`; при navigate страница размонтируется до эффекта с новым `pathname`.
+
+**Fix:** `useMarkPassiveNotificationsOnLeave(user?.id)` в `AppLayout`; `didLeaveNotificationsRoute` helper.
+
+**Tests:** `notificationPreferences` leave-route +1 → **12**. typecheck ✅.
 
 ---
 
@@ -1522,24 +2033,22 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 
 **Scope:** на `/notifications` непрочитанные выделены; при уходе (маршрут / visibility / pagehide) пассивные → `read`; `urgent` (требуют действия) остаются непрочитанными.
 
-**Graphify:** `NotificationsPage()` → `useMarkPassiveNotificationsOnLeave()` → `markAllAsRead` → `notificationRequiresAction()`.
+**Graphify:** `AppLayout()` → `useMarkPassiveNotificationsOnLeave()` → `markAllAsRead` → `notificationRequiresAction()`.
 
 ### Domain (✅)
 
-- `notificationRequiresAction` / `isPassiveUnreadNotification` / `markPassiveNotificationsReadInList`.
+- `notificationRequiresAction` / `isPassiveUnreadNotification` / `markPassiveNotificationsReadInList` / `didLeaveNotificationsRoute`.
 - `markAllAsRead` (mock + PB) пропускает `urgent`.
 
 ### UI (✅)
 
 - Unread: brand inset + fade-in stagger + pulse dot; urgent — danger.
 - Leave: optimistic cache + API; кнопка «Прочитать все» — только пассивные.
-- Маршрут (не unmount) — без ложного mark в React Strict Mode.
+- **Хук в `AppLayout`** (не в `NotificationsPage`): страница при navigate размонтируется и не видит новый path — фикс §134.
 
 ### Tests
 
-`notificationPreferences.test.ts` +4 → **11** в файле; suite **600 passed** (booking cancel flake по past-slot — вне scope). typecheck ✅.
-
-**Graphify stats:** 2504 nodes, 2676 edges, 377 communities.
+`notificationPreferences.test.ts` +5 (helpers + leave route) → **12** в файле. typecheck ✅.
 
 ---
 

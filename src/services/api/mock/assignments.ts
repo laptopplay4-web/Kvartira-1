@@ -1,5 +1,9 @@
 import type { Assignment, AssignmentGroup, User } from '@/types';
-import { canCreateAssignment, canViewAssignment } from '@/services/assignments/access';
+import {
+  canCreateAssignment,
+  canManageAssignment,
+  canViewAssignment,
+} from '@/services/assignments/access';
 import { MAX_CONTENT_BLOCKS_PER_ASSIGNMENT } from '@/services/assignments/constants';
 import { sortAssignmentsByDate } from '@/services/assignments/helpers';
 import { validateAssignmentContentFile, validateContentBlock } from '@/services/assignments/validation';
@@ -7,9 +11,12 @@ import { ApiError } from '@/services/api/types';
 import type {
   AssignmentsApi,
   CreateAssignmentInput,
+  UpdateAssignmentInput,
   UploadAssignmentFileInput,
 } from '@/services/api/types';
+import { isGeneralAssignmentGroup } from '@/services/assignments/groups/helpers';
 import { createLocalUserResolver, toMockUserId, type MockUserResolver } from '@/services/api/mock/userResolver';
+import { tryPushNotification, type MockNotificationsDb } from '@/services/api/mock/notifications';
 
 export interface MockAssignmentsDb {
   assignments: Assignment[];
@@ -54,18 +61,19 @@ export function createMockAssignmentsApi(
     return user;
   }
 
+  function resolveNotifyMemberIds(group: AssignmentGroup): string[] {
+    if (isGeneralAssignmentGroup(group)) {
+      return db.users.filter((u) => u.role === 'student').map((u) => u.id);
+    }
+    return group.memberIds;
+  }
+
   function pushGroupNotification(group: AssignmentGroup, title: string, body: string, link: string) {
-    for (const memberId of group.memberIds) {
-      db.notifications.push({
-        id: uid('notif'),
-        userId: memberId,
-        type: 'assignment',
-        title,
-        body,
-        read: false,
-        createdAt: new Date().toISOString(),
-        link,
-      });
+    const notificationsDb = db as MockAssignmentsDb & MockNotificationsDb;
+    for (const memberId of resolveNotifyMemberIds(group)) {
+      // In-app record drives book badge + mark-as-viewed; inbox UI hides type=assignment.
+      // Push delivery when user has subscription + pushEnabled.
+      tryPushNotification(notificationsDb, memberId, 'assignment', title, body, link);
     }
   }
 
@@ -174,6 +182,73 @@ export function createMockAssignmentsApi(
       );
 
       return assignment;
+    },
+
+    async updateAssignment(id, input: UpdateAssignmentInput, requesterId) {
+      await delay(150);
+      const requester = await getUserById(requesterId);
+      if (!canManageAssignment(requester)) {
+        throw new ApiError('Нет прав на изменение задания', 'FORBIDDEN', 403);
+      }
+
+      const assignment = getAssignmentById(id);
+      const group = db.assignmentGroups.find((g) => g.id === input.groupId);
+      if (!group) throw new ApiError('Группа не найдена', 'NOT_FOUND', 404);
+
+      if (!input.title.trim() || !input.description.trim()) {
+        throw new ApiError('Заполните название и описание', 'VALIDATION_ERROR', 400);
+      }
+
+      if (!input.contentBlocks.length) {
+        throw new ApiError('Добавьте хотя бы один блок материала', 'VALIDATION_ERROR', 400);
+      }
+
+      if (input.contentBlocks.length > MAX_CONTENT_BLOCKS_PER_ASSIGNMENT) {
+        throw new ApiError(
+          `Максимум ${MAX_CONTENT_BLOCKS_PER_ASSIGNMENT} блоков`,
+          'VALIDATION_ERROR',
+          400,
+        );
+      }
+
+      for (const block of input.contentBlocks) {
+        const validation = validateContentBlock(
+          block.type,
+          block.text,
+          block.url
+            ? { filename: block.filename ?? 'file', mimeType: block.mimeType ?? '', size: 1 }
+            : undefined,
+        );
+        if (!validation.valid) throw new ApiError(validation.message, 'VALIDATION_ERROR', 400);
+      }
+
+      const updated: Assignment = {
+        ...assignment,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        groupId: input.groupId,
+        dueDate: input.dueDate,
+        contentBlocks: input.contentBlocks.map((block, index) => ({
+          ...block,
+          id: uid('blk'),
+          order: block.order ?? index,
+        })),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const idx = db.assignments.findIndex((a) => a.id === id);
+      db.assignments[idx] = updated;
+      return updated;
+    },
+
+    async deleteAssignment(id, requesterId) {
+      await delay(100);
+      const requester = await getUserById(requesterId);
+      if (!canManageAssignment(requester)) {
+        throw new ApiError('Нет прав на удаление задания', 'FORBIDDEN', 403);
+      }
+      getAssignmentById(id);
+      db.assignments = db.assignments.filter((a) => a.id !== id);
     },
   };
 }

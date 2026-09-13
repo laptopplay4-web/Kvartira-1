@@ -1,12 +1,28 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type Ref,
+} from 'react';
 import { Download, Pause, Play, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/utils';
+import { downloadFromUrl } from '@/utils/files';
 import {
   formatAudioDuration,
   formatPlaybackSpeedLabel,
   getNextPlaybackSpeed,
   seekRatioFromPointer,
 } from '@/services/audio/helpers';
+
+export interface AudioPlayerHandle {
+  pause: () => void;
+  play: () => Promise<void>;
+  getElement: () => HTMLAudioElement | null;
+}
 
 export interface AudioPlayerProps {
   src: string;
@@ -16,6 +32,17 @@ export interface AudioPlayerProps {
   variant?: 'compact' | 'default';
   isOwn?: boolean;
   className?: string;
+  /** Default true — hide in chat */
+  showVolume?: boolean;
+  /** Default true — hide for chat voice (top bar) and chat MP3 */
+  showSpeed?: boolean;
+  /** Controlled playback rate (e.g. chat voice top bar) */
+  playbackRate?: number;
+  onPlaybackRateChange?: (rate: number) => void;
+  onPlayingChange?: (playing: boolean) => void;
+  /** Called when user starts playback (before play) — exclusive voice claim */
+  onPlayRequest?: () => void;
+  playerRef?: Ref<AudioPlayerHandle | null>;
 }
 
 export function AudioPlayer({
@@ -26,19 +53,50 @@ export function AudioPlayer({
   variant = 'default',
   isOwn,
   className,
+  showVolume = true,
+  showSpeed = true,
+  playbackRate,
+  onPlaybackRateChange,
+  onPlayingChange,
+  onPlayRequest,
+  playerRef,
 }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [speed, setSpeed] = useState(1);
+  const [internalSpeed, setInternalSpeed] = useState(1);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
-  const [showVolume, setShowVolume] = useState(false);
+  const [showVolumePanel, setShowVolumePanel] = useState(false);
   const [seeking, setSeeking] = useState(false);
 
+  const speed = playbackRate ?? internalSpeed;
   const effectiveVolume = muted ? 0 : volume;
+  const showDownload = Boolean(downloadUrl);
+  const showControlsRow = showSpeed || showVolume || showDownload;
+
+  useImperativeHandle(
+    playerRef,
+    () => ({
+      pause: () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        audio.pause();
+        setPlaying(false);
+      },
+      play: async () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        onPlayRequest?.();
+        await audio.play();
+        setPlaying(true);
+      },
+      getElement: () => audioRef.current,
+    }),
+    [onPlayRequest],
+  );
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -47,32 +105,44 @@ export function AudioPlayer({
     audio.volume = effectiveVolume;
   }, [speed, effectiveVolume]);
 
+  const setPlayingState = useCallback(
+    (next: boolean) => {
+      setPlaying(next);
+      onPlayingChange?.(next);
+    },
+    [onPlayingChange],
+  );
+
   const togglePlay = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
     if (playing) {
       audio.pause();
-      setPlaying(false);
+      setPlayingState(false);
       return;
     }
     try {
+      onPlayRequest?.();
       await audio.play();
-      setPlaying(true);
+      setPlayingState(true);
     } catch {
-      setPlaying(false);
+      setPlayingState(false);
     }
-  }, [playing]);
+  }, [playing, onPlayRequest, setPlayingState]);
 
-  const seekToRatio = useCallback(
-    (ratio: number) => {
-      const audio = audioRef.current;
-      if (!audio || !Number.isFinite(audio.duration)) return;
-      const nextTime = ratio * audio.duration;
-      audio.currentTime = nextTime;
-      setCurrentTime(nextTime);
-    },
-    [],
-  );
+  const cycleSpeed = useCallback(() => {
+    const next = getNextPlaybackSpeed(speed);
+    if (onPlaybackRateChange) onPlaybackRateChange(next);
+    else setInternalSpeed(next);
+  }, [speed, onPlaybackRateChange]);
+
+  const seekToRatio = useCallback((ratio: number) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audio.duration)) return;
+    const nextTime = ratio * audio.duration;
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  }, []);
 
   const handleProgressPointer = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
@@ -83,22 +153,19 @@ export function AudioPlayer({
     [seekToRatio],
   );
 
-  const handleProgressKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      const audio = audioRef.current;
-      if (!audio || !Number.isFinite(audio.duration)) return;
-      const step = event.shiftKey ? 10 : 5;
-      if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        audio.currentTime = Math.min(audio.duration, audio.currentTime + step);
-      }
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        audio.currentTime = Math.max(0, audio.currentTime - step);
-      }
-    },
-    [],
-  );
+  const handleProgressKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audio.duration)) return;
+    const step = event.shiftKey ? 10 : 5;
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      audio.currentTime = Math.min(audio.duration, audio.currentTime + step);
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      audio.currentTime = Math.max(0, audio.currentTime - step);
+    }
+  }, []);
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const displayTime = formatAudioDuration(currentTime);
@@ -192,73 +259,84 @@ export function AudioPlayer({
         </div>
       </div>
 
-      <div
-        className={cn(
-          'mt-2 flex flex-wrap items-center gap-2',
-          isCompact ? 'pl-[2.875rem]' : 'pl-[3.375rem]',
-        )}
-      >
-        <button
-          type="button"
-          onClick={() => setSpeed(getNextPlaybackSpeed(speed))}
-          className="min-h-9 rounded-pill border border-border-subtle bg-surface px-2.5 text-caption font-medium text-text-secondary transition-colors hover:border-brand/40 hover:text-text-primary focus-ring"
-          aria-label={`Скорость воспроизведения ${formatPlaybackSpeedLabel(speed)}`}
+      {showControlsRow && (
+        <div
+          className={cn(
+            'mt-2 flex flex-wrap items-center gap-2',
+            isCompact ? 'pl-[2.875rem]' : 'pl-[3.375rem]',
+          )}
         >
-          {formatPlaybackSpeedLabel(speed)}
-        </button>
+          {showSpeed && (
+            <button
+              type="button"
+              onClick={cycleSpeed}
+              className="min-h-9 rounded-pill border border-border-subtle bg-surface px-2.5 text-caption font-medium text-text-secondary transition-colors hover:border-brand/40 hover:text-text-primary focus-ring"
+              aria-label={`Скорость воспроизведения ${formatPlaybackSpeedLabel(speed)}`}
+            >
+              {formatPlaybackSpeedLabel(speed)}
+            </button>
+          )}
 
-        <div className="relative flex items-center">
-          <button
-            type="button"
-            onClick={() => setShowVolume((value) => !value)}
-            className="flex min-h-9 min-w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-ring"
-            aria-label={muted || volume === 0 ? 'Включить звук' : 'Громкость'}
-            aria-expanded={showVolume}
-          >
-            {muted || volume === 0 ? (
-              <VolumeX className="h-4 w-4" aria-hidden />
-            ) : (
-              <Volume2 className="h-4 w-4" aria-hidden />
-            )}
-          </button>
           {showVolume && (
-            <div className="ml-1 flex items-center gap-2 rounded-pill border border-border-subtle bg-surface px-2 py-1">
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={effectiveVolume}
-                onChange={(event) => {
-                  const next = Number(event.target.value);
-                  setVolume(next);
-                  setMuted(next === 0);
-                }}
-                className="h-1.5 w-20 cursor-pointer accent-brand"
-                aria-label="Уровень громкости"
-              />
+            <div className="relative flex items-center">
               <button
                 type="button"
-                onClick={() => setMuted((value) => !value)}
-                className="text-caption text-text-muted hover:text-text-primary focus-ring"
+                onClick={() => setShowVolumePanel((value) => !value)}
+                className="flex min-h-9 min-w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-ring"
+                aria-label={muted || volume === 0 ? 'Включить звук' : 'Громкость'}
+                aria-expanded={showVolumePanel}
               >
-                {muted ? 'Вкл.' : 'Выкл.'}
+                {muted || volume === 0 ? (
+                  <VolumeX className="h-4 w-4" aria-hidden />
+                ) : (
+                  <Volume2 className="h-4 w-4" aria-hidden />
+                )}
               </button>
+              {showVolumePanel && (
+                <div className="ml-1 flex items-center gap-2 rounded-pill border border-border-subtle bg-surface px-2 py-1">
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={effectiveVolume}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      setVolume(next);
+                      setMuted(next === 0);
+                    }}
+                    className="h-1.5 w-20 cursor-pointer accent-brand"
+                    aria-label="Уровень громкости"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMuted((value) => !value)}
+                    className="text-caption text-text-muted hover:text-text-primary focus-ring"
+                  >
+                    {muted ? 'Вкл.' : 'Выкл.'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {downloadUrl && (
-          <a
-            href={downloadUrl}
-            download={downloadFilename}
-            className="ml-auto flex min-h-9 min-w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-brand focus-ring"
-            aria-label="Скачать аудио"
-          >
-            <Download className="h-4 w-4" aria-hidden />
-          </a>
-        )}
-      </div>
+          {showDownload && downloadUrl && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void downloadFromUrl(downloadUrl, downloadFilename || 'audio.mp3').catch(() => {
+                  /* keep in-app */
+                });
+              }}
+              className="ml-auto flex min-h-9 min-w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-brand focus-ring"
+              aria-label="Скачать аудио"
+            >
+              <Download className="h-4 w-4" aria-hidden />
+            </button>
+          )}        </div>
+      )}
 
       <audio
         ref={audioRef}
@@ -272,9 +350,9 @@ export function AudioPlayer({
           const audio = audioRef.current;
           if (audio) setCurrentTime(audio.currentTime);
         }}
-        onEnded={() => setPlaying(false)}
-        onPause={() => setPlaying(false)}
-        onPlay={() => setPlaying(true)}
+        onEnded={() => setPlayingState(false)}
+        onPause={() => setPlayingState(false)}
+        onPlay={() => setPlayingState(true)}
         className="sr-only"
       >
         <track kind="captions" />

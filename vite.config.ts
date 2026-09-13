@@ -89,6 +89,7 @@ export default defineConfig(({ mode }) => {
           theme_color: '#00796b',
           background_color: '#0c0b10',
           display: 'standalone',
+          orientation: 'portrait',
           lang: 'ru',
           icons: [
             { src: '/assets/logo.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

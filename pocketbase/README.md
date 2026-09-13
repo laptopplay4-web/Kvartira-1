@@ -83,3 +83,19 @@ npm run pb:seed
 
 Вход: `POST /api/collections/users/auth-with-password` с телефоном в `identity`.  
 Hooks: `pb_hooks/auth.pb.js` — см. **`SCHEMA.md` § Auth**.
+
+### Web Push (телефон)
+
+1. В `.env` — `VITE_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `WEB_PUSH_RELAY_SECRET`, `WEB_PUSH_RELAY_URL`  
+   (ключи: `npm run push:vapid`).
+2. Три процесса:
+   - **Vite:** `npm run dev` (подхватит `VITE_VAPID_*`)
+   - **PocketBase с env:** `npm run pb:serve` (не голый `pocketbase.exe` — иначе hooks не видят relay)  
+     Docker: `npm run pb:up`, в `.env` для контейнера:  
+     `WEB_PUSH_RELAY_URL=http://host.docker.internal:3001/send`
+   - **Relay:** `npm run push:relay`
+3. В приложении: Настройки → Система → включить Push → разрешить уведомления в браузере.
+4. Проверка: создать ДЗ / сообщение — на устройство уйдёт push (нужна подписка + `pushEnabled`).
+
+**Телефон:** Web Push работает только с **HTTPS** (или localhost).  
+Сайт по `http://192.168.x.x` на телефоне push не получит — нужен production HTTPS или туннель (ngrok/cloudflare).

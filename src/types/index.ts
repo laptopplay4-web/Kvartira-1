@@ -169,6 +169,8 @@ export interface MessageAttachment {
   url?: string;
   thumbnailUrl?: string;
   durationSeconds?: number;
+  /** Voice note from mic; omit/`file` = regular attachment */
+  kind?: 'voice' | 'file';
 }
 
 export interface MessageSystemMetadata {
@@ -257,7 +259,11 @@ export interface SchoolEvent {
   location: string;
   imageUrl?: string;
   maxParticipants?: number;
+  /** Источник правды для UI мест; синхронизируется с регистрациями. */
+  registeredCount?: number;
   registeredUserIds: string[];
+  /** Для текущего зрителя (удобно после redact roster). */
+  isRegistered?: boolean;
   invitedUserIds?: string[];
 }
 
@@ -329,7 +335,7 @@ export interface RescheduleLessonInput {
 }
 
 // Stage 2 — Assignments (homework materials for groups)
-export type AssignmentContentType = 'voice' | 'text' | 'pdf' | 'video';
+export type AssignmentContentType = 'voice' | 'text' | 'pdf' | 'video' | 'image';
 
 export interface AssignmentContentBlock {
   id: string;

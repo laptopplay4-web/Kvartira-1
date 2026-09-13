@@ -73,7 +73,7 @@ export function DropdownMenu({
         role="menu"
         style={{ top: coords.top, left: coords.left }}
         className={cn(
-          'absolute w-[220px] overflow-hidden glass-popup py-1.5 animate-scale-in',
+          'absolute w-[220px] max-w-[calc(100vw-16px)] overflow-x-hidden overflow-y-auto scrollbar-none glass-popup py-1.5 animate-scale-in',
           className,
         )}
       >

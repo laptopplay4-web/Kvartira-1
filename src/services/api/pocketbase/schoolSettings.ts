@@ -25,6 +25,7 @@ import {
 import {
   createRotatedRegistrationInvite,
   createSeedRegistrationInvite,
+  ensurePrintableRegistrationInvite,
   extractRegistrationInviteFromContacts,
   toRegistrationInviteInfo,
   type RegistrationInviteSecret,
@@ -258,9 +259,9 @@ export const pocketbaseSchoolSettingsApi: SchoolSettingsApi = {
     return withPbError(async () => {
       await assertSchoolSettingsManage(requesterId);
       const record = await loadOrCreateSchoolSettingsRecord();
-      let invite = extractRegistrationInviteFromContacts(record.contacts);
-      if (!invite?.token) {
-        invite = createSeedRegistrationInvite();
+      const stored = extractRegistrationInviteFromContacts(record.contacts);
+      const { invite, didRotate } = ensurePrintableRegistrationInvite(stored);
+      if (didRotate) {
         const settings = mapSchoolSettingsRecord(record);
         const pb = getPocketBase();
         await pb

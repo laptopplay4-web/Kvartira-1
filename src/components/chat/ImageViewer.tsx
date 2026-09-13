@@ -15,6 +15,7 @@ export function ImageViewer({ images, initialIndex, open, onClose }: ImageViewer
   const [index, setIndex] = useState(initialIndex);
   const [downloading, setDownloading] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const skipCloseRef = useRef(false);
 
   useEffect(() => {
     setIndex(initialIndex);
@@ -53,12 +54,21 @@ export function ImageViewer({ images, initialIndex, open, onClose }: ImageViewer
     }
   };
 
+  const handleBackdropClick = () => {
+    if (skipCloseRef.current) {
+      skipCloseRef.current = false;
+      return;
+    }
+    onClose();
+  };
+
   return (
     <div
       className="fixed inset-0 z-[60] flex flex-col bg-black/80 backdrop-blur-md"
       role="dialog"
       aria-modal
       aria-label="Просмотр изображения"
+      onClick={handleBackdropClick}
       onTouchStart={(e) => {
         touchStartX.current = e.changedTouches[0]?.clientX ?? null;
       }}
@@ -69,13 +79,17 @@ export function ImageViewer({ images, initialIndex, open, onClose }: ImageViewer
         const end = e.changedTouches[0]?.clientX ?? start;
         const dx = end - start;
         if (Math.abs(dx) < 48) return;
+        skipCloseRef.current = true;
         if (dx < 0) goNext();
         else goPrev();
       }}
     >
-      <div className="flex shrink-0 items-center justify-between gap-2 p-4">
+      <div
+        className="flex shrink-0 items-center justify-between gap-2 p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <span className="truncate text-sm text-white/80">
-          {images.length > 1 ? `${index + 1} / ${images.length}` : current?.filename}
+          {images.length > 1 ? `${index + 1} / ${images.length}` : null}
         </span>
         <div className="flex items-center gap-1">
           <Button
@@ -102,7 +116,10 @@ export function ImageViewer({ images, initialIndex, open, onClose }: ImageViewer
           <Button
             variant="ghost"
             size="icon"
-            onClick={goPrev}
+            onClick={(e) => {
+              e.stopPropagation();
+              goPrev();
+            }}
             className="absolute left-2 text-white"
             aria-label="Предыдущее"
           >
@@ -110,13 +127,21 @@ export function ImageViewer({ images, initialIndex, open, onClose }: ImageViewer
           </Button>
         )}
         {current?.url && (
-          <img src={current.url} alt={current.filename} className="max-h-full max-w-full object-contain" />
+          <img
+            src={current.url}
+            alt=""
+            className="max-h-full max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
         )}
         {images.length > 1 && index < images.length - 1 && (
           <Button
             variant="ghost"
             size="icon"
-            onClick={goNext}
+            onClick={(e) => {
+              e.stopPropagation();
+              goNext();
+            }}
             className="absolute right-2 text-white"
             aria-label="Следующее"
           >

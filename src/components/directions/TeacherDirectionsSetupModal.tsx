@@ -56,7 +56,22 @@ export function TeacherDirectionsSetupModal() {
   if (!user || !needsSetup) return null;
 
   return (
-    <Modal open={open} onClose={() => {}} title="Настройте направления" dismissible={false}>
+    <Modal
+      open={open}
+      onClose={() => {}}
+      title="Настройте направления"
+      dismissible={false}
+      footer={
+        <Button
+          fullWidth
+          disabled={!isOnline || selected.length === 0}
+          loading={mutation.isPending}
+          onClick={() => mutation.mutate()}
+        >
+          Сохранить направления
+        </Button>
+      }
+    >
       <div className="mb-3">
         <Badge variant="danger">Срочно</Badge>
       </div>
@@ -81,15 +96,6 @@ export function TeacherDirectionsSetupModal() {
           hint="Можно выбрать несколько"
         />
       )}
-      <Button
-        className="mt-4"
-        fullWidth
-        disabled={!isOnline || selected.length === 0}
-        loading={mutation.isPending}
-        onClick={() => mutation.mutate()}
-      >
-        Сохранить направления
-      </Button>
     </Modal>
   );
 }

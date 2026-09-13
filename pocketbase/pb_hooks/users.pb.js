@@ -70,10 +70,27 @@ onRecordUpdateRequest((e) => {
   e.next();
 }, 'users');
 
+onRecordAfterUpdateSuccess((e) => {
+  try {
+    if (e.record.getString('role') !== 'admin') {
+      e.next();
+      return;
+    }
+    const chat = require(`${__hooks}/lib/kvartiraChat.js`);
+    chat.joinAdminToAllGroupChats($app, String(e.record.id));
+  } catch (_) {
+    /* never block role change on chat join */
+  }
+  e.next();
+}, 'users');
+
 onRecordAfterCreateSuccess((e) => {
   try {
     const chat = require(`${__hooks}/lib/kvartiraChat.js`);
     chat.joinUserToSchoolWideChats($app, String(e.record.id));
+    if (e.record.getString('role') === 'admin') {
+      chat.joinAdminToAllGroupChats($app, String(e.record.id));
+    }
   } catch (_) {
     /* never block registration on chat join */
   }

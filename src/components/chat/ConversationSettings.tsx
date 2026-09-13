@@ -17,6 +17,7 @@ import {
   isMemberMuted,
 } from '@/services/chat/access';
 import { isSchoolWideConversation } from '@/services/chat/schoolWide';
+import { sortConversationsWithPins } from '@/services/chat/helpers';
 import { useConversationMembers } from '@/hooks/useConversationMembers';
 import { Avatar } from '@/components/ui/Avatar';
 import { Bell, BellOff, LogOut, Pin, Search, Trash2 } from 'lucide-react';
@@ -169,11 +170,12 @@ export function ConversationSettings({
         currentUser.id,
       ]);
       const pinnedAt = pinned ? new Date().toISOString() : null;
-      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
-        (old ?? []).map((c) =>
+      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) => {
+        const next = (old ?? []).map((c) =>
           c.id === conversation.id ? { ...c, viewerPinnedAt: pinnedAt } : c,
-        ),
-      );
+        );
+        return sortConversationsWithPins(next, [], currentUser.id);
+      });
       queryClient.setQueryData<ConversationMember[]>(
         ['members', conversation.id, currentUser.id],
         (old) =>
@@ -274,8 +276,8 @@ export function ConversationSettings({
   );
 
   return (
-    <Modal open={open} onClose={onClose} title="Настройки чата" className="max-w-lg">
-      <div className="max-h-[70vh] space-y-6 overflow-y-auto">
+    <Modal open={open} onClose={onClose} title="Настройки чата" size="lg">
+      <div className="space-y-6">
         {canEdit && conversation.type !== 'personal' && (
           <div className="space-y-3">
             <div className="flex items-start gap-4">
@@ -326,7 +328,7 @@ export function ConversationSettings({
                   />
                 </div>
               )}
-              <ul className="max-h-48 space-y-2 overflow-y-auto">
+              <ul className="popup-scroll max-h-48 space-y-2">
                 {visibleMembers.length > 0 ? (
                   visibleMembers.map(({ member, user }) => (
                     <li key={member.userId} className="flex items-center justify-between gap-2">
@@ -382,7 +384,7 @@ export function ConversationSettings({
                     className="w-full rounded-xl border border-border bg-surface-elevated py-2.5 pl-10 pr-4 text-sm focus-ring"
                   />
                 </div>
-                <ul className="max-h-40 space-y-1 overflow-y-auto">
+                <ul className="popup-scroll max-h-40 space-y-1">
                   {visibleToAdd.length > 0 ? (
                     visibleToAdd.map((u) => (
                       <li key={u.id}>

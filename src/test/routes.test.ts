@@ -47,6 +47,8 @@ describe('router', () => {
     expect(paths).toContain('/assignments');
     expect(paths).toContain('/assignments/groups');
     expect(paths).toContain('/assignments/groups/:id');
+    expect(paths).toContain('/assignments/create');
+    expect(paths).toContain('/assignments/:id/edit');
     expect(paths).toContain('/assignments/:id');
     expect(paths).toContain('/admin');
     expect(paths).toContain('/admin/schedule');

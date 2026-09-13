@@ -77,7 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 key={item.id}
                 role="status"
                 className={cn(
-                  'pointer-events-auto flex w-full max-w-md items-start gap-3 glass-popup px-4 py-3 text-text-primary animate-slide-up-in',
+                  'pointer-events-auto flex w-full max-w-md items-start gap-3 overflow-x-hidden break-words glass-popup px-4 py-3 text-text-primary animate-slide-up-in [overflow-wrap:anywhere]',
                   TONE_CLASS[item.tone],
                 )}
               >

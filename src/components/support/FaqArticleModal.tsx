@@ -68,8 +68,28 @@ export function FaqArticleModal({ open, onClose, adminId, article, onSaved }: Fa
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Редактировать вопрос' : 'Новый вопрос FAQ'}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? 'Редактировать вопрос' : 'Новый вопрос FAQ'}
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="ghost" className="flex-1 min-h-11" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            type="submit"
+            form="faq-article-form"
+            className="flex-1 min-h-11"
+            loading={saveMutation.isPending}
+            disabled={!isOnline}
+          >
+            {isEdit ? 'Сохранить' : 'Добавить'}
+          </Button>
+        </div>
+      }
+    >
+      <form id="faq-article-form" onSubmit={handleSubmit} className="space-y-4">
         {!isOnline && (
           <p className="text-body-sm text-warning" role="alert">
             {OFFLINE_NETWORK_MESSAGE}
@@ -114,14 +134,6 @@ export function FaqArticleModal({ open, onClose, adminId, article, onSaved }: Fa
             {error}
           </p>
         )}
-        <div className="flex gap-2">
-          <Button type="button" variant="ghost" className="flex-1 min-h-11" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button type="submit" className="flex-1 min-h-11" loading={saveMutation.isPending} disabled={!isOnline}>
-            {isEdit ? 'Сохранить' : 'Добавить'}
-          </Button>
-        </div>
       </form>
     </Modal>
   );

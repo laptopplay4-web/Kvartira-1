@@ -68,7 +68,7 @@ export function UserPreviewModal({
 
   return (
     <>
-      <Modal open={open && !!userId} onClose={onClose} title="Профиль" className="sm:max-w-sm">
+      <Modal open={open && !!userId} onClose={onClose} title="Профиль" size="sm">
         {loading ? (
           <div className="flex flex-col items-center gap-4 py-4" aria-busy>
             <Skeleton className="h-24 w-24 rounded-full" />

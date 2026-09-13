@@ -10,6 +10,10 @@ import { WifiOff } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuthSessionSync } from '@/hooks/useAuthSessionSync';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
+import { useMarkPassiveNotificationsOnLeave } from '@/hooks/useMarkPassiveNotificationsOnLeave';
+import { countUnreadAssignments } from '@/services/assignments/unread';
+import { countUnreadEventParticipationsForNav } from '@/services/events/unread';
+import { countInboxUnreadNotifications } from '@/services/notifications/helpers';
 import { PwaInstallBanner } from '@/components/ui/PwaInstallBanner';
 
 export function AppLayout() {
@@ -19,6 +23,9 @@ export function AppLayout() {
   const { showBanner, installing, promptInstall, dismissPrompt } = usePwaInstall();
   const hideBottomNav = /^\/chat\/[^/]+/.test(location.pathname);
 
+  // Живёт в layout: NotificationsPage при уходе размонтируется и не видит новую location.
+  useMarkPassiveNotificationsOnLeave(user?.id);
+
   const { data: conversations } = useQuery({
     queryKey: ['conversations', user?.id],
     queryFn: () => api.chat.getConversations(user!.id),
@@ -27,13 +34,13 @@ export function AppLayout() {
 
   const chatBadge = conversations?.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0) ?? 0;
 
-  const { data: notifications } = useQuery({
+  const { data: notifications, isFetched: notificationsFetched } = useQuery({
     queryKey: ['notifications', user?.id],
     queryFn: () => api.notifications.getNotifications(user!.id),
     enabled: !!user,
   });
 
-  const notifBadge = notifications?.filter((n) => !n.read).length ?? 0;
+  const notifBadge = countInboxUnreadNotifications(notifications ?? []);
 
   const showAssignments =
     !!user &&
@@ -41,17 +48,33 @@ export function AppLayout() {
       can(user, 'assignments:view-assigned') ||
       can(user, 'assignments:view-all'));
 
-  const { data: assignments } = useQuery({
+  const { data: assignments, isFetched: assignmentsFetched } = useQuery({
     queryKey: ['assignments', user?.id, user?.role],
     queryFn: () => api.assignments.getAssignments({ requesterId: user!.id }),
-    enabled: showAssignments,
+    enabled: showAssignments && user?.role === 'student',
   });
 
-  const assignmentsBadge = user?.role === 'student' ? (assignments?.length ?? 0) : 0;
+  const assignmentIds = assignments?.map((a) => a.id) ?? [];
+  const assignmentTitles = assignments
+    ? new Map(assignments.map((a) => [a.title, a.id]))
+    : undefined;
+
+  const assignmentsBadge =
+    user?.role === 'student' && notificationsFetched && assignmentsFetched
+      ? countUnreadAssignments(assignmentIds, user.id, notifications ?? [], assignmentTitles, {
+          seed: true,
+        })
+      : 0;
+
+  const eventsBadge = user
+    ? countUnreadEventParticipationsForNav(notifications ?? [], user.id, {
+        ignoreTabSeen: user.role === 'student',
+      })
+    : 0;
 
   return (
     <div className="flex min-h-dvh min-w-0 overflow-x-hidden">
-      <SidebarNav chatBadge={chatBadge} />
+      <SidebarNav chatBadge={chatBadge} eventsBadge={eventsBadge} />
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-hidden">
         <MobileHeader
           showAssignments={showAssignments}
@@ -79,7 +102,7 @@ export function AppLayout() {
             installing={installing}
           />
         )}
-        {!hideBottomNav && <BottomNav chatBadge={chatBadge} />}
+        {!hideBottomNav && <BottomNav chatBadge={chatBadge} eventsBadge={eventsBadge} />}
       </div>
     </div>
   );

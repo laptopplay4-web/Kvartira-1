@@ -1,7 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
-import type { Message, MessageAttachment } from '@/types';
+import type { Conversation, Message, MessageAttachment } from '@/types';
 import { ApiError } from '@/services/api/types';
+import { getAttachmentsPreviewLabel } from '@/services/chat/attachments';
+import { bumpConversationInList } from '@/services/chat/helpers';
 
 function uid() {
   return `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -30,14 +32,17 @@ export function useSendMessage() {
     onMutate: async ({ conversationId, userId, text, clientMutationId, replyToMessageId, attachments }) => {
       // Don't await — awaiting in-flight refetches delays the optimistic bubble.
       void queryClient.cancelQueries({ queryKey: ['messages', conversationId, userId] });
+      void queryClient.cancelQueries({ queryKey: ['conversations', userId] });
       const previous = queryClient.getQueryData(['messages', conversationId, userId]);
+      const previousConversations = queryClient.getQueryData<Conversation[]>(['conversations', userId]);
 
+      const createdAt = new Date().toISOString();
       const optimistic: Message = {
         id: clientMutationId,
         conversationId,
         senderId: userId,
         text: text.trim(),
-        createdAt: new Date().toISOString(),
+        createdAt,
         status: 'sending',
         readBy: [userId],
         clientMutationId,
@@ -62,7 +67,27 @@ export function useSendMessage() {
         return { ...data, pages };
       });
 
-      return { previous, clientMutationId };
+      const previewText =
+        text.trim() || getAttachmentsPreviewLabel(attachments) || 'Вложение';
+      queryClient.setQueryData<Conversation[]>(['conversations', userId], (old) => {
+        if (!old) return old;
+        return bumpConversationInList(
+          old,
+          conversationId,
+          {
+            lastMessageAt: createdAt,
+            lastMessage: {
+              id: clientMutationId,
+              text: previewText,
+              senderId: userId,
+              createdAt,
+            },
+          },
+          userId,
+        );
+      });
+
+      return { previous, previousConversations, clientMutationId };
     },
     onSuccess: (msg, { conversationId, userId, clientMutationId }) => {
       queryClient.setQueryData(['messages', conversationId, userId], (old: unknown) => {
@@ -80,11 +105,34 @@ export function useSendMessage() {
           })),
         };
       });
+      queryClient.setQueryData<Conversation[]>(['conversations', userId], (old) => {
+        if (!old) return old;
+        return bumpConversationInList(
+          old,
+          conversationId,
+          {
+            lastMessageAt: msg.createdAt,
+            lastMessage: {
+              id: msg.id,
+              text:
+                msg.text ||
+                getAttachmentsPreviewLabel(msg.attachments) ||
+                'Вложение',
+              senderId: msg.senderId,
+              createdAt: msg.createdAt,
+            },
+          },
+          userId,
+        );
+      });
       queryClient.invalidateQueries({ queryKey: ['conversations', userId] });
       queryClient.invalidateQueries({ queryKey: ['conversation', conversationId, userId] });
       queryClient.invalidateQueries({ queryKey: ['chat-unread', userId] });
     },
-    onError: (_err, { conversationId, userId, clientMutationId }) => {
+    onError: (_err, { conversationId, userId, clientMutationId }, ctx) => {
+      if (ctx?.previousConversations) {
+        queryClient.setQueryData(['conversations', userId], ctx.previousConversations);
+      }
       queryClient.setQueryData(['messages', conversationId, userId], (old: unknown) => {
         if (!old || typeof old !== 'object' || !('pages' in old)) return old;
         const data = old as { pages: { messages: Message[]; hasMore: boolean; nextCursor?: string }[] };
@@ -110,6 +158,7 @@ export function useSendMessage() {
       // if the message actually landed on the server.
       if (err) {
         queryClient.invalidateQueries({ queryKey: ['messages', conversationId, userId] });
+        queryClient.invalidateQueries({ queryKey: ['conversations', userId] });
       }
     },
   });

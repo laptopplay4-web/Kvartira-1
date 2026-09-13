@@ -58,18 +58,41 @@ function assertAssignmentCreate(app, e) {
 }
 
 /**
- * Assignments are immutable after create for app users (no submit/review).
+ * Teacher or admin may update title/description/group/contentBlocks.
+ * Author (`teacher`) is locked; students cannot write.
  *
- * @param {core.App} _app
+ * @param {core.App} app
  * @param {core.RecordRequestEvent} e
  */
-function assertAssignmentUpdate(_app, e) {
+function assertAssignmentUpdate(app, e) {
   const auth = e.auth;
   if (!auth) {
     throw new ApiError(403, 'Нет доступа');
   }
-  if (!isUsersAuth(auth) || auth.getString('role') === 'admin') return;
-  throw new ApiError(403, 'Нет доступа');
+
+  const role = isUsersAuth(auth) ? auth.getString('role') : '';
+  const isStaff = role === 'admin' || role === 'teacher';
+  if (isUsersAuth(auth) && !isStaff) {
+    throw new ApiError(403, 'Нет доступа');
+  }
+
+  const record = e.record;
+  const original = typeof record.original === 'function' ? record.original() : record;
+  record.set('teacher', original.get('teacher'));
+
+  const groupId = relId(record.get('group'));
+  if (!groupId) {
+    throw new ApiError(400, 'Укажите группу получателей');
+  }
+  app.findRecordById('assignment_groups', groupId);
+
+  const title = record.getString('title').trim();
+  const description = record.getString('description').trim();
+  if (!title || !description) {
+    throw new ApiError(400, 'Заполните название и описание');
+  }
+  record.set('title', title);
+  record.set('description', description);
 }
 
 /**
@@ -84,6 +107,23 @@ function assertAssignmentGroupCreate(app, e) {
 
   if (isUsersAuth(auth) && auth.getString('role') !== 'admin') {
     e.record.set('teacher', auth.id);
+  }
+
+  const requestedKind = e.record.getString('kind') || 'custom';
+  if (requestedKind === 'general') {
+    /** @type {Record[]} */
+    let existing = [];
+    try {
+      existing =
+        app.findRecordsByFilter('assignment_groups', 'kind = "general"', '-id', 1, 0) || [];
+    } catch (_) {
+      existing = [];
+    }
+    if (existing.length > 0) {
+      throw new ApiError(400, 'Общая группа уже существует');
+    }
+    e.record.set('kind', 'general');
+  } else {
     e.record.set('kind', 'custom');
   }
 
@@ -106,15 +146,31 @@ function assertAssignmentGroupUpdate(app, e) {
   if (!auth) {
     throw new ApiError(403, 'Нет доступа');
   }
+
+  const record = e.record;
+  const original = typeof record.original === 'function' ? record.original() : record;
+  const originalKind = original.getString('kind');
+  const requestedKind = record.getString('kind') || originalKind;
+
   if (!isUsersAuth(auth) || auth.getString('role') === 'admin') {
+    if (requestedKind === 'general' && originalKind !== 'general') {
+      /** @type {Record[]} */
+      let existing = [];
+      try {
+        existing =
+          app.findRecordsByFilter('assignment_groups', 'kind = "general"', '-id', 1, 0) || [];
+      } catch (_) {
+        existing = [];
+      }
+      if (existing.length > 0 && existing[0].id !== record.id) {
+        throw new ApiError(400, 'Общая группа уже существует');
+      }
+    }
     assertMembersAreStudents(app, e.record.get('members') || []);
     return;
   }
 
-  const record = e.record;
-  const original = typeof record.original === 'function' ? record.original() : record;
-  const kind = original.getString('kind');
-  if (kind === 'general') {
+  if (originalKind === 'general') {
     throw new ApiError(403, 'Общую группу нельзя изменить');
   }
   if (relId(original.get('teacher')) !== auth.id) {
@@ -122,7 +178,23 @@ function assertAssignmentGroupUpdate(app, e) {
   }
 
   record.set('teacher', original.get('teacher'));
-  record.set('kind', kind);
+
+  if (requestedKind === 'general') {
+    /** @type {Record[]} */
+    let existing = [];
+    try {
+      existing =
+        app.findRecordsByFilter('assignment_groups', 'kind = "general"', '-id', 1, 0) || [];
+    } catch (_) {
+      existing = [];
+    }
+    if (existing.length > 0 && existing[0].id !== record.id) {
+      throw new ApiError(400, 'Общая группа уже существует');
+    }
+    record.set('kind', 'general');
+  } else {
+    record.set('kind', originalKind || 'custom');
+  }
 
   const name = record.getString('name').trim();
   if (!name || name.length < 2) {
@@ -209,6 +281,59 @@ function assertMembersAreStudents(app, members) {
   }
 }
 
+/**
+ * @param {core.App} app
+ * @param {core.Record} group
+ * @returns {string[]}
+ */
+function resolveAssignmentRecipientIds(app, group) {
+  const kind = group.getString('kind');
+  const name = group.getString('name');
+  const isSchoolWide = kind === 'general' || name === 'Все ученики';
+
+  if (isSchoolWide) {
+    try {
+      const students =
+        app.findRecordsByFilter('users', 'role = "student"', '-id', 500, 0) || [];
+      return students.map((s) => s.id).filter(Boolean);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  const raw = group.get('members') || [];
+  return Array.isArray(raw) ? raw.map(relId).filter(Boolean) : [];
+}
+
+/**
+ * After create: in-app assignment notification (book badge) + push via notifications hook.
+ * Not shown in notifications inbox on the client.
+ *
+ * @param {core.App} app
+ * @param {core.Record} record
+ */
+function notifyAssignmentCreated(app, record) {
+  try {
+    const groupId = relId(record.get('group'));
+    if (!groupId) return;
+
+    const group = app.findRecordById('assignment_groups', groupId);
+    const memberIds = resolveAssignmentRecipientIds(app, group);
+    if (!memberIds.length) return;
+
+    const notifications = require(`${__hooks}/lib/kvartiraNotifications.js`);
+    const title = 'Новое домашнее задание';
+    const body = record.getString('title') || 'Новые материалы';
+    const link = `/assignments/${record.id}`;
+
+    for (const userId of memberIds) {
+      notifications.createNotificationForUser(app, userId, 'assignment', title, body, link);
+    }
+  } catch (_) {
+    /* never fail assignment create because of notify */
+  }
+}
+
 module.exports = {
   assertAssignmentCreate,
   assertAssignmentUpdate,
@@ -216,5 +341,6 @@ module.exports = {
   assertAssignmentGroupUpdate,
   assertAssignmentGroupDelete,
   purgeAssignmentsForGroup,
+  notifyAssignmentCreated,
   relId,
 };

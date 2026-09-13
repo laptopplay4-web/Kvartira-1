@@ -130,8 +130,39 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
           ? 'Новая группа'
           : 'Общий чат';
 
+  const stepFooter =
+    step === 'personal' ? (
+      <div className="flex gap-2">
+        <Button variant="secondary" className="flex-1" onClick={() => setStep('choose')}>
+          Назад
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={() => void submitPersonal()}
+          disabled={selectedUserIds.length === 0}
+          loading={createMutation.isPending}
+        >
+          Начать чат
+        </Button>
+      </div>
+    ) : step === 'group' || step === 'school' ? (
+      <div className="flex gap-2">
+        <Button variant="secondary" className="flex-1" onClick={() => setStep('choose')}>
+          Назад
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={() => void (step === 'school' ? submitSchoolWide() : submitGroup())}
+          disabled={!title.trim() || (step === 'group' && selectedUserIds.length === 0)}
+          loading={createMutation.isPending}
+        >
+          {step === 'school' ? 'Создать общий чат' : 'Создать группу'}
+        </Button>
+      </div>
+    ) : undefined;
+
   return (
-    <Modal open={open} onClose={onClose} title={modalTitle} className="max-h-[90vh] overflow-hidden sm:max-w-lg">
+    <Modal open={open} onClose={onClose} title={modalTitle} size="lg" footer={stepFooter}>
       {step === 'choose' && (
         <div className="flex flex-col gap-2">
           {canPersonal && (
@@ -156,7 +187,7 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
       )}
 
       {step === 'personal' && (
-        <div className="flex max-h-[70vh] flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <StudentPickerList
             students={students}
             directions={directions}
@@ -167,24 +198,11 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
             emptyAllLabel="Нет учеников для чата"
           />
           {submitError && <p className="text-caption text-danger">{submitError}</p>}
-          <div className="flex gap-2">
-            <Button variant="secondary" className="flex-1" onClick={() => setStep('choose')}>
-              Назад
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={() => void submitPersonal()}
-              disabled={selectedUserIds.length === 0}
-              loading={createMutation.isPending}
-            >
-              Начать чат
-            </Button>
-          </div>
         </div>
       )}
 
       {(step === 'group' || step === 'school') && (
-        <div className="flex max-h-[70vh] flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex items-start gap-4">
             <ChatAvatarEditor
               value={avatarUrl}
@@ -207,10 +225,10 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
 
           {step === 'school' ? (
             <p className="rounded-xl bg-surface-elevated px-3 py-3 text-body-sm text-text-secondary">
-              В чат будут добавлены все пользователи школы. Число общих чатов не ограничено.
+              В чат будут добавлены все пользователи школы.
             </p>
           ) : (
-            <div className="flex min-h-0 max-h-[36vh] flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <p className="text-sm font-medium">Участники</p>
               <StudentPickerList
                 students={students}
@@ -225,19 +243,6 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
           )}
 
           {submitError && <p className="text-caption text-danger">{submitError}</p>}
-          <div className="flex gap-2">
-            <Button variant="secondary" className="flex-1" onClick={() => setStep('choose')}>
-              Назад
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={() => void (step === 'school' ? submitSchoolWide() : submitGroup())}
-              disabled={!title.trim() || (step === 'group' && selectedUserIds.length === 0)}
-              loading={createMutation.isPending}
-            >
-              {step === 'school' ? 'Создать общий чат' : 'Создать группу'}
-            </Button>
-          </div>
         </div>
       )}
     </Modal>

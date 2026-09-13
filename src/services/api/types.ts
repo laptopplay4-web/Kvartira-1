@@ -189,6 +189,7 @@ export interface UploadAttachmentInput {
   mimeType: string;
   size: number;
   dataUrl?: string;
+  kind?: 'voice' | 'file';
 }
 
 export interface ChatApi {
@@ -261,12 +262,19 @@ export interface EventsApi {
   updateEvent(id: string, input: UpdateEventInput, requesterId: string): Promise<SchoolEvent>;
   deleteEvent(id: string, requesterId: string): Promise<void>;
   getRegistration(eventId: string, userId: string): Promise<EventRegistration | null>;
+  getEventParticipants(eventId: string, requesterId: string): Promise<User[]>;
   register(
     eventId: string,
     userId: string,
     application?: CompetitionApplication,
   ): Promise<SchoolEvent>;
   unregister(eventId: string, userId: string): Promise<SchoolEvent>;
+  /** Staff: remove a student from the event roster (frees a seat). */
+  removeEventParticipant(
+    eventId: string,
+    participantUserId: string,
+    requesterId: string,
+  ): Promise<SchoolEvent>;
 }
 
 export interface CreateEventInput {
@@ -417,6 +425,14 @@ export interface UploadAssignmentFileInput {
   dataUrl?: string;
 }
 
+export interface UpdateAssignmentInput {
+  title: string;
+  description: string;
+  groupId: string;
+  dueDate?: string;
+  contentBlocks: Omit<AssignmentContentBlock, 'id'>[];
+}
+
 export interface AssignmentsApi {
   getAssignments(filters: {
     requesterId: string;
@@ -425,6 +441,12 @@ export interface AssignmentsApi {
   }): Promise<Assignment[]>;
   getAssignment(id: string, requesterId: string): Promise<Assignment>;
   createAssignment(input: CreateAssignmentInput, teacherId: string): Promise<Assignment>;
+  updateAssignment(
+    id: string,
+    input: UpdateAssignmentInput,
+    requesterId: string,
+  ): Promise<Assignment>;
+  deleteAssignment(id: string, requesterId: string): Promise<void>;
   uploadAssignmentFile(
     input: UploadAssignmentFileInput,
     userId: string,

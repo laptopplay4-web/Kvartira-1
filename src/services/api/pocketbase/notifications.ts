@@ -13,6 +13,7 @@ import {
   createDefaultNotificationPreferences,
   mergeNotificationPreferences,
   notificationRequiresAction,
+  sortNotificationsChronologically,
 } from '@/services/notifications/helpers';
 import { validateNotificationPreferencesInput } from '@/services/notifications/validation';
 import type { PushSubscriptionInput, UpdateNotificationPreferencesInput, User } from '@/types';
@@ -88,9 +89,8 @@ export const pocketbaseNotificationsApi: NotificationsApi = {
       const pb = getPocketBase();
       const records = await pb.collection('notifications').getFullList({
         filter: userFilter(userId),
-        sort: '-id',
       });
-      return records.map(mapNotificationRecord);
+      return sortNotificationsChronologically(records.map(mapNotificationRecord));
     });
   },
 
@@ -141,8 +141,10 @@ export const pocketbaseNotificationsApi: NotificationsApi = {
       const updated = mergeNotificationPreferences(current, input);
 
       const pb = getPocketBase();
+      // Explicit boolean — PB required bool treats JSON `false` as blank
+      // (fixed by migration 1791276800: pushEnabled optional).
       const saved = await pb.collection('notification_preferences').update(record.id, {
-        pushEnabled: updated.pushEnabled,
+        pushEnabled: updated.pushEnabled === true,
       });
       return mapNotificationPreferencesRecord(saved);
     });

@@ -214,7 +214,7 @@ export const conversations: Conversation[] = [
     id: 'conv-2',
     type: 'study',
     title: 'Группа: Вокал — начальный',
-    participantIds: ['user-student', 'user-teacher-1', 'user-student-2'],
+    participantIds: ['user-student', 'user-teacher-1', 'user-student-2', 'user-admin'],
     createdAt: twoDaysAgo,
     updatedAt: dayAgo,
     lastMessageAt: dayAgo,
@@ -283,6 +283,7 @@ export const conversationMembers: ConversationMember[] = [
   { conversationId: 'conv-2', userId: 'user-student', role: 'member', joinedAt: twoDaysAgo, lastReadMessageId: 'msg-4', lastReadAt: dayAgo, muted: false },
   { conversationId: 'conv-2', userId: 'user-teacher-1', role: 'owner', joinedAt: twoDaysAgo, lastReadMessageId: 'msg-4', lastReadAt: dayAgo, muted: false },
   { conversationId: 'conv-2', userId: 'user-student-2', role: 'member', joinedAt: twoDaysAgo, muted: false },
+  { conversationId: 'conv-2', userId: 'user-admin', role: 'member', joinedAt: twoDaysAgo, muted: false },
   { conversationId: 'conv-3', userId: 'user-teacher-1', role: 'member', joinedAt: dayAgo, lastReadMessageId: 'msg-5', lastReadAt: hourAgo, muted: false },
   { conversationId: 'conv-3', userId: 'user-student-2', role: 'member', joinedAt: dayAgo, muted: false },
   { conversationId: 'conv-4', userId: 'user-admin', role: 'owner', joinedAt: twoDaysAgo, lastReadMessageId: 'msg-7', lastReadAt: seedNow, muted: false },
@@ -378,6 +379,7 @@ export const events: SchoolEvent[] = [
     endTime: '21:00',
     location: 'Концертный зал «Гармония»',
     maxParticipants: 50,
+    registeredCount: 1,
     registeredUserIds: ['user-student'],
   },
   {
@@ -390,6 +392,7 @@ export const events: SchoolEvent[] = [
     endTime: '17:00',
     location: 'Студия 2',
     maxParticipants: 12,
+    registeredCount: 0,
     registeredUserIds: [],
   },
   {
@@ -400,6 +403,7 @@ export const events: SchoolEvent[] = [
     date: format(addDays(today, 21), 'yyyy-MM-dd'),
     startTime: '10:00',
     location: 'Филармония',
+    registeredCount: 0,
     registeredUserIds: [],
   },
 ];
@@ -440,7 +444,7 @@ export const notifications: AppNotification[] = [
 export const initialAssignmentGroups: AssignmentGroup[] = [
   {
     id: 'grp-general',
-    name: 'Общее задание',
+    name: 'Все ученики',
     teacherId: 'user-teacher-1',
     memberIds: ['user-student', 'user-student-2'],
     isGeneral: true,

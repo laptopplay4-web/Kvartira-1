@@ -29,20 +29,28 @@ export function ConfirmDialog({
   disabled,
 }: ConfirmDialogProps) {
   return (
-    <Modal open={open} onClose={onClose} title={title}>
-      <div className="text-body-sm text-text-secondary">{description}</div>
-      <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
-        <Button
-          variant={tone === 'destructive' ? 'destructive' : 'primary'}
-          loading={loading}
-          disabled={disabled}
-          onClick={onConfirm}
-        >
-          {confirmLabel}
-        </Button>
-        <Button variant="secondary" onClick={onClose} disabled={loading}>
-          {cancelLabel}
-        </Button>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      footer={
+        <div className="flex flex-col gap-2 sm:flex-row-reverse">
+          <Button
+            variant={tone === 'destructive' ? 'destructive' : 'primary'}
+            loading={loading}
+            disabled={disabled}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </Button>
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
+            {cancelLabel}
+          </Button>
+        </div>
+      }
+    >
+      <div className="min-w-0 break-words text-body-sm text-text-secondary [overflow-wrap:anywhere]">
+        {description}
       </div>
     </Modal>
   );

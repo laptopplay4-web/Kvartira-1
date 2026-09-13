@@ -6,6 +6,7 @@ import {
   isPassiveUnreadNotification,
   mergeNotificationPreferences,
   shouldDeliverPushNotification,
+  sortNotificationsChronologically,
 } from '@/services/notifications/helpers';
 import { validateNotificationPreferencesInput } from '@/services/notifications/validation';
 
@@ -94,9 +95,9 @@ export function createMockNotificationsApi(
   return {
     async getNotifications(userId) {
       await delay();
-      return db.notifications
-        .filter((n) => n.userId === userId)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return sortNotificationsChronologically(
+        db.notifications.filter((n) => n.userId === userId),
+      );
     },
 
     async markAsRead(id, userId) {

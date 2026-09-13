@@ -56,9 +56,6 @@ export default function AdminDirectionsPage() {
   return (
     <div className="page-container max-w-lg">
       <AdminPageHeader title="Направления" />
-      <p className="mb-4 text-body-sm text-text-secondary">
-        Каталог направлений школы. Стандартные: вокал, гитара, фортепиано.
-      </p>
 
       {!isOnline && (
         <p role="alert" className="mb-3 text-body-sm text-warning">

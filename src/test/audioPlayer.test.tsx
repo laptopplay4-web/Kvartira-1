@@ -68,7 +68,7 @@ describe('AudioPlayer', () => {
     expect(screen.getByRole('button', { name: 'Скорость воспроизведения 1.25×' })).toBeInTheDocument();
   });
 
-  it('shows download link when provided', () => {
+  it('shows download button when provided', () => {
     render(
       <AudioPlayer
         src="mock://audio/demo.mp3"
@@ -77,14 +77,36 @@ describe('AudioPlayer', () => {
       />,
     );
 
-    expect(screen.getByRole('link', { name: 'Скачать аудио' })).toHaveAttribute(
-      'href',
-      'mock://audio/demo.mp3',
-    );
+    expect(screen.getByRole('button', { name: 'Скачать аудио' })).toBeInTheDocument();
   });
 
   it('uses compact styling for chat variant', () => {
     render(<AudioPlayer src="mock://audio/demo.mp3" variant="compact" isOwn />);
     expect(screen.getByTestId('audio-player')).toHaveClass('border-brand/30');
+  });
+
+  it('hides volume and speed when disabled', () => {
+    render(
+      <AudioPlayer
+        src="mock://audio/demo.mp3"
+        title="track.mp3"
+        downloadUrl="mock://audio/demo.mp3"
+        downloadFilename="track.mp3"
+        showVolume={false}
+        showSpeed={false}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /Скорость/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Громкость|Включить звук/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Скачать аудио' })).toBeInTheDocument();
+    expect(screen.getByText('track.mp3')).toBeInTheDocument();
+  });
+
+  it('hides controls row for voice-like chat player', () => {
+    render(<AudioPlayer src="mock://audio/voice.webm" showVolume={false} showSpeed={false} />);
+
+    expect(screen.queryByRole('button', { name: /Скорость/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Скачать аудио' })).not.toBeInTheDocument();
   });
 });

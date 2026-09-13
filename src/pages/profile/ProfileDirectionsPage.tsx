@@ -72,13 +72,13 @@ export default function ProfileDirectionsPage() {
     user.role === 'student'
       ? 'Направления обучения'
       : user.role === 'admin'
-        ? 'Направления (по желанию)'
+        ? 'Направления'
         : 'Направления преподавания';
   const hint =
     user.role === 'student'
       ? 'Можно добавить новое направление, если перешли в другую группу'
       : user.role === 'admin'
-        ? 'Выберите направления, если ведёте занятия. Можно оставить пустым — без всплывающих окон.'
+        ? undefined
         : 'Можно добавить направление после повышения квалификации';
 
   const saveDisabled =
@@ -90,8 +90,8 @@ export default function ProfileDirectionsPage() {
   return (
     <div className="page-container max-w-lg">
       <BackLink label="Профиль" fallbackTo="/profile" />
-      <h1 className="text-h1 mb-2">Направления</h1>
-      <p className="mb-6 text-body-sm text-text-secondary">{hint}</p>
+      <h1 className={`text-h1 ${hint ? 'mb-2' : 'mb-6'}`}>Направления</h1>
+      {hint ? <p className="mb-6 text-body-sm text-text-secondary">{hint}</p> : null}
 
       {!isOnline && (
         <p role="alert" className="mb-3 text-body-sm text-warning">
@@ -139,9 +139,6 @@ export default function ProfileDirectionsPage() {
               disabled={!isOnline || mutation.isPending}
               error={error}
               label={label}
-              hint={
-                user.role === 'admin' ? 'Необязательно — отметьте только то, что ведёте' : undefined
-              }
             />
             <Button type="submit" disabled={saveDisabled} loading={mutation.isPending}>
               {saved ? 'Сохранено' : 'Сохранить'}

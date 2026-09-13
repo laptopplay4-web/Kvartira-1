@@ -27,7 +27,16 @@ export function AvailabilityIntervalModal({
   error,
 }: AvailabilityIntervalModalProps) {
   return (
-    <Modal open={open} onClose={onClose} title="Интервал между занятиями">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Интервал между занятиями"
+      footer={
+        <Button fullWidth onClick={onClose}>
+          Готово
+        </Button>
+      }
+    >
       <p className="mb-4 text-body-sm text-text-secondary">
         Минимальный промежуток между началом соседних слотов для записи.
       </p>
@@ -52,9 +61,6 @@ export function AvailabilityIntervalModal({
           </p>
         )}
       </fieldset>
-      <Button className="mt-6" fullWidth onClick={onClose}>
-        Готово
-      </Button>
     </Modal>
   );
 }

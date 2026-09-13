@@ -11,10 +11,11 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { format } from 'date-fns';
 import { cn } from '@/utils';
-import { useMarkPassiveNotificationsOnLeave } from '@/hooks/useMarkPassiveNotificationsOnLeave';
 import {
   isPassiveUnreadNotification,
   markPassiveNotificationsReadInList,
+  showsInNotificationsInbox,
+  sortNotificationsChronologically,
 } from '@/services/notifications/helpers';
 import type { AppNotification } from '@/types';
 
@@ -22,12 +23,14 @@ export default function NotificationsPage() {
   const user = useCurrentUser()!;
   const queryClient = useQueryClient();
 
-  useMarkPassiveNotificationsOnLeave(user.id);
-
-  const { data: notifications, isLoading, error, refetch } = useQuery({
+  const { data: notificationsRaw, isLoading, error, refetch } = useQuery({
     queryKey: ['notifications', user.id],
     queryFn: () => api.notifications.getNotifications(user.id),
   });
+
+  const notifications = notificationsRaw
+    ? sortNotificationsChronologically(notificationsRaw.filter(showsInNotificationsInbox))
+    : undefined;
 
   const markAllMutation = useMutation({
     mutationFn: () => api.notifications.markAllAsRead(user.id),

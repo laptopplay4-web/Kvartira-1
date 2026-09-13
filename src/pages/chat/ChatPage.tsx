@@ -16,10 +16,11 @@ import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useSearchMessages } from '@/hooks/useSearchMessages';
 import { useBackNavigation } from '@/hooks/useBackNavigation';
+import { useClearChatSeen } from '@/hooks/useClearChatSeen';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { canManageChats } from '@/services/chat/access';
 import { canPinMessage } from '@/services/chat/messages';
-import { getConversationDisplayTitle, isGroupLike, orderPinnedMessagesNewestFirst } from '@/services/chat/helpers';
+import { getConversationDisplayTitle, isGroupLike, orderPinnedMessagesNewestFirst, sortConversationsWithPins } from '@/services/chat/helpers';
 import type { ChatFilter } from '@/services/chat/helpers';
 import { useConversationMembers } from '@/hooks/useConversationMembers';
 import { ForwardMessageModal } from '@/components/chat/ForwardMessageModal';
@@ -35,6 +36,7 @@ import { PinnedMessageBar } from '@/components/chat/PinnedMessageBar';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ImageViewer } from '@/components/chat/ImageViewer';
 import { ConversationSettings } from '@/components/chat/ConversationSettings';
+import { ChatVoicePlaybackProvider, ChatVoiceSpeedBar } from '@/components/chat/ChatVoicePlayback';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { IconButton } from '@/components/ui/IconButton';
@@ -175,13 +177,13 @@ export default function ChatPage() {
     onMutate: async ({ conversationId, pinned }) => {
       await queryClient.cancelQueries({ queryKey: ['conversations', user.id] });
       const previous = queryClient.getQueryData<Conversation[]>(['conversations', user.id]);
-      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
-        (old ?? []).map((c) =>
-          c.id === conversationId
-            ? { ...c, viewerPinnedAt: pinned ? new Date().toISOString() : null }
-            : c,
-        ),
-      );
+      const pinnedAt = pinned ? new Date().toISOString() : null;
+      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) => {
+        const next = (old ?? []).map((c) =>
+          c.id === conversationId ? { ...c, viewerPinnedAt: pinnedAt } : c,
+        );
+        return sortConversationsWithPins(next, [], user.id);
+      });
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
@@ -203,6 +205,8 @@ export default function ChatPage() {
   const { data: members } = useConversationMembers(activeId, user.id);
 
   const messages = flattenMessages(messagePages?.pages);
+  const latestMessageId = messages[messages.length - 1]?.id ?? null;
+  useClearChatSeen(activeId, user.id, latestMessageId);
   const { typingText } = useTypingIndicator(activeId, user.id, users ?? []);
 
   const pinnedIds = activeConversation?.pinnedMessageIds ?? [];
@@ -243,21 +247,6 @@ export default function ChatPage() {
     orderedPinned.length > 0
       ? orderedPinned[pinnedCycleIndex % orderedPinned.length]
       : undefined;
-
-  useEffect(() => {
-    if (!activeId) {
-      api.chat.setOpenConversation(user.id, null);
-      return;
-    }
-    api.chat.setOpenConversation(user.id, activeId);
-    api.chat.markAsRead(activeId, user.id).then(() => {
-      refetchList();
-      queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
-    });
-    return () => {
-      api.chat.setOpenConversation(user.id, null);
-    };
-  }, [activeId, user.id, refetchList, queryClient]);
 
   useEffect(() => {
     if (!isOnline) {
@@ -488,7 +477,7 @@ export default function ChatPage() {
   const conversationPanel = (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       {activeId ? (
-        <>
+        <ChatVoicePlaybackProvider conversationId={activeId}>
           <ChatHeader
             conversation={activeConversation}
             currentUserId={user.id}
@@ -497,6 +486,8 @@ export default function ChatPage() {
             showBack
             onBack={handleBack}
           />
+
+          <ChatVoiceSpeedBar />
 
           {pinnedMessage && orderedPinned.length > 0 && (
             <PinnedMessageBar
@@ -599,7 +590,7 @@ export default function ChatPage() {
               />
             </>
           )}
-        </>
+        </ChatVoicePlaybackProvider>
       ) : (
         <>
           <ChatHeader currentUserId={user.id} currentUser={user} users={users ?? []} />

@@ -42,19 +42,8 @@ export function AddGroupMembersModal({
       open={open}
       onClose={handleClose}
       title="Добавить участников"
-      className="max-h-[90vh] overflow-hidden sm:max-w-lg"
-    >
-      <div className="flex max-h-[70vh] flex-col gap-4">
-        <StudentPickerList
-          students={students}
-          directions={directions}
-          selectedIds={selectedIds}
-          onChange={setSelectedIds}
-          mode="multiple"
-          disabled={disabled || loading}
-          emptyAllLabel="Все ученики уже в группе"
-        />
-
+      size="lg"
+      footer={
         <Button
           type="button"
           fullWidth
@@ -65,7 +54,17 @@ export function AddGroupMembersModal({
           Добавить участников
           {selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
         </Button>
-      </div>
+      }
+    >
+      <StudentPickerList
+        students={students}
+        directions={directions}
+        selectedIds={selectedIds}
+        onChange={setSelectedIds}
+        mode="multiple"
+        disabled={disabled || loading}
+        emptyAllLabel="Все ученики уже в группе"
+      />
     </Modal>
   );
 }

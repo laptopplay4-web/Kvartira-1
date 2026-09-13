@@ -15,7 +15,7 @@
 ## Нужно сделать вам перед запуском
 
 1. Выложить фронт + `pb_hooks` + миграции (`1790227200`, `1790313600`, `1790400000` и ранее некатанные) и **перезапустить PocketBase**.
-2. В `/admin/registration-qr` нажать **Сменить** токен (seed-токен в production отвергается).
+2. В `/admin/registration-qr` открыть страницу (seed автоматически заменяется) и **распечатать** QR; при компрометации — «Новый QR».
 3. Задать секреты: `WEB_PUSH_RELAY_SECRET`, VAPID, HTTPS, `VITE_API_MODE=pocketbase`.
 4. Подключить `deploy/security-headers.conf` на nginx.
 5. Отдать шаблонные тексты документов юристу (`docs/ROSKOMNADZOR_CHECKLIST.md`).

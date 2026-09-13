@@ -19,8 +19,13 @@ const PB_MESSAGE_MAP: Record<string, { message: string; code: string }> = {
     code: 'INVALID_CREDENTIALS',
   },
   'Something went wrong while processing your request.': {
-    message: 'Не удалось войти. Проверьте телефон и пароль или попробуйте позже.',
+    message: 'Не удалось выполнить запрос. Если проблема повторяется — примените миграции PocketBase и перезапустите сервер.',
     code: 'SERVER_ERROR',
+  },
+  'Failed to delete record. Make sure that the record is not part of a required relation reference.': {
+    message:
+      'Не удалось удалить мероприятие: есть связанные записи. Примените миграцию cascade и перезапустите PocketBase.',
+    code: 'CONFLICT',
   },
 };
 
@@ -31,8 +36,11 @@ const PB_FIELD_MESSAGE_MAP: Record<string, string> = {
   'Must be a valid URL.': 'Не удалось сохранить иконку. Примените миграции PocketBase и перезапустите сервер',
   'Must be at most 5000 character(s).': 'Изображение слишком большое',
   'The length must be no more than 5000.': 'Изображение слишком большое',
-  'invalid purpose': 'Недопустимый тип файла',
-  'invalid value avatar.': 'Сервер не настроен для аватаров — примените миграции PocketBase и перезапустите serve',
+  'invalid purpose': 'Недопустимый тип файла. Примените миграции PocketBase (purpose event) и перезапустите сервер',
+  'invalid value event.':
+    'Сервер не настроен для фото мероприятий — примените миграции PocketBase и перезапустите serve',
+  'Invalid value event.':
+    'Сервер не настроен для фото мероприятий — примените миграции PocketBase и перезапустите serve',
 };
 
 function extractPbFieldError(data: unknown): string | null {

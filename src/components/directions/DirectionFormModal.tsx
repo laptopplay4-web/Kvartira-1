@@ -61,13 +61,33 @@ export function DirectionFormModal({
   });
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Редактировать направление' : 'Новое направление'}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? 'Редактировать направление' : 'Новое направление'}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            type="submit"
+            form="direction-form-modal"
+            loading={mutation.isPending}
+            disabled={!isOnline || !name.trim()}
+          >
+            {isEdit ? 'Сохранить' : 'Создать'}
+          </Button>
+        </div>
+      }
+    >
       {!isOnline && (
         <p role="alert" className="mb-3 text-body-sm text-warning">
           {OFFLINE_NETWORK_MESSAGE}
         </p>
       )}
       <form
+        id="direction-form-modal"
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
@@ -98,14 +118,6 @@ export function DirectionFormModal({
             {error}
           </p>
         )}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button type="submit" loading={mutation.isPending} disabled={!isOnline || !name.trim()}>
-            {isEdit ? 'Сохранить' : 'Создать'}
-          </Button>
-        </div>
       </form>
     </Modal>
   );

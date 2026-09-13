@@ -2,6 +2,7 @@ import { can } from '@/permissions';
 import type { Conversation, ConversationMember, Message, MessageReaction, User } from '@/types';
 import { MESSAGE_EDIT_WINDOW_MS } from './constants';
 import { isGroupConversation } from './access';
+import { isSyntheticMediaCaption } from './attachments';
 
 export const DELETED_MESSAGE_TEXT = 'Сообщение удалено';
 
@@ -15,6 +16,7 @@ export function isSystemMessage(message: Message): boolean {
 
 export function getMessageDisplayText(message: Message): string {
   if (isMessageDeleted(message)) return DELETED_MESSAGE_TEXT;
+  if (isSyntheticMediaCaption(message.text, message.attachments)) return '';
   return message.text;
 }
 

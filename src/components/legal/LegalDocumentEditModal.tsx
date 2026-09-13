@@ -61,8 +61,29 @@ export function LegalDocumentEditModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Редактировать документ">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Редактировать документ"
+      size="lg"
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="ghost" className="flex-1 min-h-11" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            type="submit"
+            form="legal-edit-form"
+            className="flex-1 min-h-11"
+            loading={saveMutation.isPending}
+            disabled={!isOnline}
+          >
+            Сохранить
+          </Button>
+        </div>
+      }
+    >
+      <form id="legal-edit-form" onSubmit={handleSubmit} className="space-y-4">
         {!isOnline && (
           <p className="text-body-sm text-warning" role="alert">
             {OFFLINE_NETWORK_MESSAGE}
@@ -96,14 +117,6 @@ export function LegalDocumentEditModal({
             {error}
           </p>
         )}
-        <div className="flex gap-2">
-          <Button type="button" variant="ghost" className="flex-1 min-h-11" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button type="submit" className="flex-1 min-h-11" loading={saveMutation.isPending} disabled={!isOnline}>
-            Сохранить
-          </Button>
-        </div>
       </form>
     </Modal>
   );

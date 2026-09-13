@@ -1,6 +1,7 @@
 import type { Conversation, User } from '@/types';
 import type { ChatFilter } from '@/services/chat/helpers';
 import { filterConversations } from '@/services/chat/helpers';
+import { useConversationListFlip } from '@/hooks/useConversationListFlip';
 import { ConversationItem } from './ConversationItem';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -44,6 +45,9 @@ export function ConversationList({
     users,
   });
 
+  const orderKey = filtered.map((c) => c.id).join('|');
+  const listRef = useConversationListFlip(orderKey);
+
   if (isLoading) {
     return (
       <div className="space-y-2 p-3">
@@ -70,21 +74,38 @@ export function ConversationList({
     );
   }
 
+  const firstUnpinnedIndex = filtered.findIndex((c) => !c.viewerPinnedAt);
+  const showPinDivider =
+    firstUnpinnedIndex > 0 && filtered.some((c) => !!c.viewerPinnedAt);
+
   return (
-    <div className="flex min-h-full flex-col gap-0.5 p-2" role="list" aria-label="Список чатов">
-      {filtered.map((conv) => (
-        <ConversationItem
-          key={conv.id}
-          conversation={conv}
-          currentUser={currentUser}
-          users={users}
-          isActive={conv.id === activeId}
-          onClick={() => onSelect(conv.id)}
-          onEdit={() => onEdit(conv)}
-          onDelete={() => onDelete(conv)}
-          onPin={(pinned) => onPin(conv, pinned)}
-          onMute={(muted) => onMute(conv, muted)}
-        />
+    <div
+      ref={listRef}
+      className="flex min-h-full flex-col gap-0.5 p-2"
+      role="list"
+      aria-label="Список чатов"
+    >
+      {filtered.map((conv, index) => (
+        <div key={conv.id} data-flip-id={conv.id}>
+          {showPinDivider && index === firstUnpinnedIndex && (
+            <div
+              className="mx-3 my-1.5 border-t border-border-subtle/70"
+              role="separator"
+              aria-label="Закреплённые чаты"
+            />
+          )}
+          <ConversationItem
+            conversation={conv}
+            currentUser={currentUser}
+            users={users}
+            isActive={conv.id === activeId}
+            onClick={() => onSelect(conv.id)}
+            onEdit={() => onEdit(conv)}
+            onDelete={() => onDelete(conv)}
+            onPin={(pinned) => onPin(conv, pinned)}
+            onMute={(muted) => onMute(conv, muted)}
+          />
+        </div>
       ))}
     </div>
   );

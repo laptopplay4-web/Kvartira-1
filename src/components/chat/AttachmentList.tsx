@@ -1,9 +1,11 @@
 import { cn } from '@/utils';
-import { formatFileSize } from '@/services/chat/attachments';
+import { formatFileSize, isVoiceAttachment } from '@/services/chat/attachments';
 import { downloadFromUrl } from '@/utils/files';
 import type { MessageAttachment } from '@/types';
-import { FileText, Film, Image as ImageIcon } from 'lucide-react';
-import { AudioPlayer } from '@/components/ui/AudioPlayer';
+import { Download, FileText } from 'lucide-react';
+import { AudioPlayer, type AudioPlayerHandle } from '@/components/ui/AudioPlayer';
+import { useChatVoicePlayback } from './ChatVoicePlayback';
+import { useRef } from 'react';
 
 interface AttachmentListProps {
   attachments: MessageAttachment[];
@@ -27,13 +29,13 @@ export function AttachmentList({ attachments, isOwn, onImageClick }: AttachmentL
               type="button"
               onClick={() => onImageClick?.(att, i)}
               className="overflow-hidden rounded-lg focus-ring"
-              aria-label={`Открыть ${att.filename}`}
+              aria-label="Открыть фото"
             >
               {att.url ? (
-                <img src={att.url} alt={att.filename} className="max-h-48 max-w-full w-full object-cover" loading="lazy" />
+                <img src={att.url} alt="" className="max-h-48 max-w-full w-full object-cover" loading="lazy" />
               ) : (
                 <div className="flex h-24 items-center justify-center bg-surface">
-                  <ImageIcon className="h-8 w-8 text-text-muted" />
+                  <span className="text-caption text-text-muted">Фото</span>
                 </div>
               )}
             </button>
@@ -49,6 +51,9 @@ export function AttachmentList({ attachments, isOwn, onImageClick }: AttachmentL
 
 function AttachmentItem({ attachment, isOwn }: { attachment: MessageAttachment; isOwn?: boolean }) {
   if (attachment.type === 'audio' && attachment.url) {
+    if (isVoiceAttachment(attachment)) {
+      return <ChatVoiceAttachment attachment={attachment} isOwn={isOwn} />;
+    }
     return (
       <AudioPlayer
         src={attachment.url}
@@ -57,11 +62,42 @@ function AttachmentItem({ attachment, isOwn }: { attachment: MessageAttachment; 
         downloadFilename={attachment.filename}
         variant="compact"
         isOwn={isOwn}
+        showVolume={false}
+        showSpeed={false}
       />
     );
   }
 
-  const Icon = attachment.type === 'video' ? Film : FileText;
+  if (attachment.type === 'video' && attachment.url) {
+    return (
+      <div className="relative min-w-0 max-w-full overflow-hidden rounded-lg">
+        <video
+          src={attachment.url}
+          controls
+          playsInline
+          preload="metadata"
+          className="max-h-64 w-full rounded-lg bg-black object-contain"
+          aria-label="Видео"
+        >
+          <track kind="captions" />
+        </video>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void downloadFromUrl(attachment.url!, attachment.filename || 'video.mp4').catch(() => {
+              /* keep in-app */
+            });
+          }}
+          className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/75 focus-ring"
+          aria-label="Скачать видео"
+        >
+          <Download className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <button
@@ -75,11 +111,45 @@ function AttachmentItem({ attachment, isOwn }: { attachment: MessageAttachment; 
         isOwn ? 'border-brand-contrast/20' : 'border-border-subtle',
       )}
     >
-      <Icon className="h-5 w-5 shrink-0 opacity-70" aria-hidden />
+      <FileText className="h-5 w-5 shrink-0 opacity-70" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{attachment.filename}</p>
         <p className="text-caption opacity-70">{formatFileSize(attachment.size)}</p>
       </div>
     </button>
+  );
+}
+
+function ChatVoiceAttachment({
+  attachment,
+  isOwn,
+}: {
+  attachment: MessageAttachment;
+  isOwn?: boolean;
+}) {
+  const ctx = useChatVoicePlayback();
+  const handleRef = useRef<AudioPlayerHandle | null>(null);
+
+  if (!attachment.url) return null;
+
+  return (
+    <AudioPlayer
+      src={attachment.url}
+      variant="compact"
+      isOwn={isOwn}
+      showVolume={false}
+      showSpeed={false}
+      playbackRate={ctx?.speed}
+      playerRef={(handle) => {
+        handleRef.current = handle;
+        ctx?.registerHandle(attachment.id, handle);
+      }}
+      onPlayRequest={() => {
+        if (ctx && handleRef.current) ctx.claimPlay(attachment.id, handleRef.current);
+      }}
+      onPlayingChange={(playing) => {
+        if (!playing) ctx?.notifyStopped(attachment.id);
+      }}
+    />
   );
 }

@@ -38,11 +38,12 @@ function syncConversationLastMessage(app, conversationId) {
 
   try {
     const conv = app.findRecordById('conversations', conversationId);
+    // Sort by created (not id) — PB ids are not chronological.
     const msgs = app.findRecordsByFilter(
       'messages',
       `conversation = "${conversationId}"`,
-      '-id',
-      200,
+      '-created',
+      50,
       0,
     );
 
@@ -190,6 +191,116 @@ function joinUserToSchoolWideChats(app, userId) {
   }
 }
 
+/**
+ * @param {core.App} app
+ * @param {string} conversationId
+ * @param {string} userId
+ */
+function ensureMemberInConversation(app, conversationId, userId) {
+  if (!conversationId || !userId) return;
+
+  try {
+    app.findFirstRecordByFilter(
+      'conversation_members',
+      `conversation = "${conversationId}" && user = "${userId}"`,
+    );
+    return;
+  } catch (_) {
+    /* not found — add */
+  }
+
+  const membersCol = app.findCollectionByNameOrId('conversation_members');
+  const member = new Record(membersCol);
+  member.set('conversation', conversationId);
+  member.set('user', userId);
+  member.set('role', 'member');
+  member.set('muted', null);
+  app.save(member);
+
+  try {
+    const conv = app.findRecordById('conversations', conversationId);
+    let participantIds = [];
+    try {
+      const rawIds = conv.get('participantIds');
+      if (Array.isArray(rawIds)) participantIds = rawIds.map(String);
+    } catch (_) {
+      participantIds = [];
+    }
+    if (!participantIds.includes(userId)) {
+      participantIds.push(userId);
+      conv.set('participantIds', participantIds);
+      app.save(conv);
+    }
+  } catch (err) {
+    console.error('ensureMemberInConversation participants', err);
+  }
+}
+
+/**
+ * After a group chat is created — every admin becomes a member.
+ *
+ * @param {core.App} app
+ * @param {core.Record} conversationRecord
+ */
+function joinAdminsToGroupConversation(app, conversationRecord) {
+  if (!conversationRecord) return;
+  const type = String(conversationRecord.getString('type') || '');
+  if (type === 'personal') return;
+
+  const convId = String(conversationRecord.id);
+  /** @type {core.Record[]} */
+  let admins = [];
+  try {
+    admins = app.findRecordsByFilter('users', 'role = "admin"', '-id', 100, 0) || [];
+  } catch (_) {
+    admins = [];
+  }
+  if (!Array.isArray(admins)) admins = [];
+
+  for (const admin of admins) {
+    try {
+      ensureMemberInConversation(app, convId, String(admin.id));
+    } catch (err) {
+      console.error('joinAdminsToGroupConversation', err);
+    }
+  }
+}
+
+/**
+ * When a user becomes admin — join every non-personal conversation.
+ *
+ * @param {core.App} app
+ * @param {string} userId
+ */
+function joinAdminToAllGroupChats(app, userId) {
+  if (!userId) return;
+
+  try {
+    /** @type {core.Record[]} */
+    let convs = [];
+    try {
+      convs = app.findRecordsByFilter('conversations', 'type != "personal"', '-id', 500, 0) || [];
+    } catch (_) {
+      // Fallback: scan all and filter in JS (older PB filter quirks)
+      try {
+        convs = (app.findRecordsByFilter('conversations', '', '-id', 500, 0) || []).filter(
+          (c) => String(c.getString('type') || '') !== 'personal',
+        );
+      } catch (_) {
+        convs = [];
+      }
+    }
+    if (!Array.isArray(convs)) convs = [];
+
+    for (const conv of convs) {
+      if (String(conv.getString('type') || '') === 'personal') continue;
+      ensureMemberInConversation(app, String(conv.id), userId);
+    }
+  } catch (err) {
+    console.error('joinAdminToAllGroupChats', err);
+  }
+}
+
 function isUsersAuth(auth) {
   if (!auth) return false;
   try {
@@ -246,5 +357,7 @@ module.exports = {
   syncConversationLastMessage,
   syncReadReceipts,
   joinUserToSchoolWideChats,
+  joinAdminsToGroupConversation,
+  joinAdminToAllGroupChats,
   assertConversationPinUpdate,
 };

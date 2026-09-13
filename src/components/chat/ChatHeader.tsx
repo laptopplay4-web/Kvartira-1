@@ -72,7 +72,12 @@ export function ChatHeader({
           )}
 
           {isGroup ? (
-            <>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Настройки чата"
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-ring"
+            >
               {conversation.avatarUrl && isDisplayableAvatarSrc(conversation.avatarUrl) ? (
                 <img
                   src={conversation.avatarUrl}
@@ -80,7 +85,7 @@ export function ChatHeader({
                   className="h-9 w-9 shrink-0 rounded-full object-cover"
                 />
               ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-muted text-accent">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-muted text-accent">
                   <Users className="h-4 w-4" aria-hidden />
                 </div>
               )}
@@ -91,7 +96,7 @@ export function ChatHeader({
                   {memberCount === 1 ? 'участник' : memberCount < 5 ? 'участника' : 'участников'}
                 </p>
               </div>
-            </>
+            </button>
           ) : other ? (
             <UserPreviewTrigger
               user={other}
@@ -113,12 +118,11 @@ export function ChatHeader({
             </div>
           )}
 
-          <IconButton
-            label="Настройки чата"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <MoreHorizontal className="h-5 w-5" aria-hidden />
-          </IconButton>
+          {!isGroup && (
+            <IconButton label="Настройки чата" onClick={() => setSettingsOpen(true)}>
+              <MoreHorizontal className="h-5 w-5" aria-hidden />
+            </IconButton>
+          )}
         </div>
 
         {lesson && (

@@ -32,11 +32,11 @@ const LESSON_ACCESS = `${ADMIN} || student = @request.auth.id || teacher = @requ
 /** lesson_history: lesson participants + admin */
 const LESSON_HISTORY_ACCESS = `${ADMIN} || (@collection.lessons.id ?= lesson && (@collection.lessons.student ?= @request.auth.id || @collection.lessons.teacher ?= @request.auth.id))`;
 
-/** assignments:view-all | view-own | view-assigned (group members / general) */
-const ASSIGNMENT_ACCESS = `${ADMIN} || teacher = @request.auth.id || (@collection.assignment_groups.id ?= group && (@collection.assignment_groups.kind = "general" || @collection.assignment_groups.members.id ?= @request.auth.id))`;
+/** assignments:view-all | view-own | view-assigned (group members / general / school-wide name) */
+const ASSIGNMENT_ACCESS = `${ADMIN} || teacher = @request.auth.id || group.kind = "general" || group.name = "Все ученики" || (@collection.assignment_groups.id ?= group && (@collection.assignment_groups.kind = "general" || @collection.assignment_groups.members.id ?= @request.auth.id))`;
 
-/** assignment_groups: teacher owns custom groups; general visible to all auth */
-const ASSIGNMENT_GROUP_ACCESS = `${ADMIN} || teacher = @request.auth.id || kind = "general" || members.id ?= @request.auth.id`;
+/** assignment_groups: teacher owns custom groups; general / school-wide visible to all auth */
+const ASSIGNMENT_GROUP_ACCESS = `${ADMIN} || teacher = @request.auth.id || kind = "general" || name = "Все ученики" || members.id ?= @request.auth.id`;
 
 /** Conversation membership (chat:read) — admin without membership cannot list personal chats */
 const CONVERSATION_MEMBER = `${ADMIN} || (@collection.conversation_members.conversation ?= id && @collection.conversation_members.user ?= @request.auth.id)`;
@@ -47,8 +47,10 @@ const MESSAGE_ACCESS = `${ADMIN} || (@collection.conversation_members.conversati
 /** support:view-own-tickets | view-all-tickets */
 const TICKET_ACCESS = `${ADMIN} || user = @request.auth.id`;
 
-/** kvartira_files — owner, conversation/assignment/ticket participants; school public */
-const FILE_ACCESS = `${ADMIN} || owner = @request.auth.id || purpose = "school" || (purpose = "chat" && contextId != "" && @collection.conversation_members.conversation ?= contextId && @collection.conversation_members.user ?= @request.auth.id) || (purpose = "assignment" && contextId != "" && @collection.assignments.id ?= contextId && (@collection.assignments.teacher ?= @request.auth.id || (@collection.assignment_groups.id ?= @collection.assignments.group && (@collection.assignment_groups.kind = "general" || @collection.assignment_groups.members.id ?= @request.auth.id)))) || (purpose = "support" && contextId != "" && @collection.support_tickets.id ?= contextId && (@collection.support_tickets.user ?= @request.auth.id || @request.auth.role = "admin"))`;
+/** kvartira_files — owner, conversation/assignment/ticket participants; school/event public.
+ * Assignment branch mirrors ASSIGNMENT_ACCESS via nested `@collection.assignments.group.*`
+ * (not a second `@collection.assignment_groups` join — that fails for students). */
+const FILE_ACCESS = `${ADMIN} || owner = @request.auth.id || purpose = "school" || purpose = "event" || (purpose = "chat" && contextId != "" && @collection.conversation_members.conversation ?= contextId && @collection.conversation_members.user ?= @request.auth.id) || (purpose = "assignment" && contextId != "" && @collection.assignments.id ?= contextId && (@collection.assignments.teacher ?= @request.auth.id || @collection.assignments.group.kind = "general" || @collection.assignments.group.name = "Все ученики" || @collection.assignments.group.members.id ?= @request.auth.id)) || (purpose = "support" && contextId != "" && @collection.support_tickets.id ?= contextId && (@collection.support_tickets.user ?= @request.auth.id || @request.auth.role = "admin"))`;
 
 /** Own row or admin */
 const OWN_USER_OR_ADMIN = `${ADMIN} || user = @request.auth.id`;
@@ -164,11 +166,11 @@ const COLLECTION_RULES = {
     deleteRule: `${ADMIN} || ${TEACHER}`,
   },
   event_registrations: {
-    listRule: `${ADMIN} || user = @request.auth.id`,
-    viewRule: `${ADMIN} || user = @request.auth.id`,
-    createRule: `${ADMIN} || (${AUTH} && user = @request.auth.id)`,
+    listRule: `${ADMIN} || ${TEACHER} || user = @request.auth.id`,
+    viewRule: `${ADMIN} || ${TEACHER} || user = @request.auth.id`,
+    createRule: `${AUTH} && user = @request.auth.id && @request.auth.role = "student"`,
     updateRule: `${ADMIN} || user = @request.auth.id`,
-    deleteRule: `${ADMIN} || user = @request.auth.id`,
+    deleteRule: `${ADMIN} || ${TEACHER} || user = @request.auth.id`,
   },
   assignment_groups: {
     listRule: ASSIGNMENT_GROUP_ACCESS,
@@ -181,8 +183,8 @@ const COLLECTION_RULES = {
     listRule: ASSIGNMENT_ACCESS,
     viewRule: ASSIGNMENT_ACCESS,
     createRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
-    updateRule: ASSIGNMENT_ACCESS,
-    deleteRule: `${ADMIN} || (${TEACHER} && teacher = @request.auth.id)`,
+    updateRule: `${ADMIN} || ${TEACHER}`,
+    deleteRule: `${ADMIN} || ${TEACHER}`,
   },
   help_articles: {
     listRule: PUBLIC,

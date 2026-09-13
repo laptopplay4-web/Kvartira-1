@@ -11,6 +11,11 @@ export function canManageEventsAdmin(user: Pick<User, 'role'> | null | undefined
   return canManageEvents(user);
 }
 
+/** Запись на мероприятие — только ученики (не teacher/admin). */
+export function canRegisterForEvents(user: Pick<User, 'role'> | null | undefined): boolean {
+  return !!user && user.role === 'student';
+}
+
 /** Invited events are visible only to users on the invite list (matches mock getEvents/getEvent). */
 export function canViewSchoolEvent(
   userId: string,

@@ -65,6 +65,13 @@ function assertNotificationCreate(app, e) {
 
   const role = auth.getString('role');
   if (role === 'admin') return;
+
+  // Staff may broadcast school-wide event / assignment notices to any student.
+  const type = e.record.getString('type');
+  if ((role === 'teacher' || role === 'admin') && (type === 'event' || type === 'assignment')) {
+    return;
+  }
+
   if (role === 'teacher' && teacherSharesContextWith(app, auth.id, userId)) return;
 
   throw new ApiError(403, 'Нет доступа');
@@ -159,6 +166,7 @@ function createNotificationForUser(app, userId, type, title, body, link) {
     record.set('type', type);
     record.set('title', title);
     record.set('body', body);
+    // Do not set read=false — PB treats required/optional bool false as blank in JSVM.
     if (link) {
       record.set('link', link);
     }

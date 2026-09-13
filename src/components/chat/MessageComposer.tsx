@@ -193,8 +193,9 @@ export function MessageComposer({
         mimeType: file.type || 'audio/webm',
         size: file.size,
         dataUrl,
+        kind: 'voice',
       });
-      onSend({ text: '', attachments: [uploaded] });
+      onSend({ text: '', attachments: [{ ...uploaded, kind: 'voice' }] });
       onClearDraft();
       onCancelReply?.();
     } catch {

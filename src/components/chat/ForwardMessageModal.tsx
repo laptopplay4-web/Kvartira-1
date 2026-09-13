@@ -48,10 +48,35 @@ export function ForwardMessageModal({
         onClose();
       }}
       title="Переслать"
+      footer={
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            className="min-h-11 flex-1"
+            onClick={() => {
+              setSelected([]);
+              onClose();
+            }}
+          >
+            Отмена
+          </Button>
+          <Button
+            className="min-h-11 flex-1"
+            disabled={selected.length === 0 || loading}
+            loading={loading}
+            onClick={() => {
+              onForward(selected);
+              setSelected([]);
+            }}
+          >
+            Переслать
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-3">
         <p className="text-body-sm text-text-secondary">Выберите чат — сообщение скопируется без указания автора.</p>
-        <ul className="max-h-64 space-y-1 overflow-y-auto">
+        <ul className="space-y-1">
           {options.map((conv) => {
             const title = getConversationDisplayTitle(conv, currentUserId, users);
             const active = selected.includes(conv.id);
@@ -86,29 +111,6 @@ export function ForwardMessageModal({
             <li className="py-6 text-center text-body-sm text-text-muted">Нет доступных чатов</li>
           )}
         </ul>
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            className="min-h-11 flex-1"
-            onClick={() => {
-              setSelected([]);
-              onClose();
-            }}
-          >
-            Отмена
-          </Button>
-          <Button
-            className="min-h-11 flex-1"
-            disabled={selected.length === 0 || loading}
-            loading={loading}
-            onClick={() => {
-              onForward(selected);
-              setSelected([]);
-            }}
-          >
-            Переслать
-          </Button>
-        </div>
       </div>
     </Modal>
   );

@@ -657,212 +657,121 @@ export default function LessonDetailPage() {
 
 
 
-      <Modal open={showReschedule} onClose={() => setShowReschedule(false)} title="Перенести занятие">
-
-        <div className="space-y-4">
-
-          <Card padding="sm">
-
-            <p className="text-caption">Текущее</p>
-
-            <p className="text-body-sm tabular-nums">
-
-              {formatTimeRange(lesson.startTime, lesson.durationMinutes)} · {formatFullDate(lesson.date)}
-
-            </p>
-
-          </Card>
-
-          <div>
-
-            <p className="text-label mb-2">Новая дата</p>
-
-            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-
-              {dateOptions.map((d) => (
-
-                <button
-
-                  key={d}
-
-                  type="button"
-
-                  onClick={() => { setNewDate(d); setNewTime(''); }}
-
-                  className={cn(
-
-                    'min-h-11 rounded-lg border px-3 py-2 text-sm focus-ring',
-
-                    newDate === d ? 'border-brand bg-brand-muted' : 'border-border-subtle',
-
-                  )}
-
-                >
-
-                  {d}
-
-                </button>
-
-              ))}
-
-            </div>
-
-          </div>
-
-          {newDate && (
-
-            <div>
-
-              <p className="text-label mb-2">Доступное время</p>
-
-              {rescheduleSlots && rescheduleSlots.length === 0 ? (
-
-                <p className="text-body-sm text-text-secondary">На эту дату нет свободных слотов.</p>
-
-              ) : (
-
-                <div className="grid grid-cols-3 gap-2">
-
-                  {rescheduleSlots?.map((s) => (
-
-                    <button
-
-                      key={s.startTime}
-
-                      type="button"
-
-                      onClick={() => setNewTime(s.startTime)}
-
-                      className={cn(
-
-                        'min-h-11 rounded-lg border py-2 text-sm tabular-nums focus-ring',
-
-                        newTime === s.startTime ? 'border-brand bg-brand-muted' : 'border-border-subtle',
-
-                      )}
-
-                    >
-
-                      {s.startTime}
-
-                    </button>
-
-                  ))}
-
-                </div>
-
-              )}
-
-            </div>
-
-          )}
-
-          {!isOnline && (
-
-            <p className="text-sm text-danger" role="alert">
-
-              {OFFLINE_NETWORK_MESSAGE}
-
-            </p>
-
-          )}
-
-          {error && <p className="text-sm text-danger" role="alert">{error}</p>}
-
+      <Modal
+        open={showReschedule}
+        onClose={() => setShowReschedule(false)}
+        title="Перенести занятие"
+        footer={
           <Button
-
             fullWidth
-
             disabled={!newDate || !newTime || !isOnline}
-
             loading={rescheduleMutation.isPending}
-
             onClick={() => rescheduleMutation.mutate()}
-
           >
-
             {rescheduleMutation.isPending ? 'Переносим...' : 'Перенести'}
-
           </Button>
-
+        }
+      >
+        <div className="space-y-4">
+          <Card padding="sm">
+            <p className="text-caption">Текущее</p>
+            <p className="text-body-sm tabular-nums">
+              {formatTimeRange(lesson.startTime, lesson.durationMinutes)} · {formatFullDate(lesson.date)}
+            </p>
+          </Card>
+          <div>
+            <p className="text-label mb-2">Новая дата</p>
+            <div className="popup-scroll grid max-h-40 grid-cols-2 gap-2">
+              {dateOptions.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => { setNewDate(d); setNewTime(''); }}
+                  className={cn(
+                    'min-h-11 rounded-lg border px-3 py-2 text-sm focus-ring',
+                    newDate === d ? 'border-brand bg-brand-muted' : 'border-border-subtle',
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+          {newDate && (
+            <div>
+              <p className="text-label mb-2">Доступное время</p>
+              {rescheduleSlots && rescheduleSlots.length === 0 ? (
+                <p className="text-body-sm text-text-secondary">На эту дату нет свободных слотов.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {rescheduleSlots?.map((s) => (
+                    <button
+                      key={s.startTime}
+                      type="button"
+                      onClick={() => setNewTime(s.startTime)}
+                      className={cn(
+                        'min-h-11 rounded-lg border py-2 text-sm tabular-nums focus-ring',
+                        newTime === s.startTime ? 'border-brand bg-brand-muted' : 'border-border-subtle',
+                      )}
+                    >
+                      {s.startTime}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {!isOnline && (
+            <p className="text-sm text-danger" role="alert">
+              {OFFLINE_NETWORK_MESSAGE}
+            </p>
+          )}
+          {error && <p className="text-sm text-danger" role="alert">{error}</p>}
         </div>
-
       </Modal>
 
-
-
-      <Modal open={showCancel} onClose={() => setShowCancel(false)} title="Отменить занятие?">
-
-        <div className="space-y-4">
-
-          <p className="text-body-sm text-text-secondary">
-
-            {formatLessonDateTime(lesson.date, lesson.startTime)} · {direction?.name}
-
-          </p>
-
-          <p className="text-body-sm text-text-secondary">
-
-            После отмены слот станет доступен для другой записи.
-
-          </p>
-
-          <textarea
-
-            className="w-full rounded-lg border border-border bg-surface-elevated p-3 text-sm focus-ring"
-
-            placeholder="Причина отмены (необязательно)"
-
-            rows={3}
-
-            value={cancelReason}
-
-            onChange={(e) => setCancelReason(e.target.value)}
-
-          />
-
-          {!isOnline && (
-
-            <p className="text-sm text-danger" role="alert">
-
-              {OFFLINE_NETWORK_MESSAGE}
-
-            </p>
-
-          )}
-
-          {error && <p className="text-sm text-danger" role="alert">{error}</p>}
-
+      <Modal
+        open={showCancel}
+        onClose={() => setShowCancel(false)}
+        title="Отменить занятие?"
+        footer={
           <div className="flex gap-3">
-
             <Button variant="secondary" fullWidth onClick={() => setShowCancel(false)}>
-
               Назад
-
             </Button>
-
             <Button
-
               variant="destructive"
-
               fullWidth
-
               disabled={!isOnline}
-
               loading={cancelMutation.isPending}
-
               onClick={() => cancelMutation.mutate()}
-
             >
-
               {cancelMutation.isPending ? 'Отменяем...' : 'Отменить занятие'}
-
             </Button>
-
           </div>
-
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-body-sm text-text-secondary">
+            {formatLessonDateTime(lesson.date, lesson.startTime)} · {direction?.name}
+          </p>
+          <p className="text-body-sm text-text-secondary">
+            После отмены слот станет доступен для другой записи.
+          </p>
+          <textarea
+            className="w-full rounded-lg border border-border bg-surface-elevated p-3 text-sm focus-ring"
+            placeholder="Причина отмены (необязательно)"
+            rows={3}
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+          />
+          {!isOnline && (
+            <p className="text-sm text-danger" role="alert">
+              {OFFLINE_NETWORK_MESSAGE}
+            </p>
+          )}
+          {error && <p className="text-sm text-danger" role="alert">{error}</p>}
         </div>
-
       </Modal>
 
     </div>

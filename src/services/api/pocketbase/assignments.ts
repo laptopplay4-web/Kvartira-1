@@ -1,11 +1,15 @@
 import { ClientResponseError } from 'pocketbase';
 import type { Assignment, AssignmentContentType, User } from '@/types';
 import { ApiError } from '@/services/api/types';
-import type { AssignmentsApi, CreateAssignmentInput, UploadAssignmentFileInput } from '@/services/api/types';
+import type {
+  AssignmentsApi,
+  CreateAssignmentInput,
+  UpdateAssignmentInput,
+  UploadAssignmentFileInput,
+} from '@/services/api/types';
 import { getPocketBase } from '@/services/api/pocketbase/client';
-import { mapPocketBaseError, withPbError } from '@/services/api/pocketbase/errors';
+import { withPbError } from '@/services/api/pocketbase/errors';
 import {
-  mapAssignmentGroupRecord,
   mapAssignmentRecord,
   mapUserRecord,
 } from '@/services/api/pocketbase/mappers';
@@ -15,11 +19,14 @@ import {
   resolveAssignment,
   uploadStoredFile,
 } from '@/services/api/pocketbase/files';
-import { canCreateAssignment, canViewAssignment } from '@/services/assignments/access';
+import { resolveAssignmentGroupIdForWrite } from '@/services/api/pocketbase/groups';
+import {
+  canCreateAssignment,
+  canManageAssignment,
+} from '@/services/assignments/access';
 import { MAX_CONTENT_BLOCKS_PER_ASSIGNMENT } from '@/services/assignments/constants';
 import { sortAssignmentsByDate } from '@/services/assignments/helpers';
 import { validateAssignmentContentFile, validateContentBlock } from '@/services/assignments/validation';
-import { isGeneralAssignmentGroup } from '@/services/assignments/groups/helpers';
 
 async function getRequesterUser(userId: string): Promise<User> {
   const pb = getPocketBase();
@@ -34,60 +41,14 @@ async function getRequesterUser(userId: string): Promise<User> {
   }
 }
 
-async function loadGroups() {
-  const pb = getPocketBase();
-  const records = await pb.collection('assignment_groups').getFullList({ sort: 'name' });
-  return records.map(mapAssignmentGroupRecord);
-}
-
-async function notifyGroupMembers(groupId: string, title: string, body: string, link: string) {
-  const pb = getPocketBase();
-  try {
-    const groupRecord = await pb.collection('assignment_groups').getOne(groupId);
-    const group = mapAssignmentGroupRecord(groupRecord);
-    let memberIds = group.memberIds;
-
-    if (isGeneralAssignmentGroup(group)) {
-      const students = await pb.collection('users').getFullList({ filter: 'role = "student"' });
-      memberIds = students.map((s) => s.id);
-    }
-
-    await Promise.all(
-      memberIds.map((userId) =>
-        pb
-          .collection('notifications')
-          .create({
-            user: userId,
-            type: 'assignment',
-            title,
-            body,
-            read: false,
-            link,
-          })
-          .catch((error) => {
-            const mapped = mapPocketBaseError(error);
-            if (mapped.code !== 'FORBIDDEN') throw error;
-          }),
-      ),
-    );
-  } catch {
-    /* notification is best-effort */
-  }
-}
-
 export const pocketbaseAssignmentsApi: AssignmentsApi = {
   async getAssignments(filters) {
     return withPbError(async () => {
-      const user = await getRequesterUser(filters.requesterId);
       const pb = getPocketBase();
-      const [groups, records] = await Promise.all([
-        loadGroups(),
-        pb.collection('assignments').getFullList({ sort: '-id' }),
-      ]);
+      // Trust PocketBase list rules. Client canView + incomplete group list hid school-wide ДЗ.
+      const records = await pb.collection('assignments').getFullList({ sort: '-id' });
 
-      let list = records
-        .map(mapAssignmentRecord)
-        .filter((assignment) => canViewAssignment(user, assignment, groups));
+      let list = records.map(mapAssignmentRecord);
 
       if (filters.groupId) {
         list = list.filter((a) => a.groupId === filters.groupId);
@@ -101,9 +62,8 @@ export const pocketbaseAssignmentsApi: AssignmentsApi = {
     });
   },
 
-  async getAssignment(id, requesterId) {
+  async getAssignment(id, _requesterId) {
     return withPbError(async () => {
-      const user = await getRequesterUser(requesterId);
       const pb = getPocketBase();
       let record;
       try {
@@ -115,12 +75,7 @@ export const pocketbaseAssignmentsApi: AssignmentsApi = {
         throw error;
       }
 
-      const assignment = mapAssignmentRecord(record);
-      const groups = await loadGroups();
-      if (!canViewAssignment(user, assignment, groups)) {
-        throw new ApiError('Нет доступа к заданию', 'FORBIDDEN', 403);
-      }
-      return resolveAssignment(assignment);
+      return resolveAssignment(mapAssignmentRecord(record));
     });
   },
 
@@ -189,14 +144,7 @@ export const pocketbaseAssignmentsApi: AssignmentsApi = {
 
     return withPbError(async () => {
       const pb = getPocketBase();
-      try {
-        await pb.collection('assignment_groups').getOne(input.groupId);
-      } catch (error) {
-        if (error instanceof ClientResponseError && error.status === 404) {
-          throw new ApiError('Группа не найдена', 'NOT_FOUND', 404);
-        }
-        throw error;
-      }
+      const groupId = await resolveAssignmentGroupIdForWrite(input.groupId, teacherId);
 
       const contentBlocks = input.contentBlocks.map((block, index) => ({
         ...block,
@@ -208,7 +156,7 @@ export const pocketbaseAssignmentsApi: AssignmentsApi = {
         title: input.title.trim(),
         description: input.description.trim(),
         teacher: teacherId,
-        group: input.groupId,
+        group: groupId,
         dueDate: input.dueDate || '',
         contentBlocks,
       });
@@ -216,14 +164,100 @@ export const pocketbaseAssignmentsApi: AssignmentsApi = {
       const assignment = mapAssignmentRecord(record);
       const fileIds = collectStoredFileIds(...contentBlocks.map((b) => b.url));
       await linkStoredFilesToContext(fileIds, assignment.id);
-      await notifyGroupMembers(
-        input.groupId,
-        'Новое домашнее задание',
-        assignment.title,
-        `/assignments/${assignment.id}`,
-      );
+      // Push + unread badge: PB hook onRecordAfterCreateSuccess → notifications → push relay.
 
       return resolveAssignment(assignment);
+    });
+  },
+
+  async updateAssignment(
+    id: string,
+    input: UpdateAssignmentInput,
+    requesterId: string,
+  ): Promise<Assignment> {
+    const requester = await getRequesterUser(requesterId);
+    if (!canManageAssignment(requester)) {
+      throw new ApiError('Нет прав на изменение задания', 'FORBIDDEN', 403);
+    }
+    if (!input.title.trim() || !input.description.trim()) {
+      throw new ApiError('Заполните название и описание', 'VALIDATION_ERROR', 400);
+    }
+    if (!input.contentBlocks.length) {
+      throw new ApiError('Добавьте хотя бы один блок материала', 'VALIDATION_ERROR', 400);
+    }
+    if (input.contentBlocks.length > MAX_CONTENT_BLOCKS_PER_ASSIGNMENT) {
+      throw new ApiError(
+        `Максимум ${MAX_CONTENT_BLOCKS_PER_ASSIGNMENT} блоков`,
+        'VALIDATION_ERROR',
+        400,
+      );
+    }
+
+    for (const block of input.contentBlocks) {
+      const validation = validateContentBlock(
+        block.type,
+        block.text,
+        block.url
+          ? { filename: block.filename ?? 'file', mimeType: block.mimeType ?? '', size: 1 }
+          : undefined,
+      );
+      if (!validation.valid) throw new ApiError(validation.message, 'VALIDATION_ERROR', 400);
+    }
+
+    return withPbError(async () => {
+      const pb = getPocketBase();
+      const groupId = await resolveAssignmentGroupIdForWrite(input.groupId, requesterId);
+
+      let existing;
+      try {
+        existing = await pb.collection('assignments').getOne(id);
+      } catch (error) {
+        if (error instanceof ClientResponseError && error.status === 404) {
+          throw new ApiError('Задание не найдено', 'NOT_FOUND', 404);
+        }
+        throw error;
+      }
+
+      const existingAssignment = mapAssignmentRecord(existing);
+      const contentBlocks = input.contentBlocks.map((block, index) => ({
+        ...block,
+        id: `blk-${Date.now()}-${index}`,
+        order: block.order ?? index,
+      }));
+
+      const record = await pb.collection('assignments').update(id, {
+        title: input.title.trim(),
+        description: input.description.trim(),
+        group: groupId,
+        dueDate: input.dueDate || '',
+        contentBlocks,
+        // SDK RecordModel — поля объекта, не .get() (это API JSVM-хуков).
+        teacher: existingAssignment.teacherId,
+      });
+
+      const assignment = mapAssignmentRecord(record);
+      const fileIds = collectStoredFileIds(...contentBlocks.map((b) => b.url));
+      await linkStoredFilesToContext(fileIds, assignment.id);
+      return resolveAssignment(assignment);
+    });
+  },
+
+  async deleteAssignment(id: string, requesterId: string): Promise<void> {
+    const requester = await getRequesterUser(requesterId);
+    if (!canManageAssignment(requester)) {
+      throw new ApiError('Нет прав на удаление задания', 'FORBIDDEN', 403);
+    }
+
+    return withPbError(async () => {
+      const pb = getPocketBase();
+      try {
+        await pb.collection('assignments').delete(id);
+      } catch (error) {
+        if (error instanceof ClientResponseError && error.status === 404) {
+          throw new ApiError('Задание не найдено', 'NOT_FOUND', 404);
+        }
+        throw error;
+      }
     });
   },
 };

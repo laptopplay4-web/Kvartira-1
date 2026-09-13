@@ -103,7 +103,8 @@ export default function AdminRegistrationQrPage() {
     <div className="page-container max-w-lg">
       <AdminPageHeader title="QR регистрации" />
       <p className="mb-6 text-body-sm text-text-secondary">
-        Распечатайте код и разместите в школе. Регистрация без этого QR закрыта.
+        Распечатайте код и разместите в школе. Ссылка ведёт сразу на форму создания аккаунта.
+        Регистрация без этого QR закрыта.
       </p>
 
       {isLoading && (

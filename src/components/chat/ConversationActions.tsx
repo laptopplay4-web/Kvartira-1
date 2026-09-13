@@ -121,7 +121,7 @@ export function ConversationActions({
         role="dialog"
         aria-label="Действия с чатом"
         className={cn(
-          'pointer-events-auto absolute w-[min(280px,calc(100vw-24px))] overflow-hidden glass-popup py-1.5',
+          'pointer-events-auto absolute w-[min(280px,calc(100vw-24px))] max-h-[min(70dvh,calc(100dvh-48px))] overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-none glass-popup py-1.5',
           'motion-safe:animate-fade-in',
           coords.placeAbove && 'origin-bottom -translate-y-full',
         )}

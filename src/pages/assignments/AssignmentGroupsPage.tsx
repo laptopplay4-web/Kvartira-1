@@ -6,7 +6,7 @@ import { BackLink } from '@/components/ui/BackLink';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { canManageAssignmentGroups } from '@/services/assignments/groups/access';
-import { isCustomAssignmentGroup } from '@/services/assignments/groups/helpers';
+import { isManagedAssignmentGroup } from '@/services/assignments/groups/helpers';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import type { AssignmentGroup } from '@/types';
@@ -79,7 +79,7 @@ export default function AssignmentGroupsPage() {
     return <Navigate to="/assignments" replace />;
   }
 
-  const customGroups = groups?.filter(isCustomAssignmentGroup) ?? [];
+  const customGroups = groups?.filter(isManagedAssignmentGroup) ?? [];
 
   return (
     <div className="page-container max-w-lg">
@@ -165,7 +165,22 @@ export default function AssignmentGroupsPage() {
         />
       )}
 
-      <Modal open={createModalOpen} onClose={closeCreateModal} title="Новая группа">
+      <Modal
+        open={createModalOpen}
+        onClose={closeCreateModal}
+        title="Новая группа"
+        footer={
+          <Button
+            type="button"
+            fullWidth
+            loading={createMutation.isPending}
+            disabled={!isOnline || name.trim().length < 2}
+            onClick={() => createMutation.mutate()}
+          >
+            Создать
+          </Button>
+        }
+      >
         <div className="space-y-4">
           <Input
             label="Название"
@@ -180,15 +195,6 @@ export default function AssignmentGroupsPage() {
               {createError}
             </p>
           )}
-          <Button
-            type="button"
-            fullWidth
-            loading={createMutation.isPending}
-            disabled={!isOnline || name.trim().length < 2}
-            onClick={() => createMutation.mutate()}
-          >
-            Создать
-          </Button>
         </div>
       </Modal>
 

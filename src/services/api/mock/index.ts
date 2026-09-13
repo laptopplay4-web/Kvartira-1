@@ -53,7 +53,12 @@ import { buildPasswordMap, createMockSecurityApi, pushAlert, recordAuthLogin } f
 import { createMockLegalApi } from './legal';
 import { createMockSchoolSettingsApi } from './schoolSettings';
 import { createMockNotificationsApi, tryPushNotification } from './notifications';
-import { canManageEvents } from '@/services/events/access';
+import { canManageEvents, canRegisterForEvents } from '@/services/events/access';
+import {
+  presentSchoolEvent,
+  syncEventRegistrationFields,
+} from '@/services/events/registration';
+import { eventDetailPath, eventParticipationNotifyLink } from '@/services/events/unread';
 import {
   createSeedRegistrationInvite,
   inviteTokensEqual,
@@ -117,6 +122,22 @@ function uid(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function seedEventRegistrationsFromEvents(eventsList: SchoolEvent[]): EventRegistration[] {
+  const regs: EventRegistration[] = [];
+  for (const event of eventsList) {
+    syncEventRegistrationFields(event);
+    for (const userId of event.registeredUserIds) {
+      regs.push({
+        id: `event-reg-seed-${event.id}-${userId}`,
+        eventId: event.id,
+        userId,
+        createdAt: '2026-08-01T00:00:00.000Z',
+      });
+    }
+  }
+  return regs;
+}
+
 class MockDatabase {
   users = structuredClone(users);
   directions: Direction[] = structuredClone(seedDirections);
@@ -128,7 +149,7 @@ class MockDatabase {
   events = structuredClone(seedEvents);
   schoolInfo: PublicSchoolInfo = structuredClone(seedSchoolInfo);
   registrationInvite = createSeedRegistrationInvite('2026-09-01T00:00:00.000Z');
-  eventRegistrations: EventRegistration[] = [];
+  eventRegistrations: EventRegistration[] = seedEventRegistrationsFromEvents(this.events);
   notifications = structuredClone(seedNotifications);
   notificationPreferences = new Map();
   pushDeliveries = [];
@@ -190,7 +211,7 @@ function bookingLockKey(teacherId: string, date: string, startTime: string): str
 
 function pushNotification(
   userId: string,
-  type: 'lesson' | 'reschedule' | 'cancel' | 'assignment' | 'system',
+  type: 'lesson' | 'reschedule' | 'cancel' | 'assignment' | 'system' | 'event',
   title: string,
   body: string,
   link?: string,
@@ -771,6 +792,59 @@ export const mockLegalApi = createMockLegalApi(db, delay);
 export const mockSchoolSettingsApi = createMockSchoolSettingsApi(db, delay, getUserById);
 
 
+function notifyStaffEventRegistration(event: SchoolEvent, studentId: string) {
+  const student = getUserById(studentId);
+  const studentName = student
+    ? `${student.firstName} ${student.lastName}`.trim()
+    : 'Ученик';
+  const title = 'Новая запись на мероприятие';
+  const body = `${studentName} записался(ась) на «${event.title}»`;
+  const link = eventParticipationNotifyLink(event.id, studentId, 'join');
+  for (const user of db.users) {
+    if (user.role === 'teacher' || user.role === 'admin') {
+      tryPushNotification(db, user.id, 'event', title, body, link);
+    }
+  }
+}
+
+function notifyStaffEventCancellation(
+  event: SchoolEvent,
+  studentId: string,
+  reason: 'cancelled' | 'removed',
+) {
+  const student = getUserById(studentId);
+  const studentName = student
+    ? `${student.firstName} ${student.lastName}`.trim()
+    : 'Ученик';
+  const title =
+    reason === 'removed' ? 'Участник удалён с мероприятия' : 'Отмена участия в мероприятии';
+  const body =
+    reason === 'removed'
+      ? `${studentName} удалён(а) из «${event.title}»`
+      : `${studentName} отменил(а) участие в «${event.title}»`;
+  const link = eventParticipationNotifyLink(event.id, studentId, 'leave');
+  for (const user of db.users) {
+    if (user.role === 'teacher' || user.role === 'admin') {
+      tryPushNotification(db, user.id, 'event', title, body, link);
+    }
+  }
+}
+
+/** Ученикам — о новом мероприятии (бейдж «События»; не inbox). */
+function notifyStudentsNewEvent(event: SchoolEvent) {
+  const title = 'Новое мероприятие';
+  const body = event.title;
+  const link = eventDetailPath(event.id);
+  const invited =
+    event.type === 'invited' ? new Set(event.invitedUserIds ?? []) : null;
+
+  for (const user of db.users) {
+    if (user.role !== 'student') continue;
+    if (invited && !invited.has(user.id)) continue;
+    tryPushNotification(db, user.id, 'event', title, body, link);
+  }
+}
+
 function assertEventsAdminAccess(requesterId: string) {
   const user = getUserById(requesterId);
   if (!user || !canManageEvents(user)) {
@@ -778,13 +852,22 @@ function assertEventsAdminAccess(requesterId: string) {
   }
 }
 
+function presentEventForViewer(event: SchoolEvent, userId: string): SchoolEvent {
+  syncEventRegistrationFields(event);
+  const viewer = getUserById(userId);
+  const hideRoster = !canManageEvents(viewer);
+  return presentSchoolEvent(structuredClone(event), userId, { hideRoster });
+}
+
 export const mockEventsApi: EventsApi = {
   async getEvents(userId) {
     await delay();
-    return db.events.filter((e) => {
-      if (e.type === 'invited') return e.invitedUserIds?.includes(userId);
-      return true;
-    });
+    return db.events
+      .filter((e) => {
+        if (e.type === 'invited') return e.invitedUserIds?.includes(userId);
+        return true;
+      })
+      .map((e) => presentEventForViewer(e, userId));
   },
 
   async getEvent(id, userId) {
@@ -794,7 +877,7 @@ export const mockEventsApi: EventsApi = {
     if (event.type === 'invited' && !event.invitedUserIds?.includes(userId)) {
       throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
     }
-    return event;
+    return presentEventForViewer(event, userId);
   },
 
   async getRegistration(eventId, userId) {
@@ -803,10 +886,41 @@ export const mockEventsApi: EventsApi = {
     return db.eventRegistrations.find((r) => r.eventId === eventId && r.userId === userId) ?? null;
   },
 
+  async getEventParticipants(eventId, requesterId) {
+    await delay();
+    assertEventsAdminAccess(requesterId);
+    const event = db.events.find((e) => e.id === eventId);
+    if (!event) throw new ApiError('Мероприятие не найдено', 'NOT_FOUND', 404);
+    const viewer = getUserById(requesterId)!;
+    const fromRegs = db.eventRegistrations
+      .filter((r) => r.eventId === eventId)
+      .map((r) => r.userId);
+    const memberIds = fromRegs.length > 0 ? fromRegs : event.registeredUserIds;
+    return [...new Set(memberIds)]
+      .map((id) => getUserById(id))
+      .filter((u): u is User => !!u)
+      .map((u) => sanitizeUserPhoneForViewer(u, viewer));
+  },
+
   async register(eventId, userId, application) {
     await delay();
-    const event = await mockEventsApi.getEvent(eventId, userId);
-    if (event.maxParticipants && event.registeredUserIds.length >= event.maxParticipants) {
+    const requester = getUserById(userId);
+    if (!canRegisterForEvents(requester)) {
+      throw new ApiError('Запись на мероприятие доступна только ученикам', 'FORBIDDEN', 403);
+    }
+    const event = db.events.find((e) => e.id === eventId);
+    if (!event) throw new ApiError('Мероприятие не найдено', 'NOT_FOUND', 404);
+    if (event.type === 'invited' && !event.invitedUserIds?.includes(userId)) {
+      throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+    }
+
+    syncEventRegistrationFields(event);
+    const alreadyRegistered = event.registeredUserIds.includes(userId);
+    if (
+      !alreadyRegistered &&
+      event.maxParticipants &&
+      (event.registeredCount ?? event.registeredUserIds.length) >= event.maxParticipants
+    ) {
       throw new ApiError('Мест больше нет', 'FULL', 409);
     }
 
@@ -820,45 +934,93 @@ export const mockEventsApi: EventsApi = {
       }
     }
 
-    if (!event.registeredUserIds.includes(userId)) {
+    let createdNew = false;
+    if (!alreadyRegistered) {
       event.registeredUserIds.push(userId);
+      syncEventRegistrationFields(event);
+      createdNew = true;
     }
 
-    if (event.type === 'competition' && application) {
-      const normalized = normalizeCompetitionApplication(application);
-      const existing = db.eventRegistrations.find(
-        (r) => r.eventId === eventId && r.userId === userId,
-      );
-      if (existing) {
-        existing.application = normalized;
-      } else {
-        db.eventRegistrations.push({
-          id: uid('event-reg'),
-          eventId,
-          userId,
-          createdAt: new Date().toISOString(),
-          application: normalized,
-        });
-      }
+    const existingReg = db.eventRegistrations.find(
+      (r) => r.eventId === eventId && r.userId === userId,
+    );
+    const normalized =
+      event.type === 'competition' && application
+        ? normalizeCompetitionApplication(application)
+        : undefined;
+
+    if (existingReg) {
+      if (normalized) existingReg.application = normalized;
+    } else {
+      db.eventRegistrations.push({
+        id: uid('event-reg'),
+        eventId,
+        userId,
+        createdAt: new Date().toISOString(),
+        ...(normalized ? { application: normalized } : {}),
+      });
     }
 
-    return event;
+    if (createdNew) {
+      notifyStaffEventRegistration(event, userId);
+    }
+
+    return presentEventForViewer(event, userId);
   },
 
   async unregister(eventId, userId) {
     await delay();
-    const event = await mockEventsApi.getEvent(eventId, userId);
+    const requester = getUserById(userId);
+    if (!canRegisterForEvents(requester)) {
+      throw new ApiError('Отмена участия доступна только ученикам', 'FORBIDDEN', 403);
+    }
+    const event = db.events.find((e) => e.id === eventId);
+    if (!event) throw new ApiError('Мероприятие не найдено', 'NOT_FOUND', 404);
+    if (event.type === 'invited' && !event.invitedUserIds?.includes(userId)) {
+      throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
+    }
+    const wasRegistered =
+      event.registeredUserIds.includes(userId) ||
+      db.eventRegistrations.some((r) => r.eventId === eventId && r.userId === userId);
     event.registeredUserIds = event.registeredUserIds.filter((id) => id !== userId);
+    syncEventRegistrationFields(event);
     db.eventRegistrations = db.eventRegistrations.filter(
       (r) => !(r.eventId === eventId && r.userId === userId),
     );
-    return event;
+    if (wasRegistered) {
+      notifyStaffEventCancellation(event, userId, 'cancelled');
+    }
+    return presentEventForViewer(event, userId);
+  },
+
+  async removeEventParticipant(eventId, participantUserId, requesterId) {
+    await delay();
+    assertEventsAdminAccess(requesterId);
+    const event = db.events.find((e) => e.id === eventId);
+    if (!event) throw new ApiError('Мероприятие не найдено', 'NOT_FOUND', 404);
+    const wasRegistered =
+      event.registeredUserIds.includes(participantUserId) ||
+      db.eventRegistrations.some(
+        (r) => r.eventId === eventId && r.userId === participantUserId,
+      );
+    event.registeredUserIds = event.registeredUserIds.filter((id) => id !== participantUserId);
+    syncEventRegistrationFields(event);
+    db.eventRegistrations = db.eventRegistrations.filter(
+      (r) => !(r.eventId === eventId && r.userId === participantUserId),
+    );
+    if (wasRegistered) {
+      notifyStaffEventCancellation(event, participantUserId, 'removed');
+    }
+    return presentEventForViewer(event, requesterId);
   },
 
   async getAllEvents(requesterId) {
     await delay();
     assertEventsAdminAccess(requesterId);
-    return db.events.map((e) => structuredClone(e));
+    return db.events.map((e) => {
+      syncEventRegistrationFields(e);
+      return presentSchoolEvent(structuredClone(e), requesterId, { hideRoster: false });
+    });
   },
 
   async createEvent(input, requesterId) {
@@ -881,12 +1043,14 @@ export const mockEventsApi: EventsApi = {
       location: normalized.location,
       imageUrl: normalized.imageUrl,
       maxParticipants: normalized.maxParticipants,
+      registeredCount: 0,
       registeredUserIds: [],
       invitedUserIds: normalized.type === 'invited' ? normalized.invitedUserIds : undefined,
     };
 
     db.events.push(event);
-    return structuredClone(event);
+    notifyStudentsNewEvent(event);
+    return presentEventForViewer(event, requesterId);
   },
 
   async updateEvent(id, input, requesterId) {
@@ -903,8 +1067,12 @@ export const mockEventsApi: EventsApi = {
       startTime: input.startTime ?? event.startTime,
       endTime: input.endTime ?? event.endTime,
       location: input.location ?? event.location,
-      imageUrl: input.imageUrl ?? event.imageUrl,
-      maxParticipants: input.maxParticipants ?? event.maxParticipants,
+      imageUrl: Object.prototype.hasOwnProperty.call(input, 'imageUrl')
+        ? input.imageUrl
+        : event.imageUrl,
+      maxParticipants: Object.prototype.hasOwnProperty.call(input, 'maxParticipants')
+        ? input.maxParticipants
+        : event.maxParticipants,
       invitedUserIds: input.invitedUserIds ?? event.invitedUserIds,
     };
 
@@ -918,8 +1086,10 @@ export const mockEventsApi: EventsApi = {
       ...normalized,
       invitedUserIds: normalized.type === 'invited' ? normalized.invitedUserIds : undefined,
     });
+    if (!normalized.imageUrl) delete event.imageUrl;
+    syncEventRegistrationFields(event);
 
-    return structuredClone(event);
+    return presentEventForViewer(event, requesterId);
   },
 
   async deleteEvent(id, requesterId) {
@@ -1164,6 +1334,26 @@ export const mockAvailabilityApi: AvailabilityApi = {
 
 export const mockNotificationsApi = createMockNotificationsApi(db, delay, getUserById);
 
+/** Test helper: mock push outbox after tryPushNotification. */
+export function getMockPushDeliveries(): Array<{
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  link?: string;
+  createdAt: string;
+}> {
+  return structuredClone(db.pushDeliveries);
+}
+
+/** Test helper: wipe roster JSON while keeping event_registrations. */
+export function clearMockEventRoster(eventId: string): void {
+  const event = db.events.find((e) => e.id === eventId);
+  if (!event) return;
+  event.registeredUserIds = [];
+  event.registeredCount = 0;
+}
+
 export function resetMockDatabase() {
   db.users = structuredClone(users);
   db.directions = structuredClone(seedDirections);
@@ -1175,7 +1365,7 @@ export function resetMockDatabase() {
   db.events = structuredClone(seedEvents);
   db.schoolInfo = structuredClone(seedSchoolInfo);
   db.registrationInvite = createSeedRegistrationInvite('2026-09-01T00:00:00.000Z');
-  db.eventRegistrations = [];
+  db.eventRegistrations = seedEventRegistrationsFromEvents(db.events);
   db.notifications = structuredClone(seedNotifications);
   db.notificationPreferences = new Map();
   db.pushDeliveries = [];

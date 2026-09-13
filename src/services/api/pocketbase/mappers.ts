@@ -299,8 +299,39 @@ export function mapLessonHistoryRecord(record: PbLessonHistoryRecord | RecordMod
 }
 
 function asIdList(value: unknown): string[] {
+  if (value == null) return [];
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      return asIdList(JSON.parse(trimmed) as unknown);
+    } catch {
+      return trimmed ? [trimmed] : [];
+    }
+  }
   if (!Array.isArray(value)) return [];
-  return value.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  return value
+    .map((item) => {
+      if (typeof item === 'string' && item.length > 0) return item;
+      if (item && typeof item === 'object' && 'id' in item) {
+        const id = (item as { id: unknown }).id;
+        return typeof id === 'string' && id.length > 0 ? id : '';
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function readRecordField(record: RecordModel, field: string): unknown {
+  const withGet = record as RecordModel & { get?: (key: string) => unknown };
+  if (typeof withGet.get === 'function') {
+    try {
+      return withGet.get(field);
+    } catch {
+      /* fall through */
+    }
+  }
+  return (record as Record<string, unknown>)[field];
 }
 
 export interface PbEventRecord extends RecordModel {
@@ -313,34 +344,52 @@ export interface PbEventRecord extends RecordModel {
   location: string;
   imageUrl?: string;
   maxParticipants?: number;
+  registeredCount?: number;
   registeredUserIds?: string[];
   invitedUserIds?: string[];
 }
 
 export function mapEventRecord(record: PbEventRecord | RecordModel): SchoolEvent {
   const r = record as PbEventRecord;
+  const registeredUserIds = asIdList(
+    readRecordField(record, 'registeredUserIds') ?? r.registeredUserIds,
+  );
+  const registeredCountRaw = readRecordField(record, 'registeredCount') ?? r.registeredCount;
+  const registeredCount =
+    typeof registeredCountRaw === 'number' && registeredCountRaw >= 0
+      ? registeredCountRaw
+      : registeredUserIds.length;
+
   const event: SchoolEvent = {
     id: record.id,
-    title: r.title,
-    description: r.description,
-    type: r.type,
-    date: normalizePbDate(r.date),
-    startTime: r.startTime,
-    location: r.location,
-    registeredUserIds: asIdList(r.registeredUserIds),
+    title: String(readRecordField(record, 'title') ?? r.title ?? ''),
+    description: String(readRecordField(record, 'description') ?? r.description ?? ''),
+    type: (readRecordField(record, 'type') ?? r.type) as EventType,
+    date: normalizePbDate(readRecordField(record, 'date') ?? r.date),
+    startTime: String(readRecordField(record, 'startTime') ?? r.startTime ?? ''),
+    location: String(readRecordField(record, 'location') ?? r.location ?? ''),
+    registeredCount,
+    registeredUserIds,
   };
 
-  const endTime = emptyToUndefined(r.endTime);
+  const endTime = emptyToUndefined(
+    (readRecordField(record, 'endTime') ?? r.endTime) as string | undefined,
+  );
   if (endTime) event.endTime = endTime;
 
-  const imageUrl = emptyToUndefined(r.imageUrl);
+  const imageUrl = emptyToUndefined(
+    (readRecordField(record, 'imageUrl') ?? r.imageUrl) as string | undefined,
+  );
   if (imageUrl) event.imageUrl = imageUrl;
 
-  if (typeof r.maxParticipants === 'number' && r.maxParticipants > 0) {
-    event.maxParticipants = r.maxParticipants;
+  const maxParticipants = readRecordField(record, 'maxParticipants') ?? r.maxParticipants;
+  if (typeof maxParticipants === 'number' && maxParticipants > 0) {
+    event.maxParticipants = maxParticipants;
   }
 
-  const invitedUserIds = asIdList(r.invitedUserIds);
+  const invitedUserIds = asIdList(
+    readRecordField(record, 'invitedUserIds') ?? r.invitedUserIds,
+  );
   if (invitedUserIds.length > 0) event.invitedUserIds = invitedUserIds;
 
   return event;
@@ -814,9 +863,11 @@ export function mapNotificationPreferencesRecord(
   record: PbNotificationPreferencesRecord | RecordModel,
 ): NotificationPreferences {
   const r = record as PbNotificationPreferencesRecord;
+  // Optional bool in PB may arrive as false | null | undefined | 0/1 after OFF.
+  const raw: unknown = (record as { pushEnabled?: unknown }).pushEnabled;
   return {
     userId: relId(r.user),
-    pushEnabled: Boolean(r.pushEnabled),
+    pushEnabled: raw === true || raw === 1 || raw === 'true',
   };
 }
 

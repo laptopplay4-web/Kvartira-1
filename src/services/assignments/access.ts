@@ -22,3 +22,8 @@ export function canViewAssignment(
 export function canCreateAssignment(user: User): boolean {
   return can(user, 'assignments:create');
 }
+
+/** Teacher/admin with create permission may edit or delete any assignment. */
+export function canManageAssignment(user: User): boolean {
+  return can(user, 'assignments:create');
+}

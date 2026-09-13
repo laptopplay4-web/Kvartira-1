@@ -1,4 +1,5 @@
 import type { AssignmentContentType } from '@/types';
+import { ALLOWED_IMAGE_MIMES } from '@/services/chat/constants';
 import { validateAttachment, type AttachmentValidationInput } from '@/services/chat/validation';
 import { ASSIGNMENT_CONTENT_ACCEPT } from '@/services/assignments/constants';
 
@@ -19,6 +20,16 @@ export function validateAssignmentContentFile(
       input.mimeType === 'audio/mp3' ||
       input.filename.toLowerCase().endsWith('.mp3');
     if (!isMp3) return { valid: false, message: 'Загрузите MP3-файл' };
+  }
+
+  if (contentType === 'image') {
+    const name = input.filename.toLowerCase();
+    const isImage =
+      (ALLOWED_IMAGE_MIMES as readonly string[]).includes(input.mimeType) ||
+      /\.(jpe?g|png|gif|webp)$/.test(name);
+    if (!isImage) {
+      return { valid: false, message: 'Загрузите фото (JPEG, PNG, WebP или GIF)' };
+    }
   }
 
   if (contentType === 'pdf') {

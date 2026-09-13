@@ -1,5 +1,12 @@
 import type { PushSubscriptionInput, WebPushClientState } from '@/types';
-import { VAPID_PUBLIC_KEY_ENV } from './constants';
+import { SERVICE_WORKER_READY_TIMEOUT_MS, VAPID_PUBLIC_KEY_ENV } from './constants';
+
+export type EnablePushStatus = 'subscribed' | 'unavailable' | 'failed';
+
+export interface EnablePushResult {
+  status: EnablePushStatus;
+  message?: string;
+}
 
 export function isWebPushSupported(): boolean {
   if (typeof window === 'undefined') return false;
@@ -58,10 +65,49 @@ export function subscriptionToInput(subscription: PushSubscription): PushSubscri
   };
 }
 
+/**
+ * Resolve SW registration without hanging: `navigator.serviceWorker.ready`
+ * never settles when no worker is registered (common in Vite dev).
+ */
+export async function getServiceWorkerRegistration(
+  timeoutMs = SERVICE_WORKER_READY_TIMEOUT_MS,
+): Promise<ServiceWorkerRegistration | null> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return null;
+  }
+
+  try {
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing) return existing;
+  } catch {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: ServiceWorkerRegistration | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+
+    const timer = setTimeout(() => {
+      void navigator.serviceWorker.getRegistration().then((reg) => finish(reg ?? null), () => finish(null));
+    }, timeoutMs);
+
+    void navigator.serviceWorker.ready.then(
+      (reg) => finish(reg),
+      () => finish(null),
+    );
+  });
+}
+
 export async function getActivePushSubscription(): Promise<PushSubscription | null> {
   if (!isWebPushSupported()) return null;
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await getServiceWorkerRegistration();
+  if (!registration) return null;
   return registration.pushManager.getSubscription();
 }
 
@@ -71,14 +117,32 @@ export async function subscribeToWebPush(): Promise<PushSubscription> {
     throw new Error('Push не настроен на сервере');
   }
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await getServiceWorkerRegistration();
+  if (!registration) {
+    throw new Error('Service Worker ещё не готов');
+  }
+
   const existing = await registration.pushManager.getSubscription();
   if (existing) return existing;
 
-  return registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidKey),
-  });
+  const applicationServerKey = urlBase64ToUint8Array(vapidKey) as BufferSource;
+  try {
+    return await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+  } catch (firstError) {
+    // Chrome иногда отказывает сразу после unsubscribe — один короткий retry.
+    await new Promise((r) => setTimeout(r, 350));
+    try {
+      return await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+    } catch {
+      throw firstError;
+    }
+  }
 }
 
 export async function unsubscribeFromWebPush(): Promise<void> {

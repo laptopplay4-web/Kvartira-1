@@ -47,3 +47,13 @@ onRecordUpdateRequest((e) => {
   chat.assertConversationPinUpdate(e);
   e.next();
 }, 'conversations');
+
+onRecordAfterCreateSuccess((e) => {
+  try {
+    const chat = require(`${__hooks}/lib/kvartiraChat.js`);
+    chat.joinAdminsToGroupConversation($app, e.record);
+  } catch (_) {
+    /* never block create on admin join */
+  }
+  e.next();
+}, 'conversations');

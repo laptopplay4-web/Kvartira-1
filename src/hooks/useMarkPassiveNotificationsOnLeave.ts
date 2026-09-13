@@ -3,23 +3,24 @@ import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import type { AppNotification } from '@/types';
-import { markPassiveNotificationsReadInList } from '@/services/notifications/helpers';
+import {
+  didLeaveNotificationsRoute,
+  markPassiveNotificationsReadInList,
+} from '@/services/notifications/helpers';
 
 /**
- * На /notifications: непрочитанные остаются выделенными.
- * При уходе (смена маршрута / скрытие вкладки / pagehide) — пассивные → read;
- * urgent (требуют действия) не трогаем.
- *
- * Смена маршрута, а не unmount — чтобы React Strict Mode не сбрасывал прочтение.
+ * Пассивные unread → read при уходе с `/notifications`.
+ * Вызывать из AppLayout (остаётся смонтированным при смене маршрута).
+ * NotificationsPage при navigate размонтируется — там хук не сработает.
  */
-export function useMarkPassiveNotificationsOnLeave(userId: string) {
+export function useMarkPassiveNotificationsOnLeave(userId: string | undefined) {
   const queryClient = useQueryClient();
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
   const flushingRef = useRef(false);
 
   const flushPassiveRead = () => {
-    if (flushingRef.current) return;
+    if (!userId || flushingRef.current) return;
     flushingRef.current = true;
 
     queryClient.setQueryData<AppNotification[]>(['notifications', userId], (old) =>
@@ -43,16 +44,13 @@ export function useMarkPassiveNotificationsOnLeave(userId: string) {
     const prev = prevPathRef.current;
     prevPathRef.current = location.pathname;
 
-    const leftNotifications =
-      prev.startsWith('/notifications') && !location.pathname.startsWith('/notifications');
-
-    if (leftNotifications) {
+    if (didLeaveNotificationsRoute(prev, location.pathname)) {
       flushRef.current();
     }
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!location.pathname.startsWith('/notifications')) return;
+    if (!userId || !location.pathname.startsWith('/notifications')) return;
 
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
@@ -70,5 +68,5 @@ export function useMarkPassiveNotificationsOnLeave(userId: string) {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onPageHide);
     };
-  }, [location.pathname]);
+  }, [location.pathname, userId]);
 }

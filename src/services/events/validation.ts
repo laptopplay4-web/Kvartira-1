@@ -66,8 +66,11 @@ export function validateEventInput(input: Partial<CreateEventInput>): string | n
   }
 
   const imageUrl = input.imageUrl?.trim();
-  if (imageUrl && imageUrl.length > MAX_IMAGE_URL) {
-    return `Ссылка на изображение не длиннее ${MAX_IMAGE_URL} символов`;
+  if (imageUrl) {
+    const isDataOrFile = imageUrl.startsWith('data:') || imageUrl.startsWith('pbfile:');
+    if (!isDataOrFile && imageUrl.length > MAX_IMAGE_URL) {
+      return `Ссылка на изображение не длиннее ${MAX_IMAGE_URL} символов`;
+    }
   }
 
   if (input.type === 'invited') {

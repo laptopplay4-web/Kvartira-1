@@ -1,9 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   isWebPushSupported,
   urlBase64ToUint8Array,
   getWebPushClientState,
+  getServiceWorkerRegistration,
+  getActivePushSubscription,
 } from '@/services/push/helpers';
+import {
+  PUSH_NOT_CONFIGURED_MESSAGE,
+  PUSH_UNSUPPORTED_MESSAGE,
+} from '@/services/push/constants';
 import {
   createMockNotificationsApi,
   tryPushNotification,
@@ -44,6 +50,29 @@ describe('web push helpers', () => {
   it('decodes base64url vapid key', () => {
     const bytes = urlBase64ToUint8Array('AQID');
     expect(Array.from(bytes)).toEqual([1, 2, 3]);
+  });
+
+  it('resolves null when no service worker is registered (no hang)', async () => {
+    const ready = new Promise<ServiceWorkerRegistration>(() => {
+      /* never settles — mirrors browsers with no SW */
+    });
+    const getRegistration = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        getRegistration,
+        ready,
+      },
+    });
+
+    await expect(getServiceWorkerRegistration(50)).resolves.toBeNull();
+    await expect(getActivePushSubscription()).resolves.toBeNull();
+    expect(getRegistration).toHaveBeenCalled();
+  });
+
+  it('exposes distinct unavailable copy for missing VAPID vs unsupported browser', () => {
+    expect(PUSH_NOT_CONFIGURED_MESSAGE).toMatch(/VAPID/i);
+    expect(PUSH_UNSUPPORTED_MESSAGE).toMatch(/браузере/i);
   });
 });
 

@@ -16,7 +16,12 @@ import {
   canManageAssignmentGroups,
   canViewAssignmentGroup,
 } from '@/services/assignments/groups/access';
-import { isGeneralAssignmentGroup } from '@/services/assignments/groups/helpers';
+import {
+  GENERAL_ASSIGNMENT_GROUP_ID,
+  GENERAL_ASSIGNMENT_GROUP_LABEL,
+  isGeneralAssignmentGroup,
+  isKindGeneralGroup,
+} from '@/services/assignments/groups/helpers';
 import { validateGroupName } from '@/services/assignments/validation';
 
 async function getRequesterUser(userId: string): Promise<User> {
@@ -45,6 +50,94 @@ async function loadGroupOrThrow(id: string): Promise<AssignmentGroup> {
   }
 }
 
+/**
+ * PB ids ≠ mock `grp-general`. Find or create the school-wide general group.
+ * Orphan customs named «Все ученики» are promoted or reassigned — never wipe assignments.
+ */
+export async function ensureGeneralAssignmentGroup(ownerTeacherId: string): Promise<AssignmentGroup> {
+  const pb = getPocketBase();
+  const all = (await pb.collection('assignment_groups').getFullList({ sort: '-id' })).map(
+    mapAssignmentGroupRecord,
+  );
+  const kindGenerals = all.filter((g) => isKindGeneralGroup(g));
+  const namedCustoms = all.filter(
+    (g) => !isKindGeneralGroup(g) && g.name.trim() === GENERAL_ASSIGNMENT_GROUP_LABEL,
+  );
+
+  const reassignAssignmentsThenDelete = async (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    try {
+      const linked = await pb.collection('assignments').getFullList({
+        filter: `group = "${escapePbFilter(fromId)}"`,
+        fields: 'id',
+      });
+      await Promise.all(
+        linked.map((row) => pb.collection('assignments').update(row.id, { group: toId })),
+      );
+      await pb.collection('assignment_groups').delete(fromId);
+    } catch {
+      /* best-effort cleanup */
+    }
+  };
+
+  if (kindGenerals[0]) {
+    const general = kindGenerals[0];
+    await Promise.all(namedCustoms.map((g) => reassignAssignmentsThenDelete(g.id, general.id)));
+    return general;
+  }
+
+  if (namedCustoms[0]) {
+    const promoted = await pb.collection('assignment_groups').update(namedCustoms[0].id, {
+      kind: 'general',
+      name: GENERAL_ASSIGNMENT_GROUP_LABEL,
+    });
+    const general = mapAssignmentGroupRecord(promoted);
+    await Promise.all(
+      namedCustoms.slice(1).map((g) => reassignAssignmentsThenDelete(g.id, general.id)),
+    );
+    return general;
+  }
+
+  const record = await pb.collection('assignment_groups').create({
+    name: GENERAL_ASSIGNMENT_GROUP_LABEL,
+    teacher: ownerTeacherId,
+    kind: 'general',
+    members: [],
+  });
+  return mapAssignmentGroupRecord(record);
+}
+
+/** Map sentinel / school-wide recipient to real PB general group id. */
+export async function resolveAssignmentGroupIdForWrite(
+  groupId: string,
+  ownerTeacherId: string,
+): Promise<string> {
+  const trimmed = groupId.trim();
+  if (!trimmed || trimmed === GENERAL_ASSIGNMENT_GROUP_ID) {
+    const general = await ensureGeneralAssignmentGroup(ownerTeacherId);
+    return general.id;
+  }
+
+  const pb = getPocketBase();
+  try {
+    const record = await pb.collection('assignment_groups').getOne(trimmed);
+    const mapped = mapAssignmentGroupRecord(record);
+    if (!isKindGeneralGroup(mapped) && mapped.name.trim() === GENERAL_ASSIGNMENT_GROUP_LABEL) {
+      const promoted = await pb.collection('assignment_groups').update(trimmed, {
+        kind: 'general',
+        name: GENERAL_ASSIGNMENT_GROUP_LABEL,
+      });
+      return promoted.id;
+    }
+    return mapped.id;
+  } catch (error) {
+    if (error instanceof ClientResponseError && error.status === 404) {
+      throw new ApiError('Группа не найдена', 'NOT_FOUND', 404);
+    }
+    throw error;
+  }
+}
+
 async function loadMembers(memberIds: string[]): Promise<User[]> {
   if (memberIds.length === 0) return [];
   const pb = getPocketBase();
@@ -60,6 +153,15 @@ export const pocketbaseAssignmentGroupsApi: AssignmentGroupsApi = {
     return withPbError(async () => {
       const user = await getRequesterUser(requesterId);
       const pb = getPocketBase();
+
+      if (canManageAssignmentGroups(user)) {
+        try {
+          await ensureGeneralAssignmentGroup(requesterId);
+        } catch {
+          /* still list existing groups if ensure fails */
+        }
+      }
+
       const records = await pb.collection('assignment_groups').getFullList({ sort: 'name' });
       return records
         .map(mapAssignmentGroupRecord)
@@ -70,7 +172,11 @@ export const pocketbaseAssignmentGroupsApi: AssignmentGroupsApi = {
   async getGroup(id, requesterId) {
     return withPbError(async () => {
       const user = await getRequesterUser(requesterId);
-      const group = await loadGroupOrThrow(id);
+      const resolvedId =
+        id === GENERAL_ASSIGNMENT_GROUP_ID
+          ? (await ensureGeneralAssignmentGroup(requesterId)).id
+          : id;
+      const group = await loadGroupOrThrow(resolvedId);
       if (!canViewAssignmentGroup(user, group)) {
         throw new ApiError('Нет доступа к группе', 'FORBIDDEN', 403);
       }

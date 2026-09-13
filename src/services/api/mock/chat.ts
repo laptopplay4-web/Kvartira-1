@@ -51,9 +51,17 @@ import {
   SCHOOL_WIDE_CHAT_DEFAULT_TITLE,
 } from '@/services/chat/constants';
 import { detectAttachmentType, validateAttachment, validateMessageContent } from '@/services/chat/validation';
+import {
+  getAttachmentsPreviewLabel,
+  isSyntheticMediaCaption,
+} from '@/services/chat/attachments';
 import { chatRealtimeService } from '@/services/chat/realtime';
 import { findConversationForLesson } from '@/services/lessons/helpers';
 import { ensureSchoolWideMembership, isSchoolWideConversation } from '@/services/chat/schoolWide';
+import {
+  ensureAdminGroupMembership,
+  withAdminsInParticipants,
+} from '@/services/chat/adminGroups';
 
 export interface MockChatDb {
   users: User[];
@@ -113,6 +121,9 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
   function assertConversationAccess(conversationId: string, userId: string): Conversation {
     const user = getUserById(userId);
     const conv = getConversationOrThrow(conversationId);
+    if (user.role === 'admin' && conv.type !== 'personal') {
+      ensureAdminGroupMembership(db, userId);
+    }
     if (!canAccessConversation(user, conv, db.conversationMembers)) {
       throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
     }
@@ -138,7 +149,12 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       lastMessage: lastMessage
         ? {
             id: lastMessage.id,
-            text: lastMessage.text || lastMessage.attachments?.[0]?.filename || 'Вложение',
+            text:
+              lastMessage.text && !isSyntheticMediaCaption(lastMessage.text, lastMessage.attachments)
+                ? lastMessage.text
+                : getAttachmentsPreviewLabel(lastMessage.attachments) ||
+                  lastMessage.text ||
+                  'Вложение',
             senderId: lastMessage.senderId,
             createdAt: lastMessage.createdAt,
           }
@@ -216,6 +232,9 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       const user = getUserById(userId);
       if (!can(user, 'chat:read')) throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
       ensureSchoolWideMembership(db, userId);
+      if (user.role === 'admin') {
+        ensureAdminGroupMembership(db, userId);
+      }
       const list = db.conversations
         .filter((c) => canAccessConversation(user, c, db.conversationMembers))
         .map((c) => enrichConversation(c, userId));
@@ -332,7 +351,8 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         senderMember.lastReadAt = now;
       }
 
-      const preview = normalized || (attachments[0]?.filename ?? 'Вложение');
+      const preview =
+        normalized || getAttachmentsPreviewLabel(attachments);
       notifyMembers(conversationId, userId, preview, options.suppressNotification);
 
       chatRealtimeService.emit({ type: 'message.created', conversationId, message: msg });
@@ -520,6 +540,8 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
           const title = input.title?.trim();
           if (!title) throw new ApiError('Укажите название группы', 'VALIDATION', 400);
         }
+        // Admin is always a participant of every group chat.
+        uniqueParticipants = withAdminsInParticipants(uniqueParticipants, db.users);
       }
 
       const now = new Date().toISOString();
@@ -819,6 +841,7 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         mimeType: input.mimeType,
         size: input.size,
         url: input.dataUrl ?? `mock://attachments/${uid('file')}`,
+        ...(input.kind ? { kind: input.kind } : {}),
       };
       return attachment;
     },

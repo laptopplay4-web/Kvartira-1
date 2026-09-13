@@ -5,7 +5,7 @@ import { Plus, Trash2, UserMinus } from 'lucide-react';
 import { BackLink } from '@/components/ui/BackLink';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
-import { isUserAmongMembers } from '@/services/assignments/groups/helpers';
+import { isUserAmongMembers, isManagedAssignmentGroup } from '@/services/assignments/groups/helpers';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import { AddGroupMembersModal } from '@/components/assignments/AddGroupMembersModal';
@@ -104,7 +104,7 @@ export default function AssignmentGroupDetailPage() {
     );
   }
 
-  if (!group.canManage) {
+  if (!group.canManage || !isManagedAssignmentGroup(group)) {
     return <Navigate to="/assignments/groups" replace />;
   }
 

@@ -242,4 +242,94 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(source).toContain('directionIds');
     expect(source).toContain("type: 'json'");
   });
+
+  it('assignment staff write migration allows any teacher|admin update/delete', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790844800_kvartira_assignment_staff_write.js'),
+      'utf8',
+    );
+    expect(source).toContain('assignments');
+    expect(source).toContain('updateRule');
+    expect(source).toContain('deleteRule');
+    expect(source).toContain('@request.auth.role = "teacher"');
+  });
+
+  it('assignment general list migration exposes school-wide assignments to students', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1790931200_kvartira_assignment_general_list.js'),
+      'utf8',
+    );
+    expect(source).toContain('group.kind = "general"');
+    expect(source).toContain('group.name = "Все ученики"');
+    expect(source).toContain('assignment_groups');
+  });
+
+  it('events registeredCount + image text + event file purpose migration', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1791017600_kvartira_events_count_image.js'),
+      'utf8',
+    );
+    expect(source).toContain('registeredCount');
+    expect(source).toContain("type: 'text'");
+    expect(source).toContain("'event'");
+    expect(source).toContain('purpose = "event"');
+  });
+
+  it('event registrations staff list + student-only create migration', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1791104000_kvartira_event_reg_staff_list.js'),
+      'utf8',
+    );
+    expect(source).toContain('event_registrations');
+    expect(source).toContain('@request.auth.role = "teacher"');
+    expect(source).toContain('@request.auth.role = "student"');
+  });
+
+  it('event delete cascade migration enables cascadeDelete on registrations', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1791190400_kvartira_event_delete_cascade.js'),
+      'utf8',
+    );
+    expect(source).toContain('event_registrations');
+    expect(source).toContain('cascadeDelete = true');
+    expect(source).toContain('@request.auth.role = "teacher"');
+  });
+
+  it('pushEnabled bool migration relaxes required on notification_preferences', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1791276800_kvartira_push_enabled_bool.js'),
+      'utf8',
+    );
+    expect(source).toContain('notification_preferences');
+    expect(source).toContain('pushEnabled');
+    expect(source).toContain('field.required = false');
+  });
+
+  it('assignment files school-wide access matches group name «Все ученики»', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1791363200_kvartira_assignment_files_schoolwide.js'),
+      'utf8',
+    );
+    expect(source).toContain('kvartira_files');
+    expect(source).toContain('Все ученики');
+    expect(source).toContain('purpose = "assignment"');
+  });
+
+  it('assignment files access uses nested assignments.group (not broken double join)', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1791450000_kvartira_assignment_files_group_nested.js'),
+      'utf8',
+    );
+    const rbac = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraRbac.js'),
+      'utf8',
+    );
+    expect(source).toContain('@collection.assignments.group.kind = "general"');
+    expect(source).toContain('@collection.assignments.group.name = "Все ученики"');
+    expect(source).toContain('@collection.assignments.group.members.id ?= @request.auth.id');
+    expect(rbac).toContain('@collection.assignments.group.kind = "general"');
+    expect(rbac).not.toMatch(
+      /FILE_ACCESS[\s\S]*@collection\.assignment_groups\.id \?= @collection\.assignments\.group/,
+    );
+  });
 });

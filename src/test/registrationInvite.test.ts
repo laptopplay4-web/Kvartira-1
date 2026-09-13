@@ -10,8 +10,10 @@ import { SEED_REGISTRATION_INVITE_TOKEN } from '@/services/registration/constant
 import {
   buildRegistrationInviteUrl,
   createRotatedRegistrationInvite,
+  ensurePrintableRegistrationInvite,
   inviteTokensEqual,
   isRegistrationInviteTokenFormat,
+  isSeedRegistrationInviteToken,
   readInviteTokenFromSearch,
 } from '@/services/registration/invite';
 
@@ -43,6 +45,21 @@ describe('registration invite helpers', () => {
     const b = createRotatedRegistrationInvite();
     expect(a.token).not.toBe(b.token);
     expect(isRegistrationInviteTokenFormat(a.token)).toBe(true);
+  });
+
+  it('detects seed token and replaces it for printable QR', () => {
+    expect(isSeedRegistrationInviteToken(SEED_REGISTRATION_INVITE_TOKEN)).toBe(true);
+    const fromSeed = ensurePrintableRegistrationInvite({
+      token: SEED_REGISTRATION_INVITE_TOKEN,
+      rotatedAt: '2026-09-01T00:00:00.000Z',
+    });
+    expect(fromSeed.didRotate).toBe(true);
+    expect(fromSeed.invite.token).not.toBe(SEED_REGISTRATION_INVITE_TOKEN);
+    expect(isRegistrationInviteTokenFormat(fromSeed.invite.token)).toBe(true);
+
+    const kept = ensurePrintableRegistrationInvite(fromSeed.invite);
+    expect(kept.didRotate).toBe(false);
+    expect(kept.invite.token).toBe(fromSeed.invite.token);
   });
 });
 
@@ -86,16 +103,23 @@ describe('mock registration invite gate', () => {
     expect(session.user.phone).toBe('+79009998873');
   });
 
-  it('admin can get and rotate invite; old token stops working', async () => {
-    const before = await mockSchoolSettingsApi.getRegistrationInvite('user-admin', 'http://localhost');
-    expect(before.token).toBe(SEED_REGISTRATION_INVITE_TOKEN);
+  it('admin getRegistrationInvite replaces seed so QR opens the form', async () => {
+    const before = await mockSchoolSettingsApi.getRegistrationInvite(
+      'user-admin',
+      'http://localhost',
+    );
+    expect(before.token).not.toBe(SEED_REGISTRATION_INVITE_TOKEN);
     expect(before.registerUrl).toContain('/register?invite=');
+    expect(before.registerUrl).toContain(before.token);
+
+    const check = await mockAuthApi.validateRegistrationInvite(before.token);
+    expect(check.valid).toBe(true);
 
     const rotated = await mockSchoolSettingsApi.rotateRegistrationInvite(
       'user-admin',
       'http://localhost',
     );
-    expect(rotated.token).not.toBe(SEED_REGISTRATION_INVITE_TOKEN);
+    expect(rotated.token).not.toBe(before.token);
 
     await expect(
       mockAuthApi.register(
@@ -104,7 +128,7 @@ describe('mock registration invite gate', () => {
         'Аня',
         'Тест',
         ['dir-vocal'],
-        SEED_REGISTRATION_INVITE_TOKEN,
+        before.token,
       ),
     ).rejects.toMatchObject({ code: 'INVITE_INVALID' });
 

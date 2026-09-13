@@ -7,6 +7,51 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
+/** Voice note: explicit kind, or legacy `voice-*` filenames from recorder. */
+export function isVoiceAttachment(attachment: MessageAttachment): boolean {
+  if (attachment.kind === 'voice') return true;
+  if (attachment.kind === 'file') return false;
+  return attachment.type === 'audio' && attachment.filename.startsWith('voice-');
+}
+
+const MEDIA_CAPTION_PLACEHOLDERS = new Set([
+  'Вложение',
+  'Фото',
+  'Видео',
+  'Голосовое',
+  'Аудио',
+  'Файл',
+]);
+
+/** Label for chat list / notifications when message has no user caption. */
+export function getAttachmentPreviewLabel(attachment: MessageAttachment): string {
+  if (attachment.type === 'image') return 'Фото';
+  if (attachment.type === 'video') return 'Видео';
+  if (isVoiceAttachment(attachment)) return 'Голосовое';
+  if (attachment.type === 'audio') return attachment.filename || 'Аудио';
+  return attachment.filename || 'Файл';
+}
+
+export function getAttachmentsPreviewLabel(attachments: MessageAttachment[] | undefined): string {
+  if (!attachments?.length) return 'Вложение';
+  if (attachments.length === 1) return getAttachmentPreviewLabel(attachments[0]!);
+  return 'Вложение';
+}
+
+/**
+ * True when `text` is only a synthetic stand-in for media (filename or placeholder),
+ * not a real user caption — hide it under the attachment in the bubble.
+ */
+export function isSyntheticMediaCaption(
+  text: string,
+  attachments: MessageAttachment[] | undefined,
+): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || !attachments?.length) return false;
+  if (MEDIA_CAPTION_PLACEHOLDERS.has(trimmed)) return true;
+  return attachments.some((a) => a.filename === trimmed);
+}
+
 export function createAttachmentFromFile(file: File, id: string): MessageAttachment | null {
   const type = detectAttachmentType(file.type, file.name);
   if (!type) return null;

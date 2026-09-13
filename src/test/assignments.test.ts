@@ -5,7 +5,7 @@ import {
   mockAssignmentGroupsApi,
   resetMockDatabase,
 } from '@/services/api/mock';
-import { canViewAssignment, canCreateAssignment } from '@/services/assignments/access';
+import { canViewAssignment, canCreateAssignment, canManageAssignment } from '@/services/assignments/access';
 import {
   canEditAssignmentGroup,
   canManageAssignmentGroups,
@@ -13,9 +13,16 @@ import {
 } from '@/services/assignments/groups/access';
 import {
   filterStudentsByDirection,
+  isManagedAssignmentGroup,
   isUserAmongMembers,
 } from '@/services/assignments/groups/helpers';
 import { getRecentAssignmentsForHome } from '@/services/assignments/helpers';
+import {
+  assignmentIdFromNotificationLink,
+  countUnreadAssignments,
+  getUnreadAssignmentIds,
+  markAssignmentViewedLocal,
+} from '@/services/assignments/unread';
 import {
   validateAssignmentContentFile,
   validateContentBlock,
@@ -101,6 +108,43 @@ describe('assignment access', () => {
     expect(canCreateAssignment(teacher)).toBe(true);
     expect(canCreateAssignment(student)).toBe(false);
   });
+
+  it('staff with create permission can manage assignments', () => {
+    expect(canManageAssignment(teacher)).toBe(true);
+    expect(canManageAssignment(admin)).toBe(true);
+    expect(canManageAssignment(student)).toBe(false);
+  });
+  it('student can view school-wide assignment by group name Все ученики', () => {
+    const schoolWide: AssignmentGroup = {
+      id: 'grp-orphan-all',
+      name: 'Все ученики',
+      teacherId: teacher.id,
+      memberIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const assignment: Assignment = {
+      ...baseAssignment,
+      id: 'asgn-all',
+      groupId: schoolWide.id,
+    };
+    expect(canViewAssignment(student, assignment, [schoolWide])).toBe(true);
+    expect(canViewAssignment(otherStudent, assignment, [schoolWide])).toBe(true);
+  });
+
+  it('hides system Все ученики from managed groups list', () => {
+    expect(
+      isManagedAssignmentGroup({
+        id: 'x',
+        name: 'Все ученики',
+        teacherId: teacher.id,
+        memberIds: [],
+        createdAt: '',
+        updatedAt: '',
+      }),
+    ).toBe(false);
+    expect(isManagedAssignmentGroup(vocalGroup)).toBe(true);
+  });
 });
 
 describe('assignment group access', () => {
@@ -134,6 +178,85 @@ describe('assignment home helpers', () => {
   });
 });
 
+describe('assignment unread helpers', () => {
+  const userId = 'user-student';
+  const viewedKey = `kvartira:assignmentViewed:v2:${userId}`;
+  const seededKey = `kvartira:assignmentViewedSeeded:v2:${userId}`;
+
+  beforeEach(() => {
+    localStorage.removeItem(viewedKey);
+    localStorage.removeItem(seededKey);
+  });
+
+  it('parses assignment id from notification link', () => {
+    expect(assignmentIdFromNotificationLink('/assignments/asgn-1')).toBe('asgn-1');
+    expect(assignmentIdFromNotificationLink('https://app.example/assignments/asgn-1')).toBe(
+      'asgn-1',
+    );
+    expect(assignmentIdFromNotificationLink('assignments/asgn-1')).toBe('asgn-1');
+    expect(assignmentIdFromNotificationLink('/assignments/create')).toBeNull();
+    expect(assignmentIdFromNotificationLink('/assignments/groups')).toBeNull();
+    expect(assignmentIdFromNotificationLink('/home')).toBeNull();
+  });
+
+  it('seeds existing as viewed but keeps notified as unread', () => {
+    const notifications = [
+      {
+        read: false,
+        type: 'assignment' as const,
+        link: '/assignments/a2',
+        body: 'Новое',
+        title: 'Новое домашнее задание',
+      },
+    ];
+    const unread = getUnreadAssignmentIds(['a1', 'a2', 'a3'], userId, notifications, undefined, {
+      seed: true,
+    });
+    expect(unread.has('a2')).toBe(true);
+    expect(unread.has('a1')).toBe(false);
+    expect(
+      countUnreadAssignments(['a1', 'a2', 'a3'], userId, notifications, undefined, { seed: true }),
+    ).toBe(1);
+  });
+
+  it('clears unread after local viewed mark', () => {
+    const notifications = [
+      {
+        read: false,
+        type: 'assignment' as const,
+        link: '/assignments/a2',
+        body: 'Новое',
+        title: 'Новое домашнее задание',
+      },
+    ];
+    expect(
+      countUnreadAssignments(['a1', 'a2'], userId, notifications, undefined, { seed: true }),
+    ).toBe(1);
+    markAssignmentViewedLocal(userId, 'a2');
+    expect(
+      countUnreadAssignments(['a1', 'a2'], userId, notifications, undefined, { seed: true }),
+    ).toBe(0);
+  });
+
+  it('matches notification by assignment title when link missing', () => {
+    const notifications = [
+      {
+        read: false,
+        type: 'assignment' as const,
+        link: undefined,
+        body: 'Этюд',
+        title: 'Новое домашнее задание',
+      },
+    ];
+    const titles = new Map([['Этюд', 'a9']]);
+    const unread = getUnreadAssignmentIds(['a8', 'a9'], userId, notifications, titles, {
+      seed: true,
+    });
+    expect(unread.has('a9')).toBe(true);
+    expect(unread.has('a8')).toBe(false);
+  });
+});
+
 describe('assignment content validation', () => {
   it('accepts mp3 for voice block', () => {
     const result = validateAssignmentContentFile(
@@ -141,6 +264,27 @@ describe('assignment content validation', () => {
       'voice',
     );
     expect(result.valid).toBe(true);
+  });
+
+  it('accepts image (photo) block', () => {
+    expect(
+      validateAssignmentContentFile(
+        { filename: 'score.jpg', mimeType: 'image/jpeg', size: 1024 },
+        'image',
+      ).valid,
+    ).toBe(true);
+    expect(
+      validateAssignmentContentFile(
+        { filename: 'notes.png', mimeType: 'image/png', size: 2048 },
+        'image',
+      ).valid,
+    ).toBe(true);
+    expect(
+      validateAssignmentContentFile(
+        { filename: 'doc.pdf', mimeType: 'application/pdf', size: 1024 },
+        'image',
+      ).valid,
+    ).toBe(false);
   });
 
   it('accepts pdf block', () => {
@@ -210,8 +354,14 @@ describe('mock assignments API', () => {
   });
 
   it('notifies group members when assignment is created', async () => {
-    const { mockNotificationsApi } = await import('@/services/api/mock');
+    const { mockNotificationsApi, getMockPushDeliveries } = await import('@/services/api/mock');
+    await mockNotificationsApi.registerPushSubscription(student.id, {
+      endpoint: 'https://push.example.com/asgn',
+      keys: { p256dh: 'a', auth: 'b' },
+    });
     const before = await mockNotificationsApi.getNotifications(student.id);
+    const pushBefore = getMockPushDeliveries().length;
+
     await mockAssignmentsApi.createAssignment(
       {
         title: 'Уведомление тест',
@@ -224,11 +374,122 @@ describe('mock assignments API', () => {
     const after = await mockNotificationsApi.getNotifications(student.id);
     expect(after.length).toBe(before.length + 1);
     expect(after[0].type).toBe('assignment');
+
+    const pushes = getMockPushDeliveries();
+    expect(pushes.length).toBeGreaterThan(pushBefore);
+    expect(pushes.some((d) => d.type === 'assignment' && d.userId === student.id)).toBe(true);
   });
 
   it('admin can view all assignments', async () => {
     const list = await mockAssignmentsApi.getAssignments({ requesterId: admin.id });
     expect(list.some((a) => a.groupId === 'grp-guitarists')).toBe(true);
+  });
+
+  it('teacher updates assignment without notifying students', async () => {
+    const { mockNotificationsApi } = await import('@/services/api/mock');
+    const created = await mockAssignmentsApi.createAssignment(
+      {
+        title: 'До правки',
+        description: 'Старое',
+        groupId: 'grp-vocalists',
+        contentBlocks: [{ type: 'text', order: 0, text: 'Старый текст' }],
+      },
+      teacher.id,
+    );
+    const before = await mockNotificationsApi.getNotifications(student.id);
+
+    const updated = await mockAssignmentsApi.updateAssignment(
+      created.id,
+      {
+        title: 'После правки',
+        description: 'Новое',
+        groupId: 'grp-vocalists',
+        contentBlocks: [{ type: 'text', order: 0, text: 'Новый текст' }],
+      },
+      teacher.id,
+    );
+
+    expect(updated.title).toBe('После правки');
+    expect(updated.contentBlocks[0]?.text).toBe('Новый текст');
+    const after = await mockNotificationsApi.getNotifications(student.id);
+    expect(after.length).toBe(before.length);
+  });
+
+  it('admin can update another teacher assignment', async () => {
+    const list = await mockAssignmentsApi.getAssignments({ requesterId: teacher.id });
+    const target = list[0]!;
+    const updated = await mockAssignmentsApi.updateAssignment(
+      target.id,
+      {
+        title: 'Админ правка',
+        description: target.description,
+        groupId: target.groupId,
+        contentBlocks: [{ type: 'text', order: 0, text: 'Обновлено админом' }],
+      },
+      admin.id,
+    );
+    expect(updated.title).toBe('Админ правка');
+    expect(updated.teacherId).toBe(target.teacherId);
+  });
+
+  it('another teacher can update assignment (staff manage)', async () => {
+    const otherTeacher: User = {
+      id: 'user-teacher-2',
+      phone: '+79007654321',
+      role: 'teacher',
+      firstName: 'Other',
+      lastName: 'Teacher',
+    };
+    const list = await mockAssignmentsApi.getAssignments({ requesterId: teacher.id });
+    const target = list[0]!;
+    const updated = await mockAssignmentsApi.updateAssignment(
+      target.id,
+      {
+        title: 'Правка коллеги',
+        description: target.description,
+        groupId: target.groupId,
+        contentBlocks: [{ type: 'text', order: 0, text: 'От другого преподавателя' }],
+      },
+      otherTeacher.id,
+    );
+    expect(updated.title).toBe('Правка коллеги');
+  });
+
+  it('student cannot update assignment (IDOR)', async () => {
+    const list = await mockAssignmentsApi.getAssignments({ requesterId: student.id });
+    await expect(
+      mockAssignmentsApi.updateAssignment(
+        list[0]!.id,
+        {
+          title: 'Hack',
+          description: 'x',
+          groupId: list[0]!.groupId,
+          contentBlocks: [{ type: 'text', order: 0, text: 'nope' }],
+        },
+        student.id,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('teacher deletes assignment; student cannot', async () => {
+    const created = await mockAssignmentsApi.createAssignment(
+      {
+        title: 'На удаление',
+        description: 'Описание',
+        groupId: 'grp-vocalists',
+        contentBlocks: [{ type: 'text', order: 0, text: 'Материал' }],
+      },
+      teacher.id,
+    );
+
+    await expect(
+      mockAssignmentsApi.deleteAssignment(created.id, student.id),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    await mockAssignmentsApi.deleteAssignment(created.id, teacher.id);
+    await expect(mockAssignmentsApi.getAssignment(created.id, teacher.id)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
   });
 });
 

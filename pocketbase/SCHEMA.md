@@ -29,7 +29,7 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 | `login_history` | `LoginHistoryEntry` | user, success |
 | `security_alerts` | `SecurityAlert` | user, type, read |
 | `notifications` | `AppNotification` | user, type, title, link |
-| `notification_preferences` | `NotificationPreferences` | user, pushEnabled |
+| `notification_preferences` | `NotificationPreferences` | user, pushEnabled (optional после `1791276800_*`; required bool трактовал `false` как blank) |
 | `push_subscriptions` | Web Push endpoint | user, endpoint, p256dh, auth, userAgent |
 | `school_settings` | `PublicSchoolInfo` | name, tagline, about, contacts (json: phone/email/address/workingHours + socialLinks + directionsVideo) |
 | `public_news` | `PublicNewsItem` | title, excerpt, publishedAt |

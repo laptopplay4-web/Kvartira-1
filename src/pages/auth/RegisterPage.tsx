@@ -76,7 +76,13 @@ const schema = z
 
 type FormData = z.infer<typeof schema>;
 
-function RegistrationInviteGate({ checking }: { checking: boolean }) {
+function RegistrationInviteGate({
+  checking,
+  hasInviteToken,
+}: {
+  checking: boolean;
+  hasInviteToken: boolean;
+}) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
@@ -87,8 +93,9 @@ function RegistrationInviteGate({ checking }: { checking: boolean }) {
           </div>
           <h1 className="text-h1">Регистрация по QR</h1>
           <p className="mt-3 text-body-sm text-text-secondary">
-            Аккаунт ученика создаётся только после сканирования QR-кода в школе «Квартира».
-            Код размещён на стенде у входа.
+            {hasInviteToken
+              ? 'Это приглашение недействительно или устарело. Попросите актуальный QR на стенде школы «Квартира».'
+              : 'Аккаунт ученика создаётся только после сканирования QR-кода в школе «Квартира». Код размещён на стенде у входа.'}
           </p>
         </div>
 
@@ -102,8 +109,9 @@ function RegistrationInviteGate({ checking }: { checking: boolean }) {
             <div className="flex items-start gap-3 text-left text-body-sm text-text-secondary">
               <QrCode className="mt-0.5 h-5 w-5 shrink-0 text-brand" aria-hidden />
               <p>
-                Откройте камеру телефона, наведите на распечатанный QR — браузер откроет форму
-                регистрации с действующим приглашением.
+                {hasInviteToken
+                  ? 'Откройте камеру, наведите на распечатанный QR — откроется форма создания аккаунта.'
+                  : 'Откройте камеру телефона, наведите на распечатанный QR — браузер откроет форму регистрации с действующим приглашением.'}
               </p>
             </div>
             <p className="text-body-sm text-text-muted" role="status">
@@ -245,7 +253,9 @@ export default function RegisterPage() {
   };
 
   if (!inviteValid) {
-    return <RegistrationInviteGate checking={inviteChecking} />;
+    return (
+      <RegistrationInviteGate checking={inviteChecking} hasInviteToken={!!inviteToken} />
+    );
   }
 
   return (

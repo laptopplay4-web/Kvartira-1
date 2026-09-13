@@ -2,16 +2,33 @@ import type { AssignmentGroup, User } from '@/types';
 import { formatUserDirectionLabels } from '@/services/users/helpers';
 
 export const GENERAL_ASSIGNMENT_GROUP_ID = 'grp-general';
-export const GENERAL_ASSIGNMENT_GROUP_LABEL = 'Общее задание';
+export const GENERAL_ASSIGNMENT_GROUP_LABEL = 'Все ученики';
 
 export function isGeneralAssignmentGroup(group: AssignmentGroup | string): boolean {
   if (typeof group === 'string') {
     return group === GENERAL_ASSIGNMENT_GROUP_ID;
   }
+  return (
+    group.isGeneral === true ||
+    group.id === GENERAL_ASSIGNMENT_GROUP_ID ||
+    group.name.trim() === GENERAL_ASSIGNMENT_GROUP_LABEL
+  );
+}
+
+/** True only when PB `kind = general` (or mock sentinel id). */
+export function isKindGeneralGroup(group: AssignmentGroup): boolean {
   return group.isGeneral === true || group.id === GENERAL_ASSIGNMENT_GROUP_ID;
 }
 
 export function isCustomAssignmentGroup(group: AssignmentGroup): boolean {
+  return !isGeneralAssignmentGroup(group);
+}
+
+/**
+ * Groups teachers manage in /assignments/groups.
+ * System «Все ученики» is excluded (general / school-wide recipient preset).
+ */
+export function isManagedAssignmentGroup(group: AssignmentGroup): boolean {
   return !isGeneralAssignmentGroup(group);
 }
 
@@ -28,7 +45,7 @@ export function getAssignmentGroupLabel(
 
 export function sortRecipientGroups(groups: AssignmentGroup[]): AssignmentGroup[] {
   return [...groups]
-    .filter(isCustomAssignmentGroup)
+    .filter(isManagedAssignmentGroup)
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 }
 

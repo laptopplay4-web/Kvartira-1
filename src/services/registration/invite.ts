@@ -81,6 +81,28 @@ export function normalizeRegistrationInviteToken(token: string | null | undefine
   return typeof token === 'string' ? token.trim() : '';
 }
 
+/** Public seed from the repo — never encode this in a wall QR for production. */
+export function isSeedRegistrationInviteToken(token: string | null | undefined): boolean {
+  const normalized = normalizeRegistrationInviteToken(token);
+  return (
+    normalized.length > 0 && inviteTokensEqual(normalized, SEED_REGISTRATION_INVITE_TOKEN)
+  );
+}
+
+/**
+ * Invite that is safe to print as a QR deep-link.
+ * Missing or seed tokens are rotated so `/register?invite=…` opens the form
+ * (PocketBase rejects the committed seed outside `KVARTIRA_DEV=1`).
+ */
+export function ensurePrintableRegistrationInvite(
+  current: RegistrationInviteSecret | null | undefined,
+): { invite: RegistrationInviteSecret; didRotate: boolean } {
+  if (current?.token && !isSeedRegistrationInviteToken(current.token)) {
+    return { invite: current, didRotate: false };
+  }
+  return { invite: createRotatedRegistrationInvite(), didRotate: true };
+}
+
 export function parseRegistrationInvite(value: unknown): RegistrationInviteSecret | null {
   const obj = asObject(value);
   if (!obj) return null;

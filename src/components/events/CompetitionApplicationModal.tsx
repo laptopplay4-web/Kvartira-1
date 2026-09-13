@@ -73,8 +73,22 @@ export function CompetitionApplicationModal({
   const displayError = error || serverError;
 
   return (
-    <Modal open={open} onClose={handleClose} title="Заявка на конкурс">
-      <form className="space-y-4" onSubmit={submit}>
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Заявка на конкурс"
+      footer={
+        <div className="flex gap-3">
+          <Button type="button" variant="secondary" fullWidth onClick={handleClose} disabled={loading}>
+            Отмена
+          </Button>
+          <Button type="submit" form="competition-application-form" fullWidth loading={loading} disabled={disabled}>
+            Подать заявку
+          </Button>
+        </div>
+      }
+    >
+      <form id="competition-application-form" className="space-y-4" onSubmit={submit}>
         <Input
           label="Произведение"
           error={errors.pieceTitle?.message}
@@ -133,15 +147,6 @@ export function CompetitionApplicationModal({
             {displayError}
           </p>
         )}
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={handleClose} disabled={loading}>
-            Отмена
-          </Button>
-          <Button type="submit" fullWidth loading={loading} disabled={disabled}>
-            Подать заявку
-          </Button>
-        </div>
       </form>
     </Modal>
   );

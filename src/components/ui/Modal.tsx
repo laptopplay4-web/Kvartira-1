@@ -10,12 +10,24 @@ import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { IconButton } from './IconButton';
 
+type ModalSize = 'sm' | 'md' | 'lg';
+
+const MODAL_SIZE_CLASS: Record<ModalSize, string> = {
+  sm: 'max-w-[var(--popup-max-sm)]',
+  md: 'max-w-[var(--popup-max-md)]',
+  lg: 'max-w-[var(--popup-max-lg)]',
+};
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Sticky action row — always visible below the scrollable body. */
+  footer?: ReactNode;
   className?: string;
+  /** Desktop reading width. Default md (28rem). */
+  size?: ModalSize;
   /** false — без крестика, Escape и клика по фону (блокирующие диалоги). */
   dismissible?: boolean;
   /** Full-bleed overlay (crop / lightbox). */
@@ -35,7 +47,9 @@ export function Modal({
   onClose,
   title,
   children,
+  footer,
   className,
+  size = 'md',
   dismissible = true,
   variant = 'default',
 }: ModalProps) {
@@ -114,7 +128,7 @@ export function Modal({
     <div
       className={cn(
         'fixed inset-0 z-modal flex justify-center',
-        fullscreen ? 'items-stretch' : 'items-end sm:items-center',
+        fullscreen ? 'items-stretch' : 'items-end p-0 sm:items-center sm:p-6',
       )}
       role="dialog"
       aria-modal
@@ -129,29 +143,44 @@ export function Modal({
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          'relative z-10 outline-none motion-safe:animate-scale-in',
+          'relative z-10 flex min-h-0 min-w-0 flex-col outline-none motion-safe:animate-scale-in',
           fullscreen
-            ? 'flex h-full w-full flex-col bg-surface/90 backdrop-blur-xl'
-            : 'glass-popup max-h-[90dvh] w-full max-w-md overflow-y-auto p-6 sm:rounded-2xl rounded-t-2xl sm:mx-4',
+            ? 'h-full w-full overflow-x-hidden bg-surface/90 backdrop-blur-xl'
+            : [
+                'glass-popup w-full p-6 sm:rounded-2xl rounded-t-2xl',
+                MODAL_SIZE_CLASS[size],
+                'max-h-[90dvh] sm:max-h-[min(90dvh,var(--popup-max-h))]',
+                'overflow-hidden',
+              ],
           className,
         )}
       >
         <div
           className={cn(
-            'mb-4 flex items-center justify-between gap-3',
+            'mb-4 flex shrink-0 items-center justify-between gap-3',
             fullscreen && 'border-b border-border px-4 py-3',
           )}
         >
-          <h2 id={titleId} className="text-h2">
+          <h2 id={titleId} className="min-w-0 flex-1 break-words text-h2">
             {title}
           </h2>
           {dismissible && (
-            <IconButton label="Закрыть" onClick={onClose} size="sm">
+            <IconButton label="Закрыть" onClick={onClose} size="sm" className="shrink-0">
               <X className="h-5 w-5" aria-hidden />
             </IconButton>
           )}
         </div>
-        <div className={cn(fullscreen && 'min-h-0 flex-1 overflow-y-auto px-4 pb-4')}>{children}</div>
+        <div
+          className={cn(
+            'min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain break-words scrollbar-none [overflow-wrap:anywhere]',
+            fullscreen && 'px-4 pb-4',
+          )}
+        >
+          {children}
+        </div>
+        {footer ? (
+          <div className="mt-4 shrink-0 border-t border-border/60 pt-4">{footer}</div>
+        ) : null}
       </div>
     </div>,
     document.body,

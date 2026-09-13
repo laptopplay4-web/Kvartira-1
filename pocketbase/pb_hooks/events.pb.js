@@ -2,18 +2,28 @@
 /**
  * ROADMAP 2.3 — event registration hooks:
  * - capacity check (maxParticipants → 409 «Мест больше нет»)
- * - sync events.registeredUserIds after create/delete
- * - hide the participant id lists from everyone but staff
+ * - sync events.registeredUserIds + registeredCount after create/delete
+ * - notify staff on new registration
+ * - notify students on new event
+ * - hide participant id lists from everyone but staff; expose count via registeredCount
  */
 
+onRecordAfterCreateSuccess((e) => {
+  // Student notify is done from the FE adapter after create (reliable with current auth).
+  // Keep hook export for server-side reseed / future use — avoid duplicate notices.
+  e.next();
+}, 'events');
+
+onRecordDeleteRequest((e) => {
+  const events = require(`${__hooks}/lib/kvartiraEvents.js`);
+  events.purgeEventDependents($app, e.record.id);
+  e.next();
+}, 'events');
+
 /**
- * `events` is publicly readable (landing page), so the raw record used to ship
- * the full roster of who is invited and who signed up.
- *
- * The UI needs two things from those lists and nothing else: how many seats are
- * taken, and whether the current user is in them. So for non-staff every other
- * id is replaced with an opaque placeholder — the length and the self-check
- * still work, the roster no longer leaks.
+ * Non-staff: clear roster arrays (length lied after 'hidden' placeholders).
+ * registeredCount stays on the record for capacity UI; isRegistered via own id check
+ * is reconstructed client-side from a single-element list when viewer is registered.
  */
 onRecordEnrich((e) => {
   const auth = e.auth;
@@ -36,25 +46,46 @@ onRecordEnrich((e) => {
     return;
   }
 
-  /** @param {string} field */
-  const redact = (field) => {
-    const raw = e.record.get(field);
-    if (!Array.isArray(raw)) return;
-    e.record.set(
-      field,
-      raw.map((id) => (viewerId && String(id) === viewerId ? viewerId : 'hidden')),
-    );
-  };
+  const rawRegistered = e.record.get('registeredUserIds');
+  const ids = Array.isArray(rawRegistered) ? rawRegistered.map(String) : [];
+  const isRegistered = !!(viewerId && ids.includes(viewerId));
 
-  redact('registeredUserIds');
-  redact('invitedUserIds');
+  // Prefer stored registeredCount; fall back to roster length before redact.
+  let count = 0;
+  try {
+    count = e.record.getInt('registeredCount');
+  } catch (_) {
+    count = 0;
+  }
+  if (!count && count !== 0) {
+    count = ids.length;
+  }
+  if (typeof count !== 'number' || count < 0) {
+    count = ids.length;
+  }
+  try {
+    e.record.set('registeredCount', count);
+  } catch (_) {
+    /* field may be missing until migration */
+  }
+  e.record.set('registeredUserIds', isRegistered && viewerId ? [viewerId] : []);
+
+  const rawInvited = e.record.get('invitedUserIds');
+  if (Array.isArray(rawInvited)) {
+    e.record.set(
+      'invitedUserIds',
+      rawInvited
+        .map(String)
+        .filter((id) => (viewerId ? id === viewerId : false)),
+    );
+  }
 
   e.next();
 }, 'events');
 
 onRecordCreateRequest((e) => {
   const events = require(`${__hooks}/lib/kvartiraEvents.js`);
-  events.assertRegistrationCapacity($app, e.record);
+  events.assertRegistrationCreate($app, e.record, e.auth);
   if (e.auth && e.auth.collection().name === 'users' && e.auth.getString('role') !== 'admin') {
     e.record.set('user', e.auth.id);
   }
@@ -63,12 +94,27 @@ onRecordCreateRequest((e) => {
 
 onRecordAfterCreateSuccess((e) => {
   const events = require(`${__hooks}/lib/kvartiraEvents.js`);
-  events.syncRegisteredUserIds($app, events.relId(e.record.get('event')));
+  const eventId = events.relId(e.record.get('event'));
+  events.syncRegisteredUserIds($app, eventId);
+  events.notifyStaffEventRegistration($app, e.record);
+  e.next();
+}, 'event_registrations');
+
+/** Stash event/user/auth before delete — AfterDelete often has empty relations; auth only on *Request. */
+onRecordDeleteRequest((e) => {
+  const events = require(`${__hooks}/lib/kvartiraEvents.js`);
+  events.stashUnregistrationNotify(e.record, e.auth);
   e.next();
 }, 'event_registrations');
 
 onRecordAfterDeleteSuccess((e) => {
   const events = require(`${__hooks}/lib/kvartiraEvents.js`);
-  events.syncRegisteredUserIds($app, events.relId(e.record.get('event')));
+  const stashed = events.takeUnregistrationNotify(e.record.id);
+  const eventId =
+    events.relId(e.record.get('event')) || (stashed && stashed.eventId) || '';
+  if (eventId) {
+    events.syncRegisteredUserIds($app, eventId);
+  }
+  events.notifyStaffEventUnregistration($app, e.record, stashed);
   e.next();
 }, 'event_registrations');

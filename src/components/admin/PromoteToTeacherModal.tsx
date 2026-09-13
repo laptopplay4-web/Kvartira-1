@@ -40,13 +40,8 @@ export function PromoteToTeacherModal({
   const hasMatches = visibleStudents.length > 0;
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Назначить преподавателя"
-      className="max-h-[90vh] overflow-hidden sm:max-w-lg"
-    >
-      <div className="flex max-h-[70vh] flex-col gap-3">
+    <Modal open={open} onClose={onClose} title="Назначить преподавателя" size="lg">
+      <div className="flex flex-col gap-3">
         <p className="text-body-sm text-text-secondary">
           Выберите ученика для назначения преподавателем.
         </p>
@@ -68,7 +63,7 @@ export function PromoteToTeacherModal({
           </div>
         )}
 
-        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+        <div className="space-y-1">
           {hasMatches ? (
             visibleStudents.map((student) => {
               const isPromoting = promotingUserId === student.id;

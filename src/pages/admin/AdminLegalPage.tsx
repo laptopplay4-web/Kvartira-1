@@ -45,10 +45,6 @@ export default function AdminLegalPage() {
     <div className="page-container">
       <AdminPageHeader title="Юридические документы" />
 
-      <p className="mb-6 text-body-sm text-text-secondary">
-        Управление текстами и версиями документов. Тексты требуют юридической проверки перед публикацией.
-      </p>
-
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (

@@ -90,6 +90,18 @@ describe('notification read helpers', () => {
     ).toBe(1);
   });
 
+  it('hides admin help/report alerts from bell (profile badge instead)', () => {
+    expect(showsInNotificationsInbox({ type: 'system', link: '/admin/help/t1' })).toBe(false);
+    expect(showsInNotificationsInbox({ type: 'system', link: '/home' })).toBe(true);
+    expect(
+      countInboxUnreadNotifications([
+        { read: false, type: 'system', link: '/admin/help/t1' },
+        { read: false, type: 'system', link: '/admin/help/t1' },
+        { read: false, type: 'lesson' },
+      ]),
+    ).toBe(1);
+  });
+
   it('detects leave from notifications route', () => {
     expect(didLeaveNotificationsRoute('/notifications', '/home')).toBe(true);
     expect(didLeaveNotificationsRoute('/notifications', '/profile')).toBe(true);

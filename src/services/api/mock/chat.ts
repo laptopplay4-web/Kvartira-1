@@ -129,8 +129,12 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
   function assertConversationAccess(conversationId: string, userId: string): Conversation {
     const user = getUserById(userId);
     const conv = getConversationOrThrow(conversationId);
-    if (user.role === 'admin' && conv.type !== 'personal') {
-      ensureAdminGroupMembership(db, userId);
+    if (user.role === 'admin') {
+      // Moderation / report deep-link: admin may open any chat by id (list stays membership-based).
+      if (conv.type !== 'personal') {
+        ensureAdminGroupMembership(db, userId);
+      }
+      return conv;
     }
     if (!canAccessConversation(user, conv, db.conversationMembers)) {
       throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);

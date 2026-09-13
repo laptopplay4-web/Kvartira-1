@@ -11,7 +11,9 @@ import { ApiError } from '@/services/api/types';
 import { getPocketBase } from '@/services/api/pocketbase/client';
 import { mapPocketBaseError, withPbError } from '@/services/api/pocketbase/errors';
 import {
+  mapConversationRecord,
   mapHelpArticleRecord,
+  mapMessageRecord,
   mapSupportTicketRecord,
   mapUserRecord,
 } from '@/services/api/pocketbase/mappers';
@@ -29,6 +31,15 @@ import {
   canViewTicket,
 } from '@/services/support/access';
 import {
+  adminHelpTicketPath,
+  supportTicketAdminNotifyTitle,
+} from '@/services/support/adminInbox';
+import {
+  applyEnrichedReportContext,
+  enrichReportContextFromSources,
+  reportContextNeedsEnrichment,
+} from '@/services/support/reportContext';
+import {
   filterFaqArticles,
   filterTickets,
   searchTickets,
@@ -40,7 +51,15 @@ import {
   validateReplyInput,
   validateSupportAttachment,
 } from '@/services/support/validation';
-import type { SupportTicket, SupportTicketCategory, SupportTicketStatus, User } from '@/types';
+import type {
+  Conversation,
+  Message,
+  SupportTicket,
+  SupportTicketCategory,
+  SupportTicketReportContext,
+  SupportTicketStatus,
+  User,
+} from '@/types';
 
 function uid(prefix: string): string {
   const suffix = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -92,7 +111,13 @@ function buildTicketsFilter(filters: {
   return parts.join(' && ');
 }
 
-async function pushSupportNotification(userId: string, title: string, body: string, link: string): Promise<void> {
+async function pushSupportNotification(
+  userId: string,
+  title: string,
+  body: string,
+  link: string,
+  options?: { urgent?: boolean },
+): Promise<void> {
   const pb = getPocketBase();
   try {
     await pb.collection('notifications').create({
@@ -102,11 +127,106 @@ async function pushSupportNotification(userId: string, title: string, body: stri
       body,
       read: false,
       link,
+      ...(options?.urgent ? { urgent: true } : {}),
     });
   } catch (error) {
     const mapped = mapPocketBaseError(error);
     if (mapped.code !== 'FORBIDDEN') throw error;
   }
+}
+
+async function notifyAdminsNewTicket(ticket: SupportTicket): Promise<void> {
+  const pb = getPocketBase();
+  const isReport = Boolean(ticket.reportContext);
+  const title = supportTicketAdminNotifyTitle(isReport);
+  const link = adminHelpTicketPath(ticket.id);
+  try {
+    const admins = await pb.collection('users').getFullList({
+      filter: 'role = "admin"',
+    });
+    for (const admin of admins) {
+      await pushSupportNotification(admin.id, title, ticket.subject, link, { urgent: true });
+    }
+  } catch {
+    /* best-effort — ticket already created */
+  }
+}
+
+/** Direct PB reads — bypass ChatApi membership (admin may not be in personal chats). */
+async function loadReportSources(
+  ctx: SupportTicketReportContext,
+): Promise<{ conversation: Conversation | null; message: Message | null; users: User[] }> {
+  const pb = getPocketBase();
+  let conversation: Conversation | null = null;
+  let message: Message | null = null;
+  let users: User[] = [];
+
+  try {
+    conversation = mapConversationRecord(await pb.collection('conversations').getOne(ctx.conversationId));
+  } catch {
+    conversation = null;
+  }
+
+  try {
+    const record = await pb.collection('messages').getOne(ctx.messageId);
+    message = mapMessageRecord(record);
+    if (message.conversationId !== ctx.conversationId) {
+      message = null;
+    }
+  } catch {
+    message = null;
+  }
+
+  if (conversation?.type === 'personal' && conversation.participantIds.length) {
+    try {
+      const filter = conversation.participantIds
+        .map((id) => `id = "${escapePbFilter(id)}"`)
+        .join(' || ');
+      const records = await pb.collection('users').getFullList({ filter });
+      users = records.map((r) => mapUserRecord(r));
+    } catch {
+      users = [];
+    }
+  }
+
+  return { conversation, message, users };
+}
+
+async function enrichTicketReport(
+  ticket: SupportTicket,
+  viewerId: string,
+  options?: { persist?: boolean },
+): Promise<SupportTicket> {
+  if (!ticket.reportContext || !reportContextNeedsEnrichment(ticket.reportContext)) {
+    return ticket;
+  }
+
+  const sources = await loadReportSources(ticket.reportContext);
+  const enriched = enrichReportContextFromSources(ticket.reportContext, {
+    ...sources,
+    viewerId,
+  });
+  const next = applyEnrichedReportContext(ticket, enriched);
+
+  if (options?.persist !== false) {
+    const changed =
+      next.reportContext?.conversationTitle !== ticket.reportContext?.conversationTitle ||
+      next.reportContext?.messagePreview !== ticket.reportContext?.messagePreview ||
+      next.message !== ticket.message;
+    if (changed) {
+      try {
+        const pb = getPocketBase();
+        await pb.collection('support_tickets').update(ticket.id, {
+          reportContext: next.reportContext ?? null,
+          message: next.message,
+        });
+      } catch {
+        /* best-effort persist */
+      }
+    }
+  }
+
+  return next;
 }
 
 export const pocketbaseSupportApi: SupportApi = {
@@ -133,14 +253,17 @@ export const pocketbaseSupportApi: SupportApi = {
       list = filterTickets(list, { status: filters.status, category: filters.category });
       list = searchTickets(list, filters.query ?? '');
       const resolved = await Promise.all(list.map(resolveSupportTicket));
-      return sortTicketsByDate(resolved);
+      const enriched = await Promise.all(
+        resolved.map((ticket) => enrichTicketReport(ticket, filters.requesterId)),
+      );
+      return sortTicketsByDate(enriched);
     });
   },
 
   async getTicket(id, requesterId) {
     return withPbError(async () => {
       const { ticket } = await assertViewAccess(id, requesterId);
-      return ticket;
+      return enrichTicketReport(ticket, requesterId);
     });
   },
 
@@ -189,15 +312,40 @@ export const pocketbaseSupportApi: SupportApi = {
           id: uid('attach'),
         })) ?? [];
 
+      let reportContext = input.reportContext ?? null;
+      let message = input.message.trim();
+      if (reportContext) {
+        const sources = await loadReportSources(reportContext);
+        reportContext = enrichReportContextFromSources(reportContext, {
+          ...sources,
+          viewerId: userId,
+        });
+        message = applyEnrichedReportContext(
+          {
+            id: 'tmp',
+            userId,
+            subject: input.subject.trim(),
+            message,
+            category: input.category,
+            status: 'open',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            attachments: [],
+            reportContext,
+          },
+          reportContext,
+        ).message;
+      }
+
       const record = await pb.collection('support_tickets').create({
         user: userId,
         subject: input.subject.trim(),
-        message: input.message.trim(),
+        message,
         category: input.category,
         status: 'open',
         attachments,
         adminReply: null,
-        reportContext: input.reportContext ?? null,
+        reportContext,
       });
 
       await linkStoredFilesToContext(
@@ -206,21 +354,7 @@ export const pocketbaseSupportApi: SupportApi = {
       );
 
       const ticket = await resolveSupportTicket(mapSupportTicketRecord(record));
-
-      if (input.reportContext) {
-        const admins = await pb.collection('users').getFullList({
-          filter: 'role = "admin"',
-        });
-        for (const admin of admins) {
-          await pushSupportNotification(
-            admin.id,
-            'Жалоба на сообщение в чате',
-            ticket.subject,
-            `/profile/help/${ticket.id}`,
-          );
-        }
-      }
-
+      await notifyAdminsNewTicket(ticket);
       return ticket;
     });
   },

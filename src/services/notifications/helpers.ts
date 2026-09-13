@@ -36,18 +36,29 @@ export function notificationRequiresAction(
 }
 
 /**
- * ДЗ и записи на мероприятия не показываем во вкладке «Уведомления» /
- * бейдже колокольчика — отдельные бейджи (книга / События).
+ * ДЗ, мероприятия и admin-обращения/жалобы не в колокольчике —
+ * отдельные бейджи (книга / События / Профиль → Админ).
  */
 export function showsInNotificationsInbox(
-  n: Pick<AppNotification, 'type'> | Partial<Pick<AppNotification, 'type'>>,
+  n: Pick<AppNotification, 'type'> & Partial<Pick<AppNotification, 'link' | 'type'>>,
 ): boolean {
-  return n.type !== 'assignment' && n.type !== 'event';
+  if (n.type === 'assignment' || n.type === 'event') return false;
+  if (isSupportAdminInboxNotification(n)) return false;
+  return true;
+}
+
+/** Admin help inbox alerts (`/admin/help…`) — badge on Profile, not bell. */
+export function isSupportAdminInboxNotification(
+  n: Partial<Pick<AppNotification, 'link'>>,
+): boolean {
+  if (!n.link) return false;
+  const path = n.link.split('?')[0]?.replace(/\/$/, '') ?? '';
+  return path === '/admin/help' || path.startsWith('/admin/help/');
 }
 
 export function countInboxUnreadNotifications(
   notifications: (Pick<AppNotification, 'read' | 'type'> &
-    Partial<Pick<AppNotification, 'type'>>)[],
+    Partial<Pick<AppNotification, 'link' | 'type'>>)[],
 ): number {
   return notifications.filter((n) => !n.read && showsInNotificationsInbox(n)).length;
 }

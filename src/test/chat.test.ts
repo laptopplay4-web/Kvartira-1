@@ -30,8 +30,14 @@ describe('chat access', () => {
     }
   });
 
-  it('admin does not access personal chats without membership', async () => {
-    await expect(mockChatApi.getConversation('conv-1', 'user-admin')).rejects.toThrow(ApiError);
+  it('admin can open personal chat by id (report deep-link) but list stays membership-based', async () => {
+    const personal = await mockChatApi.getConversation('conv-1', 'user-admin');
+    expect(personal.id).toBe('conv-1');
+    const msgs = await mockChatApi.getMessages('conv-1', 'user-admin');
+    expect(msgs.messages.length).toBeGreaterThan(0);
+
+    const list = await mockChatApi.getConversations('user-admin');
+    expect(list.some((c) => c.id === 'conv-1')).toBe(false);
   });
 
   it('admin sees all group chats and is a member', async () => {

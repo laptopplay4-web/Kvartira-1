@@ -53,7 +53,7 @@ import { buildPasswordMap, createMockSecurityApi, pushAlert, recordAuthLogin } f
 import { createMockLegalApi } from './legal';
 import { createMockSchoolSettingsApi } from './schoolSettings';
 import { createMockNotificationsApi, tryPushNotification } from './notifications';
-import { canManageEvents, canRegisterForEvents } from '@/services/events/access';
+import { canManageEvents, canRegisterForEvents, canViewSchoolEvent } from '@/services/events/access';
 import {
   presentSchoolEvent,
   syncEventRegistrationFields,
@@ -74,6 +74,7 @@ import {
   validateCompetitionApplication,
   validateEventInput,
 } from '@/services/events/validation';
+import { resolveEventImageWriteInput } from '@/services/events/imageWrite';
 import {
   MOCK_PASSWORD_RESET_CODE,
   PASSWORD_RESET_MIN_LENGTH,
@@ -862,11 +863,9 @@ function presentEventForViewer(event: SchoolEvent, userId: string): SchoolEvent 
 export const mockEventsApi: EventsApi = {
   async getEvents(userId) {
     await delay();
+    const viewer = getUserById(userId);
     return db.events
-      .filter((e) => {
-        if (e.type === 'invited') return e.invitedUserIds?.includes(userId);
-        return true;
-      })
+      .filter((e) => canViewSchoolEvent(userId, e, viewer))
       .map((e) => presentEventForViewer(e, userId));
   },
 
@@ -874,7 +873,8 @@ export const mockEventsApi: EventsApi = {
     await delay();
     const event = db.events.find((e) => e.id === id);
     if (!event) throw new ApiError('Мероприятие не найдено', 'NOT_FOUND', 404);
-    if (event.type === 'invited' && !event.invitedUserIds?.includes(userId)) {
+    const viewer = getUserById(userId);
+    if (!canViewSchoolEvent(userId, event, viewer)) {
       throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
     }
     return presentEventForViewer(event, userId);
@@ -1059,6 +1059,7 @@ export const mockEventsApi: EventsApi = {
     const event = db.events.find((e) => e.id === id);
     if (!event) throw new ApiError('Мероприятие не найдено', 'NOT_FOUND', 404);
 
+    const imageProvided = Object.prototype.hasOwnProperty.call(input, 'imageUrl');
     const merged: CreateEventInput = {
       title: input.title ?? event.title,
       description: input.description ?? event.description,
@@ -1067,9 +1068,11 @@ export const mockEventsApi: EventsApi = {
       startTime: input.startTime ?? event.startTime,
       endTime: input.endTime ?? event.endTime,
       location: input.location ?? event.location,
-      imageUrl: Object.prototype.hasOwnProperty.call(input, 'imageUrl')
-        ? input.imageUrl
-        : event.imageUrl,
+      imageUrl: resolveEventImageWriteInput(
+        imageProvided ? input.imageUrl : undefined,
+        event.imageUrl,
+        imageProvided,
+      ),
       maxParticipants: Object.prototype.hasOwnProperty.call(input, 'maxParticipants')
         ? input.maxParticipants
         : event.maxParticipants,

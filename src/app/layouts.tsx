@@ -15,6 +15,7 @@ import { useMarkPassiveNotificationsOnLeave } from '@/hooks/useMarkPassiveNotifi
 import { countUnreadAssignments } from '@/services/assignments/unread';
 import { countUnreadEventParticipationsForNav } from '@/services/events/unread';
 import { countInboxUnreadNotifications } from '@/services/notifications/helpers';
+import { countOpenSupportTickets } from '@/services/support/adminInbox';
 import { PwaInstallBanner } from '@/components/ui/PwaInstallBanner';
 
 export function AppLayout() {
@@ -73,9 +74,20 @@ export function AppLayout() {
       })
     : 0;
 
+  const showAdminSupportInbox = !!user && can(user, 'support:view-all-tickets');
+  const { data: openSupportTickets } = useQuery({
+    queryKey: ['support', 'tickets', 'admin-open-count', user?.id],
+    queryFn: () => api.support.getTickets({ requesterId: user!.id, status: 'open' }),
+    enabled: showAdminSupportInbox,
+  });
+
+  const profileBadge = showAdminSupportInbox
+    ? countOpenSupportTickets(openSupportTickets)
+    : 0;
+
   return (
     <div className="flex min-h-dvh min-w-0 overflow-x-hidden">
-      <SidebarNav chatBadge={chatBadge} eventsBadge={eventsBadge} />
+      <SidebarNav chatBadge={chatBadge} eventsBadge={eventsBadge} profileBadge={profileBadge} />
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-hidden">
         <MobileHeader
           showAssignments={showAssignments}
@@ -104,7 +116,9 @@ export function AppLayout() {
             installing={installing}
           />
         )}
-        {!hideBottomNav && <BottomNav chatBadge={chatBadge} eventsBadge={eventsBadge} />}
+        {!hideBottomNav && (
+          <BottomNav chatBadge={chatBadge} eventsBadge={eventsBadge} profileBadge={profileBadge} />
+        )}
       </div>
     </div>
   );

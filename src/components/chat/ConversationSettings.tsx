@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ChatAvatarEditor } from '@/components/chat/ChatAvatarEditor';
+import { AddGroupMembersModal } from '@/components/assignments/AddGroupMembersModal';
 import { api } from '@/services/api';
 import type { Conversation, ConversationMember, User } from '@/types';
 import { formatUserName } from '@/utils';
@@ -19,8 +20,9 @@ import {
 import { isSchoolWideConversation } from '@/services/chat/schoolWide';
 import { sortConversationsWithPins } from '@/services/chat/helpers';
 import { useConversationMembers } from '@/hooks/useConversationMembers';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { Avatar } from '@/components/ui/Avatar';
-import { Bell, BellOff, LogOut, Pin, Search, Trash2 } from 'lucide-react';
+import { Bell, BellOff, LogOut, Pin, Search, Trash2, UserPlus } from 'lucide-react';
 import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
 
 interface ConversationSettingsProps {
@@ -43,20 +45,30 @@ export function ConversationSettings({
   onDeleted,
 }: ConversationSettingsProps) {
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
   const { data: members } = useConversationMembers(conversation.id, currentUser.id);
   const [title, setTitle] = useState(conversation.title);
   const [avatarUrl, setAvatarUrl] = useState(conversation.avatarUrl ?? '');
   const [avatarError, setAvatarError] = useState('');
   const [memberQuery, setMemberQuery] = useState('');
-  const [addQuery, setAddQuery] = useState('');
+  const [addMembersOpen, setAddMembersOpen] = useState(false);
+
+  const { data: directions = [] } = useQuery({
+    queryKey: ['directions'],
+    queryFn: () => api.lessons.getDirections(),
+    enabled: open && conversation.type !== 'personal',
+  });
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setAddMembersOpen(false);
+      return;
+    }
     setTitle(conversation.title);
     setAvatarUrl(conversation.avatarUrl ?? '');
     setAvatarError('');
     setMemberQuery('');
-    setAddQuery('');
+    setAddMembersOpen(false);
   }, [open, conversation.id, conversation.title, conversation.avatarUrl]);
 
   const schoolWide = isSchoolWideConversation(conversation);
@@ -204,13 +216,16 @@ export function ConversationSettings({
 
   const isListPinned = !!(currentMember?.pinnedAt || conversation.viewerPinnedAt);
 
-  const addMemberMutation = useMutation({
-    mutationFn: (targetUserId: string) =>
-      api.chat.addMember(conversation.id, currentUser.id, targetUserId),
+  const addMembersMutation = useMutation({
+    mutationFn: async (studentIds: string[]) => {
+      for (const targetUserId of studentIds) {
+        await api.chat.addMember(conversation.id, currentUser.id, targetUserId);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
       queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      setAddQuery('');
+      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
     },
   });
 
@@ -259,23 +274,21 @@ export function ConversationSettings({
     return memberUsers.filter((x) => matched.has(x.user.id));
   }, [memberUsers, memberQuery]);
 
-  const availableToAdd = useMemo(
+  const memberIds = useMemo(() => {
+    if (members?.length) return new Set(members.map((m) => m.userId));
+    return new Set(conversation.participantIds);
+  }, [members, conversation.participantIds]);
+
+  const availableStudents = useMemo(
     () =>
       users.filter(
-        (u) => u.id !== currentUser.id && !conversation.participantIds.includes(u.id),
+        (u) => u.role === 'student' && u.id !== currentUser.id && !memberIds.has(u.id),
       ),
-    [users, currentUser.id, conversation.participantIds],
-  );
-
-  const visibleToAdd = useMemo(
-    () =>
-      [...filterUsersBySearchQuery(availableToAdd, addQuery)].sort((a, b) =>
-        formatUserName(a).localeCompare(formatUserName(b), 'ru'),
-      ),
-    [availableToAdd, addQuery],
+    [users, currentUser.id, memberIds],
   );
 
   return (
+    <>
     <Modal open={open} onClose={onClose} title="Настройки чата" size="lg">
       <div className="space-y-6">
         {canEdit && conversation.type !== 'personal' && (
@@ -367,54 +380,19 @@ export function ConversationSettings({
               </ul>
             </div>
 
-            {canManage && availableToAdd.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Добавить участника</p>
-                <div className="relative">
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
-                    aria-hidden
-                  />
-                  <input
-                    type="search"
-                    value={addQuery}
-                    onChange={(e) => setAddQuery(e.target.value)}
-                    placeholder="Поиск по имени или телефону"
-                    aria-label="Поиск пользователя для добавления"
-                    className="w-full rounded-xl border border-border bg-surface-elevated py-2.5 pl-10 pr-4 text-sm focus-ring"
-                  />
-                </div>
-                <ul className="popup-scroll max-h-40 space-y-1">
-                  {visibleToAdd.length > 0 ? (
-                    visibleToAdd.map((u) => (
-                      <li key={u.id}>
-                        <button
-                          type="button"
-                          disabled={addMemberMutation.isPending}
-                          onClick={() => addMemberMutation.mutate(u.id)}
-                          className="flex w-full min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-surface-elevated focus-ring"
-                        >
-                          <Avatar
-                            src={u.avatarUrl}
-                            firstName={u.firstName}
-                            lastName={u.lastName}
-                            size="sm"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{formatUserName(u)}</p>
-                            <p className="truncate text-caption text-text-muted">
-                              {getRoleLabel(u.role)}
-                            </p>
-                          </div>
-                          <span className="text-sm text-brand">Добавить</span>
-                        </button>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="py-4 text-center text-body-sm text-text-muted">Ничего не найдено</li>
-                  )}
-                </ul>
-              </div>
+            {canManage && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full justify-start"
+                disabled={!isOnline || availableStudents.length === 0 || addMembersMutation.isPending}
+                onClick={() => setAddMembersOpen(true)}
+              >
+                <UserPlus className="h-4 w-4" />
+                {availableStudents.length === 0
+                  ? 'Все ученики уже в чате'
+                  : 'Добавить участников'}
+              </Button>
             )}
           </>
         )}
@@ -465,5 +443,18 @@ export function ConversationSettings({
         </div>
       </div>
     </Modal>
+
+    <AddGroupMembersModal
+      open={addMembersOpen}
+      onClose={() => setAddMembersOpen(false)}
+      students={availableStudents}
+      directions={directions}
+      loading={addMembersMutation.isPending}
+      disabled={!isOnline}
+      onAdd={async (studentIds) => {
+        await addMembersMutation.mutateAsync(studentIds);
+      }}
+    />
+    </>
   );
 }

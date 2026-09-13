@@ -27,6 +27,7 @@ describe('router', () => {
     expect(paths).toContain('/lessons/book');
     expect(paths).toContain('/chat');
     expect(paths).toContain('/events');
+    expect(paths).toContain('/events/archive');
     expect(paths).toContain('/profile');
     expect(paths).toContain('/profile/settings');
     expect(paths).toContain('/lessons/availability');
@@ -51,6 +52,8 @@ describe('router', () => {
     expect(paths).toContain('/assignments/:id/edit');
     expect(paths).toContain('/assignments/:id');
     expect(paths).toContain('/admin');
+    expect(paths).toContain('/admin/help');
+    expect(paths).toContain('/admin/help/:id');
     expect(paths).toContain('/admin/schedule');
     expect(paths).toContain('/admin/users');
     expect(paths).toContain('/admin/legal');

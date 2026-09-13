@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Sparkles, Plus, CalendarDays } from 'lucide-react';
@@ -93,6 +94,9 @@ export default function HomePage() {
   } = useQuery({
     queryKey: ['events', user.id],
     queryFn: () => api.events.getEvents(user.id),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const upcomingLessons = lessons
@@ -101,7 +105,10 @@ export default function HomePage() {
 
   const upcoming = upcomingLessons?.slice(0, 3);
   const nextLesson = upcomingLessons?.[0];
-  const nextEvent = events ? getNextUpcomingEvent(events) : undefined;
+  const nextEvent = useMemo(
+    () => (events ? getNextUpcomingEvent(events) : undefined),
+    [events],
+  );
 
   const getDirectionName = (id: string) => directions?.find((d) => d.id === id)?.name ?? '';
   const getTeacher = (id: string) =>
@@ -175,6 +182,7 @@ export default function HomePage() {
         ) : nextEvent ? (
           <Link to={`/events/${nextEvent.id}`}>
             <HomeEventCard
+              key={nextEvent.id}
               title={nextEvent.title}
               subtitle={`${formatLessonDateTime(nextEvent.date, nextEvent.startTime)} · ${nextEvent.location}`}
               imageUrl={nextEvent.imageUrl}

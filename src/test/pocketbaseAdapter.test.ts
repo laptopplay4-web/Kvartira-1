@@ -920,6 +920,7 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
   it('support hooks lock ticket create user and admin-only reply', () => {
     const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/support.pb.js'), 'utf8');
     const lib = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraSupport.js'), 'utf8');
+    const adapter = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/support.ts'), 'utf8');
 
     expect(hook).toContain('support_tickets');
     expect(hook).toContain('onRecordCreateRequest');
@@ -927,6 +928,9 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('assertTicketCreate');
     expect(lib).toContain('assertTicketUpdate');
     expect(lib).toContain("status', 'open'");
+    expect(adapter).toContain('notifyAdminsNewTicket');
+    expect(adapter).toContain('adminHelpTicketPath');
+    expect(adapter).toContain('urgent: true');
   });
 
   it('mapLegalDocumentRecord and mapUserConsentRecord map relations and json fields', () => {

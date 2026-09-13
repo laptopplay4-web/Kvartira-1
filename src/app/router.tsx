@@ -14,6 +14,7 @@ const LessonDetailPage = lazy(() => import('@/pages/lessons/LessonDetailPage'));
 const BookLessonPage = lazy(() => import('@/pages/lessons/BookLessonPage'));
 const ChatPage = lazy(() => import('@/pages/chat/ChatPage'));
 const EventsPage = lazy(() => import('@/pages/events/EventsPage'));
+const EventsArchivePage = lazy(() => import('@/pages/events/EventsArchivePage'));
 const EventDetailPage = lazy(() => import('@/pages/events/EventDetailPage'));
 const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
 const SettingsLayout = lazy(() => import('@/pages/profile/settings/SettingsLayout'));
@@ -38,6 +39,7 @@ const AdminLegalPage = lazy(() => import('@/pages/admin/AdminLegalPage'));
 const AdminSchoolSettingsPage = lazy(() => import('@/pages/admin/AdminSchoolSettingsPage'));
 const AdminRegistrationQrPage = lazy(() => import('@/pages/admin/AdminRegistrationQrPage'));
 const AdminDirectionsPage = lazy(() => import('@/pages/admin/AdminDirectionsPage'));
+const AdminHelpPage = lazy(() => import('@/pages/admin/AdminHelpPage'));
 const LandingPage = lazy(() => import('@/pages/public/LandingPage'));
 const DirectionDetailPage = lazy(() => import('@/pages/public/DirectionDetailPage'));
 const TeacherDetailPage = lazy(() => import('@/pages/public/TeacherDetailPage'));
@@ -78,6 +80,7 @@ export const appRoutes = [
           { path: '/chat', element: <ChatPage /> },
           { path: '/chat/:id', element: <ChatPage /> },
           { path: '/events', element: <EventsPage /> },
+          { path: '/events/archive', element: <EventsArchivePage /> },
           { path: '/events/:id', element: <EventDetailPage /> },
           { path: '/profile', element: <ProfilePage /> },
           {
@@ -107,6 +110,13 @@ export const appRoutes = [
           {
             element: <AdminRoute permission="admin:access" />,
             children: [{ path: '/admin', element: <AdminHubPage /> }],
+          },
+          {
+            element: <AdminRoute permission="support:view-all-tickets" />,
+            children: [
+              { path: '/admin/help', element: <AdminHelpPage /> },
+              { path: '/admin/help/:id', element: <HelpTicketDetailPage /> },
+            ],
           },
           {
             element: <AdminRoute permission="admin:schedule" />,

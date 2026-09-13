@@ -199,6 +199,95 @@ describe('getNextUpcomingEvent', () => {
     expect(getNextUpcomingEvent(events, now)?.id).toBe('early');
   });
 
+  it('picks earlier datetime across days regardless of array order', () => {
+    const events: SchoolEvent[] = [
+      {
+        id: 'concert-far',
+        title: 'Far concert',
+        type: 'concert',
+        date: '2099-06-10',
+        startTime: '12:00',
+        location: 'Hall',
+        description: '',
+        registeredUserIds: [],
+      },
+      {
+        id: 'concert-near',
+        title: 'Near concert',
+        type: 'concert',
+        date: '2099-06-02',
+        startTime: '19:30',
+        location: 'Hall',
+        description: '',
+        registeredUserIds: [],
+      },
+      {
+        id: 'master-mid',
+        title: 'Master',
+        type: 'masterclass',
+        date: '2099-06-05',
+        startTime: '09:00',
+        location: 'Studio',
+        description: '',
+        registeredUserIds: [],
+      },
+    ];
+    expect(getNextUpcomingEvent(events, now)?.id).toBe('concert-near');
+  });
+
+  it('accepts HH:mm:ss startTime from storage', () => {
+    const events: SchoolEvent[] = [
+      {
+        id: 'with-seconds',
+        title: 'Soon',
+        type: 'concert',
+        date: '2099-06-01',
+        startTime: '09:05:00',
+        location: 'Hall',
+        description: '',
+        registeredUserIds: [],
+      },
+      {
+        id: 'later',
+        title: 'Later',
+        type: 'concert',
+        date: '2099-06-01',
+        startTime: '10:00',
+        location: 'Hall',
+        description: '',
+        registeredUserIds: [],
+      },
+    ];
+    expect(getNextUpcomingEvent(events, now)?.id).toBe('with-seconds');
+  });
+
+  it('excludes archived events (past endTime) from nearest', () => {
+    const events: SchoolEvent[] = [
+      {
+        id: 'ended',
+        title: 'Ended',
+        type: 'concert',
+        date: '2026-08-30',
+        startTime: '10:00',
+        endTime: '12:00',
+        location: 'Hall',
+        description: '',
+        registeredUserIds: [],
+      },
+      {
+        id: 'future',
+        title: 'Future',
+        type: 'concert',
+        date: '2099-06-01',
+        startTime: '19:00',
+        location: 'Hall',
+        description: '',
+        registeredUserIds: [],
+      },
+    ];
+    expect(getNextUpcomingEvent(events, now)?.id).toBe('future');
+  });
+
   it('does not mutate the input array', () => {
     const events: SchoolEvent[] = [
       {

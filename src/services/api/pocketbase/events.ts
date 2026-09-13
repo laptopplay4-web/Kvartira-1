@@ -28,6 +28,7 @@ import {
   validateCompetitionApplication,
   validateEventInput,
 } from '@/services/events/validation';
+import { resolveEventImageWriteInput } from '@/services/events/imageWrite';
 import { sanitizeUserPhoneForViewer } from '@/services/users/helpers';
 import type { SchoolEvent, User } from '@/types';
 
@@ -167,7 +168,8 @@ async function loadEventOrThrow(id: string): Promise<SchoolEvent> {
 
 async function assertCanViewEvent(id: string, userId: string): Promise<SchoolEvent> {
   const event = await loadEventOrThrow(id);
-  if (!canViewSchoolEvent(userId, event)) {
+  const viewer = await getRequesterUser(userId).catch(() => null);
+  if (!canViewSchoolEvent(userId, event, viewer)) {
     throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
   }
   return event;
@@ -233,7 +235,9 @@ export const pocketbaseEventsApi: EventsApi = {
       const viewer = await getRequesterUser(userId).catch(() => null);
       const pb = getPocketBase();
       const records = await pb.collection('events').getFullList({ sort: 'date,startTime' });
-      const events = records.map(mapEventRecord).filter((event) => canViewSchoolEvent(userId, event));
+      const events = records
+        .map(mapEventRecord)
+        .filter((event) => canViewSchoolEvent(userId, event, viewer));
       const ownRegistered = canManageEvents(viewer)
         ? new Set<string>()
         : await loadOwnRegisteredEventIds(userId);
@@ -511,7 +515,11 @@ export const pocketbaseEventsApi: EventsApi = {
         startTime: input.startTime ?? event.startTime,
         endTime: input.endTime ?? event.endTime,
         location: input.location ?? event.location,
-        imageUrl: imageProvided ? input.imageUrl : event.imageUrl,
+        imageUrl: resolveEventImageWriteInput(
+          imageProvided ? input.imageUrl : undefined,
+          event.imageUrl,
+          imageProvided,
+        ),
         maxParticipants: Object.prototype.hasOwnProperty.call(input, 'maxParticipants')
           ? input.maxParticipants
           : event.maxParticipants,
@@ -533,7 +541,7 @@ export const pocketbaseEventsApi: EventsApi = {
           await deleteStoredFiles(event.imageUrl);
           nextImage = await maybeUploadEventImage(requesterId, normalized.imageUrl, id);
         } else {
-          nextImage = normalized.imageUrl;
+          nextImage = await maybeUploadEventImage(requesterId, normalized.imageUrl, id);
         }
       }
 

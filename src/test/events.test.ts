@@ -8,6 +8,13 @@ import {
   validateCompetitionApplication,
   validateEventInput,
 } from '@/services/events/validation';
+import { resolveEventImageWriteInput } from '@/services/events/imageWrite';
+import {
+  filterActiveEvents,
+  filterArchivedEvents,
+  isEventArchived,
+} from '@/services/events/helpers';
+import type { SchoolEvent } from '@/types';
 
 describe('validateCompetitionApplication', () => {
   it('requires piece title and composer', () => {
@@ -65,6 +72,48 @@ describe('validateEventInput', () => {
         location: 'Зал',
       }),
     ).toBe('Укажите приглашённых пользователей');
+  });
+
+  it('rejects long http image URLs (signed display URLs must not be written back)', () => {
+    const longUrl = `https://cdn.example/${'a'.repeat(480)}.jpg`;
+    expect(
+      validateEventInput({
+        title: 'Концерт',
+        description: 'Описание',
+        type: 'concert',
+        date: '2026-12-01',
+        startTime: '18:00',
+        location: 'Зал',
+        imageUrl: longUrl,
+      }),
+    ).toMatch(/изображение/);
+  });
+});
+
+describe('resolveEventImageWriteInput', () => {
+  it('keeps stored pbfile when client echoes a signed URL', () => {
+    expect(
+      resolveEventImageWriteInput(
+        'https://pb.example/api/files/x/y?token=long',
+        'pbfile:file123',
+        true,
+      ),
+    ).toBe('pbfile:file123');
+  });
+
+  it('omits image when not provided', () => {
+    expect(resolveEventImageWriteInput(undefined, 'pbfile:file123', false)).toBe('pbfile:file123');
+  });
+
+  it('clears image when provided as undefined', () => {
+    expect(resolveEventImageWriteInput(undefined, 'pbfile:file123', true)).toBeUndefined();
+  });
+
+  it('allows data and pbfile uploads', () => {
+    expect(resolveEventImageWriteInput('data:image/jpeg;base64,xx', 'pbfile:old', true)).toBe(
+      'data:image/jpeg;base64,xx',
+    );
+    expect(resolveEventImageWriteInput('pbfile:new', 'pbfile:old', true)).toBe('pbfile:new');
   });
 });
 
@@ -194,8 +243,44 @@ describe('mockEventsApi events CRUD', () => {
       'user-admin',
     );
     expect(updated.title).toBe('Обновлённый концерт');
+    expect(updated.imageUrl).toBe('https://cdn.example/concert.jpg');
+
+    const updatedEcho = await mockEventsApi.updateEvent(
+      created.id,
+      {
+        title: 'Ещё раз',
+        imageUrl: `https://pb.example/api/files/kvartira_files/x/${'t'.repeat(80)}?token=abc`,
+      },
+      'user-admin',
+    );
+    // External https kept as-is when stored is not pbfile:
+    expect(updatedEcho.imageUrl?.startsWith('https://')).toBe(true);
+
+    const withPbfile = await mockEventsApi.createEvent(
+      {
+        title: 'С файлом',
+        description: 'Описание',
+        type: 'concert',
+        date: '2026-12-02',
+        startTime: '19:00',
+        location: 'Зал',
+        imageUrl: 'pbfile:evtimg1',
+      },
+      'user-admin',
+    );
+    const kept = await mockEventsApi.updateEvent(
+      withPbfile.id,
+      {
+        title: 'С файлом 2',
+        imageUrl: `https://pb.example/api/files/${'x'.repeat(60)}?token=${'y'.repeat(40)}`,
+      },
+      'user-admin',
+    );
+    expect(kept.title).toBe('С файлом 2');
+    expect(kept.imageUrl).toBe('pbfile:evtimg1');
 
     await mockEventsApi.deleteEvent(created.id, 'user-admin');
+    await mockEventsApi.deleteEvent(withPbfile.id, 'user-admin');
     const all = await mockEventsApi.getAllEvents('user-admin');
     expect(all.find((e) => e.id === created.id)).toBeUndefined();
   });
@@ -227,6 +312,64 @@ describe('canViewSchoolEvent', () => {
     expect(canViewSchoolEvent('user-student', invited)).toBe(true);
     expect(canViewSchoolEvent('user-teacher-1', invited)).toBe(false);
     expect(canViewSchoolEvent('user-student', { type: 'concert' })).toBe(true);
+  });
+
+  it('lets teacher and admin see invited events for management', () => {
+    const invited = {
+      type: 'invited' as const,
+      invitedUserIds: ['user-student'],
+    };
+    expect(canViewSchoolEvent('user-teacher-1', invited, { role: 'teacher' })).toBe(true);
+    expect(canViewSchoolEvent('user-admin', invited, { role: 'admin' })).toBe(true);
+    expect(canViewSchoolEvent('user-other', invited, { role: 'student' })).toBe(false);
+  });
+});
+
+describe('event archive helpers', () => {
+  const now = new Date('2026-09-13T12:00:00');
+
+  const base = {
+    title: 'E',
+    description: '',
+    type: 'concert' as const,
+    location: 'Hall',
+    registeredUserIds: [] as string[],
+  };
+
+  it('archives by endTime when set, otherwise by startTime', () => {
+    const withEnd: SchoolEvent = {
+      ...base,
+      id: 'a',
+      date: '2026-09-13',
+      startTime: '10:00',
+      endTime: '11:00',
+    };
+    const ongoing: SchoolEvent = {
+      ...base,
+      id: 'b',
+      date: '2026-09-13',
+      startTime: '10:00',
+      endTime: '18:00',
+    };
+    const noEndPast: SchoolEvent = {
+      ...base,
+      id: 'c',
+      date: '2026-09-13',
+      startTime: '09:00',
+    };
+
+    expect(isEventArchived(withEnd, now)).toBe(true);
+    expect(isEventArchived(ongoing, now)).toBe(false);
+    expect(isEventArchived(noEndPast, now)).toBe(true);
+  });
+
+  it('splits active and archived lists', () => {
+    const list: SchoolEvent[] = [
+      { ...base, id: 'past', date: '2026-01-01', startTime: '12:00', endTime: '14:00' },
+      { ...base, id: 'future', date: '2099-01-01', startTime: '12:00', endTime: '14:00' },
+    ];
+    expect(filterActiveEvents(list, now).map((e) => e.id)).toEqual(['future']);
+    expect(filterArchivedEvents(list, now).map((e) => e.id)).toEqual(['past']);
   });
 });
 

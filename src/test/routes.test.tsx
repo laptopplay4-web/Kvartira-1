@@ -24,6 +24,7 @@ const mockGetConversations = vi.fn();
 const mockGetNotifications = vi.fn();
 const mockGetAllUsers = vi.fn();
 const mockUpdateUserRole = vi.fn();
+const mockGetTickets = vi.fn();
 
 vi.mock('@/services/api', () => ({
   api: {
@@ -44,6 +45,9 @@ vi.mock('@/services/api', () => ({
     users: {
       getAllUsers: (...args: unknown[]) => mockGetAllUsers(...args),
       updateUserRole: (...args: unknown[]) => mockUpdateUserRole(...args),
+    },
+    support: {
+      getTickets: (...args: unknown[]) => mockGetTickets(...args),
     },
   },
 }));
@@ -138,6 +142,7 @@ describe('admin shell routes', () => {
     mockGetEvents.mockResolvedValue([]);
     mockGetConversations.mockResolvedValue([]);
     mockGetNotifications.mockResolvedValue([]);
+    mockGetTickets.mockResolvedValue([]);
     mockGetAllUsers.mockResolvedValue([adminUser, studentUser]);
     mockUpdateUserRole.mockResolvedValue(studentUser);
   });
@@ -152,6 +157,7 @@ describe('admin shell routes', () => {
     expect(screen.getByRole('link', { name: /Расписание/ })).toHaveAttribute('href', '/admin/schedule');
     expect(screen.getByRole('link', { name: /Пользователи/ })).toHaveAttribute('href', '/admin/users');
     expect(screen.queryByRole('link', { name: /Мероприятия/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Помощь/ })).toHaveAttribute('href', '/admin/help');
     expect(screen.getByRole('link', { name: /Направления/ })).toHaveAttribute(
       'href',
       '/admin/directions',

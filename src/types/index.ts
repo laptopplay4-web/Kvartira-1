@@ -409,6 +409,10 @@ export interface SupportTicketReportContext {
   conversationId: string;
   messageId: string;
   reason: MessageReportReason;
+  /** Snapshot at report time (survives rename / delete). */
+  conversationTitle?: string;
+  /** Snapshot of message text / attachment label at report time. */
+  messagePreview?: string;
 }
 
 export interface SupportTicket {

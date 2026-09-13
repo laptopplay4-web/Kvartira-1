@@ -11,7 +11,7 @@ import {
   getToggledStaffRole,
   getUserRoleChangeError,
 } from '@/services/users/access';
-import { filterUsersBySearchQuery, sanitizeUserPhoneForViewer, preserveOwnPhone } from '@/services/users/helpers';
+import { filterUsersBySearchQuery, sanitizeUserPhoneForViewer, preserveOwnPhone, dedupeUsersById } from '@/services/users/helpers';
 import { users } from '@/mocks/seed';
 import type { User } from '@/types';
 
@@ -61,6 +61,16 @@ describe('filterUsersBySearchQuery', () => {
   it('skips missing phone without throwing', () => {
     const withoutPhone = { ...student, phone: undefined as unknown as string };
     expect(filterUsersBySearchQuery([withoutPhone], student.firstName)).toEqual([withoutPhone]);
+  });
+});
+
+describe('dedupeUsersById', () => {
+  it('keeps first occurrence and drops duplicate ids', () => {
+    const dup = { ...student, firstName: 'Дубль' };
+    const other = { ...teacher, id: 'user-other' };
+    expect(dedupeUsersById([student, dup, other])).toEqual([student, other]);
+    expect(dedupeUsersById([])).toEqual([]);
+    expect(dedupeUsersById([student])).toEqual([student]);
   });
 });
 

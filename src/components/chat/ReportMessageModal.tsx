@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
@@ -10,6 +10,7 @@ import {
   MESSAGE_REPORT_REASON_LABELS,
   buildReportTicketMessage,
   buildReportTicketSubject,
+  formatReportedMessagePreview,
   validateReportMessageInput,
 } from '@/services/support/reportMessage';
 
@@ -20,6 +21,8 @@ interface ReportMessageModalProps {
   onClose: () => void;
   message: Message;
   conversationId: string;
+  /** Display title of the chat (group name or counterpart). */
+  conversationTitle: string;
   userId: string;
   onSubmitted?: () => void;
 }
@@ -29,10 +32,12 @@ export function ReportMessageModal({
   onClose,
   message,
   conversationId,
+  conversationTitle,
   userId,
   onSubmitted,
 }: ReportMessageModalProps) {
   const isOnline = useOnlineStatus();
+  const queryClient = useQueryClient();
   const [reason, setReason] = useState<MessageReportReason>('image_rights');
   const [details, setDetails] = useState('');
   const [error, setError] = useState('');
@@ -45,18 +50,24 @@ export function ReportMessageModal({
         conversationId,
         messageId: message.id,
       });
+      const messagePreview = formatReportedMessagePreview(message);
+      const title = conversationTitle.trim() || conversationId;
       return api.support.createTicket(
         {
           subject: buildReportTicketSubject(reason),
           message: buildReportTicketMessage(reason, details, {
             conversationId,
             messageId: message.id,
+            conversationTitle: title,
+            messagePreview,
           }),
           category: 'chat',
           reportContext: {
             conversationId,
             messageId: message.id,
             reason,
+            conversationTitle: title,
+            messagePreview,
           },
         },
         userId,
@@ -66,6 +77,8 @@ export function ReportMessageModal({
       setError('');
       setDetails('');
       setReason('image_rights');
+      void queryClient.invalidateQueries({ queryKey: ['support'] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
       onSubmitted?.();
       onClose();
     },

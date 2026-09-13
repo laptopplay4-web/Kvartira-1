@@ -16,12 +16,14 @@ export function canRegisterForEvents(user: Pick<User, 'role'> | null | undefined
   return !!user && user.role === 'student';
 }
 
-/** Invited events are visible only to users on the invite list (matches mock getEvents/getEvent). */
+/** Invited events: invitees + staff (teacher/admin) for management. */
 export function canViewSchoolEvent(
   userId: string,
   event: Pick<SchoolEvent, 'type' | 'invitedUserIds'>,
+  viewer?: Pick<User, 'role'> | null,
 ): boolean {
   if (event.type !== 'invited') return true;
+  if (viewer?.role === 'teacher' || viewer?.role === 'admin') return true;
   return event.invitedUserIds?.includes(userId) ?? false;
 }
 

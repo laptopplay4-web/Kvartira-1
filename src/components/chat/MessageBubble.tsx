@@ -40,6 +40,8 @@ interface MessageBubbleProps {
   onReplyClick?: (messageId: string) => void;
   onImageClick?: (message: Message, index: number) => void;
   highlighted?: boolean;
+  /** Report deep-link uses danger ring; default is brand. */
+  highlightVariant?: 'brand' | 'report';
 }
 
 function StatusIcon({ status }: { status: Message['status'] }) {
@@ -73,6 +75,7 @@ export function MessageBubble({
   onReplyClick,
   onImageClick,
   highlighted,
+  highlightVariant = 'brand',
 }: MessageBubbleProps) {
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -127,7 +130,10 @@ export function MessageBubble({
         'relative flex min-w-0 max-w-full gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
         isOwn ? 'flex-row-reverse' : 'flex-row',
         actionsOpen && 'z-[1]',
-        highlighted && 'rounded-lg ring-2 ring-brand/50 motion-safe:animate-pulse',
+        highlighted &&
+          (highlightVariant === 'report'
+            ? 'rounded-lg ring-2 ring-danger shadow-[0_0_0_1px_var(--color-danger)] motion-safe:animate-pulse'
+            : 'rounded-lg ring-2 ring-brand/50 motion-safe:animate-pulse'),
       )}
       id={`message-${message.id}`}
     >

@@ -43,6 +43,9 @@ interface MessageListProps {
   onImageClick?: (message: Message, index: number) => void;
   onDragDrop?: (files: FileList) => void;
   highlightMessageId?: string | null;
+  highlightVariant?: 'brand' | 'report';
+  /** When true, skip initial jump-to-bottom (report / msg deep-link). */
+  preserveDeepLinkScroll?: boolean;
   conversation?: Conversation | null;
   members?: ConversationMember[];
   /** Newest → oldest pin ids; drives Telegram-style pin bar sync on scroll. */
@@ -76,6 +79,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     onImageClick,
     onDragDrop,
     highlightMessageId,
+    highlightVariant = 'brand',
+    preserveDeepLinkScroll = false,
     conversation,
     members,
     pinnedIdsNewestFirst,
@@ -125,6 +130,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   }));
 
   useEffect(() => {
+    if (preserveDeepLinkScroll) return;
     if (isLoading) return;
     if (messages.length <= prevCountRef.current) {
       prevCountRef.current = messages.length;
@@ -139,13 +145,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       setShowNewIndicator(true);
     }
     prevCountRef.current = messages.length;
-  }, [messages, isLoading, isAtBottom, scrollToBottom, currentUserId]);
+  }, [messages, isLoading, isAtBottom, scrollToBottom, currentUserId, preserveDeepLinkScroll]);
 
   useEffect(() => {
+    if (preserveDeepLinkScroll) return;
     if (!isLoading && messages.length > 0 && !loadingMoreRef.current) {
       scrollToBottom('instant');
     }
-  }, [isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoading, preserveDeepLinkScroll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = containerRef.current;
@@ -355,6 +362,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                   onReplyClick={(id) => scrollToMessage(id)}
                   onImageClick={onImageClick}
                   highlighted={highlightMessageId === entry.group.message.id}
+                  highlightVariant={highlightVariant}
                 />
                 {entry.group.message.status === 'failed' && onRetryMessage && (
                   <div className="mt-1 flex justify-end">

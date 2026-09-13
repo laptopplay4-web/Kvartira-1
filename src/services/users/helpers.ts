@@ -74,3 +74,16 @@ export function filterUsersBySearchQuery(users: User[], query: string): User[] {
     );
   });
 }
+
+/** Stable unique list by `id` (first occurrence wins) — avoids phantom «Выбрать всех (N)». */
+export function dedupeUsersById(users: User[]): User[] {
+  if (users.length <= 1) return users;
+  const seen = new Set<string>();
+  const result: User[] = [];
+  for (const user of users) {
+    if (!user?.id || seen.has(user.id)) continue;
+    seen.add(user.id);
+    result.push(user);
+  }
+  return result;
+}

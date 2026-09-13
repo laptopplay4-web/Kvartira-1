@@ -1,13 +1,20 @@
 import { useState } from 'react';
-import { Navigate, Link, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BackLink } from '@/components/ui/BackLink';
 import { format } from 'date-fns';
+import { MessageSquareWarning } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { canReplyToTicket } from '@/services/support/access';
+import { adminHelpListPath, isAdminHelpTicketPath } from '@/services/support/adminInbox';
 import { SUPPORT_CATEGORY_LABELS } from '@/services/support/helpers';
-import { MESSAGE_REPORT_REASON_LABELS } from '@/services/support/reportMessage';
+import {
+  MESSAGE_REPORT_REASON_LABELS,
+  buildReportedMessageChatLink,
+  extractReportComment,
+} from '@/services/support/reportMessage';
+import { resolveReportDisplayLabels } from '@/services/support/reportContext';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +27,8 @@ import { can } from '@/permissions';
 
 export default function HelpTicketDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const user = useCurrentUser()!;
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
@@ -27,11 +36,19 @@ export default function HelpTicketDetailPage() {
   const [closeAfterReply, setCloseAfterReply] = useState(false);
   const [replyError, setReplyError] = useState('');
 
+  const fromAdminInbox = isAdminHelpTicketPath(location.pathname);
+  const isAdminInbox = can(user, 'support:view-all-tickets');
+  const listFallback = fromAdminInbox || isAdminInbox ? adminHelpListPath() : '/profile/help';
+  const backLabel = 'Помощь';
+
   const { data: ticket, isLoading, error, refetch } = useQuery({
     queryKey: ['support', 'ticket', id, user.id],
     queryFn: () => api.support.getTicket(id!, user.id),
     enabled: !!id,
   });
+
+  const reportCtx = ticket?.reportContext;
+  const canViewReport = !!reportCtx && isAdminInbox;
 
   const replyMutation = useMutation({
     mutationFn: () => api.support.replyToTicket(id!, { text: replyText, close: closeAfterReply }, user.id),
@@ -39,13 +56,19 @@ export default function HelpTicketDetailPage() {
       setReplyText('');
       setReplyError('');
       queryClient.invalidateQueries({ queryKey: ['support'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
     onError: (err) => {
       setReplyError(err instanceof ApiError ? err.message : 'Не удалось отправить ответ');
     },
   });
 
-  if (!id) return <Navigate to="/profile/help" replace />;
+  if (!id) return <Navigate to={listFallback} replace />;
+
+  /** Admin must work tickets from `/admin/help`, not profile inbox. */
+  if (ticket && isAdminInbox && !fromAdminInbox) {
+    return <Navigate to={`/admin/help/${ticket.id}`} replace />;
+  }
 
   if (error) {
     return (
@@ -65,6 +88,14 @@ export default function HelpTicketDetailPage() {
   }
 
   const canReply = canReplyToTicket(user, ticket);
+  const reportComment = reportCtx ? extractReportComment(ticket.message) : null;
+  const { conversationTitle, messagePreview } = resolveReportDisplayLabels(ticket);
+  const chatLink = reportCtx ? buildReportedMessageChatLink(reportCtx) : null;
+
+  function openReportedMessage() {
+    if (!chatLink) return;
+    navigate(chatLink);
+  }
 
   function handleReply(e: React.FormEvent) {
     e.preventDefault();
@@ -76,7 +107,7 @@ export default function HelpTicketDetailPage() {
   return (
     <div className="page-container max-w-lg">
       <div className="mb-6">
-        <BackLink label="Помощь" fallbackTo="/profile/help" className="mb-0" />
+        <BackLink label={backLabel} fallbackTo={listFallback} className="mb-0" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -84,40 +115,70 @@ export default function HelpTicketDetailPage() {
         <SupportTicketStatusBadge status={ticket.status} />
       </div>
 
-      <Card className="mb-4">
-        <dl className="space-y-2 text-body-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-text-muted">Категория</dt>
-            <dd>{SUPPORT_CATEGORY_LABELS[ticket.category]}</dd>
+      {canViewReport && reportCtx && chatLink ? (
+        <Card
+          interactive
+          role="link"
+          tabIndex={0}
+          aria-label="Открыть сообщение в чате"
+          className="mb-4 border-danger/40 bg-danger-muted/15"
+          onClick={openReportedMessage}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openReportedMessage();
+            }
+          }}
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <MessageSquareWarning className="h-4 w-4 shrink-0 text-danger" aria-hidden />
+            <h2 className="text-label uppercase tracking-wide text-danger">Жалоба на сообщение</h2>
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-text-muted">Создано</dt>
-            <dd>{format(new Date(ticket.createdAt), 'dd.MM.yyyy HH:mm')}</dd>
-          </div>
-        </dl>
-        <p className="mt-4 text-body-sm whitespace-pre-wrap">{ticket.message}</p>
-        <SupportAttachmentList attachments={ticket.attachments} />
-      </Card>
-
-      {ticket.reportContext && can(user, 'support:view-all-tickets') && (
-        <Card className="mb-4 border-warning/30 bg-warning-muted/20">
-          <h2 className="mb-2 text-label uppercase tracking-wide">Жалоба на сообщение</h2>
-          <dl className="space-y-2 text-body-sm">
+          <dl className="mb-4 space-y-3 text-body-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-text-muted">Причина</dt>
-              <dd>{MESSAGE_REPORT_REASON_LABELS[ticket.reportContext.reason]}</dd>
+              <dt className="text-text-muted">Категория</dt>
+              <dd>{SUPPORT_CATEGORY_LABELS[ticket.category]}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-text-muted">Сообщение</dt>
-              <dd className="font-mono text-caption">{ticket.reportContext.messageId}</dd>
+              <dt className="text-text-muted">Создано</dt>
+              <dd>{format(new Date(ticket.createdAt), 'dd.MM.yyyy HH:mm')}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-text-muted">Причина</dt>
+              <dd className="mt-0.5 font-medium">{MESSAGE_REPORT_REASON_LABELS[reportCtx.reason]}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-text-muted">Чат</dt>
+              <dd className="mt-0.5 font-medium text-brand">{conversationTitle}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-text-muted">Сообщение</dt>
+              <dd className="mt-1 rounded-lg border border-danger/50 bg-surface-elevated px-3 py-2 whitespace-pre-wrap">
+                {messagePreview}
+              </dd>
             </div>
           </dl>
-          <Link
-            to={`/chat/${ticket.reportContext.conversationId}?msg=${ticket.reportContext.messageId}`}
-            className="mt-3 inline-flex min-h-11 items-center text-body-sm font-medium text-brand"
-          >
-            Открыть в чате
-          </Link>
+          {reportComment && (
+            <p className="text-body-sm whitespace-pre-wrap">
+              <span className="text-caption text-text-muted">Комментарий · </span>
+              {reportComment}
+            </p>
+          )}
+        </Card>
+      ) : (
+        <Card className="mb-4">
+          <dl className="space-y-2 text-body-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-text-muted">Категория</dt>
+              <dd>{SUPPORT_CATEGORY_LABELS[ticket.category]}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-text-muted">Создано</dt>
+              <dd>{format(new Date(ticket.createdAt), 'dd.MM.yyyy HH:mm')}</dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-body-sm whitespace-pre-wrap">{ticket.message}</p>
+          <SupportAttachmentList attachments={ticket.attachments} />
         </Card>
       )}
 

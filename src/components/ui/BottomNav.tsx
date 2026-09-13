@@ -16,15 +16,16 @@ interface NavItem {
 interface BottomNavProps {
   chatBadge?: number;
   eventsBadge?: number;
+  profileBadge?: number;
 }
 
-export function BottomNav({ chatBadge = 0, eventsBadge = 0 }: BottomNavProps) {
+export function BottomNav({ chatBadge = 0, eventsBadge = 0, profileBadge = 0 }: BottomNavProps) {
   const items: NavItem[] = [
     { to: '/home', label: 'Главная', icon: Home },
     { to: '/lessons', label: 'Занятия', icon: Calendar },
     { to: '/chat', label: 'Чат', icon: MessageCircle, badge: chatBadge },
     { to: '/events', label: 'События', icon: Sparkles, badge: eventsBadge },
-    { to: '/profile', label: 'Профиль', icon: User },
+    { to: '/profile', label: 'Профиль', icon: User, badge: profileBadge },
   ];
 
   return (
@@ -63,7 +64,7 @@ export function BottomNav({ chatBadge = 0, eventsBadge = 0 }: BottomNavProps) {
   );
 }
 
-export function SidebarNav({ chatBadge = 0, eventsBadge = 0 }: BottomNavProps) {
+export function SidebarNav({ chatBadge = 0, eventsBadge = 0, profileBadge = 0 }: BottomNavProps) {
   const user = useCurrentUser();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -73,7 +74,7 @@ export function SidebarNav({ chatBadge = 0, eventsBadge = 0 }: BottomNavProps) {
     { to: '/lessons', label: 'Занятия', icon: Calendar },
     { to: '/chat', label: 'Чат', icon: MessageCircle, badge: chatBadge },
     { to: '/events', label: 'События', icon: Sparkles, badge: eventsBadge },
-    { to: '/profile', label: 'Профиль', icon: User },
+    { to: '/profile', label: 'Профиль', icon: User, badge: profileBadge },
   ];
 
   return (
@@ -123,7 +124,12 @@ export function SidebarNav({ chatBadge = 0, eventsBadge = 0 }: BottomNavProps) {
             )}
           >
             <Shield className="h-5 w-5" aria-hidden />
-            Админ
+            <span className="flex-1">Админ</span>
+            {profileBadge > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-bold text-brand-contrast">
+                {profileBadge > 9 ? '9+' : profileBadge}
+              </span>
+            )}
           </Link>
         )}
       </nav>

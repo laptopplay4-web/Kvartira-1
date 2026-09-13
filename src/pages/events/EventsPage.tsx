@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Sparkles, MapPin, Clock, Users } from 'lucide-react';
+import { Archive, Plus, Sparkles, MapPin, Clock, Users } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { api } from '@/services/api';
 import { canManageEvents } from '@/services/events/access';
+import {
+  filterActiveEvents,
+  sortEventsByStartAsc,
+} from '@/services/events/helpers';
 import {
   countUnreadForEvent,
   markEventsTabSeen,
@@ -28,6 +32,7 @@ import { cn } from '@/utils';
 
 export default function EventsPage() {
   const user = useCurrentUser()!;
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const canManage = canManageEvents(user);
@@ -37,6 +42,11 @@ export default function EventsPage() {
     queryKey: ['events', user.id],
     queryFn: () => api.events.getEvents(user.id),
   });
+
+  const activeEvents = useMemo(
+    () => (events ? sortEventsByStartAsc(filterActiveEvents(events)) : []),
+    [events],
+  );
 
   const { data: notifications } = useQuery({
     queryKey: ['notifications', user.id],
@@ -60,15 +70,25 @@ export default function EventsPage() {
       <header className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-h1">Мероприятия</h1>
         {canManage && (
-          <IconButton
-            label="Добавить мероприятие"
-            variant="tonal"
-            className="shrink-0"
-            disabled={!isOnline}
-            onClick={() => setCreating(true)}
-          >
-            <Plus className="h-5 w-5" aria-hidden />
-          </IconButton>
+          <div className="flex shrink-0 items-center gap-2">
+            <IconButton
+              label="Архив мероприятий"
+              variant="tonal"
+              className="shrink-0"
+              onClick={() => navigate('/events/archive')}
+            >
+              <Archive className="h-5 w-5" aria-hidden />
+            </IconButton>
+            <IconButton
+              label="Добавить мероприятие"
+              variant="tonal"
+              className="shrink-0"
+              disabled={!isOnline}
+              onClick={() => setCreating(true)}
+            >
+              <Plus className="h-5 w-5" aria-hidden />
+            </IconButton>
+          </div>
         )}
       </header>
 
@@ -80,9 +100,9 @@ export default function EventsPage() {
 
       {isLoading ? (
         <div className="space-y-4">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-32" />)}</div>
-      ) : events && events.length > 0 ? (
+      ) : activeEvents.length > 0 ? (
         <div className="space-y-4">
-          {events.map((event) => {
+          {activeEvents.map((event) => {
             const staffDelta = notifications
               ? summarizeUnreadParticipationDelta(notifications, event.id)
               : { joins: 0, leaves: 0 };

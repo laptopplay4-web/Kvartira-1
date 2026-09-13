@@ -55,7 +55,11 @@ export default function ChatPage() {
   const messageListRef = useRef<MessageListHandle>(null);
   const isOnline = useOnlineStatus();
   const wasOfflineRef = useRef(false);
-  const deepLinkMsgHandledRef = useRef<string | null>(null);
+  const deepLinkPendingRef = useRef<{
+    conversationId: string;
+    messageId: string;
+    highlight: 'brand' | 'report';
+  } | null>(null);
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('all');
@@ -67,6 +71,7 @@ export default function ChatPage() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
+  const [highlightVariant, setHighlightVariant] = useState<'brand' | 'report'>('brand');
   const [imageViewer, setImageViewer] = useState<{ images: Message['attachments']; index: number } | null>(null);
   const [pinnedCycleIndex, setPinnedCycleIndex] = useState(0);
   const freezePinnedScrollSyncRef = useRef(false);
@@ -266,26 +271,78 @@ export default function ChatPage() {
   }, [isOnline, activeId, refetchList, refetchMessages, queryClient, user.id]);
 
   useEffect(() => {
-    const msgId = searchParams.get('msg');
-    if (!activeId || !msgId || messagesLoading) return;
-    const key = `${activeId}:${msgId}`;
-    if (deepLinkMsgHandledRef.current === key) return;
-    deepLinkMsgHandledRef.current = key;
+    const msgFromUrl = searchParams.get('msg');
+    const hlFromUrl = searchParams.get('hl');
+    if (msgFromUrl) {
+      deepLinkPendingRef.current = {
+        conversationId: activeId ?? '',
+        messageId: msgFromUrl,
+        highlight: hlFromUrl === 'report' ? 'report' : 'brand',
+      };
+    }
+    const pending = deepLinkPendingRef.current;
+    if (!activeId || !pending || pending.messageId === '') return;
+    if (pending.conversationId && pending.conversationId !== activeId) {
+      deepLinkPendingRef.current = { ...pending, conversationId: activeId };
+    }
+    if (messagesLoading || isFetchingNextPage || convLoading) return;
+
+    const msgId = pending.messageId;
+    setHighlightVariant(pending.highlight);
     setHighlightMessageId(msgId);
-    const timer = window.setTimeout(() => {
-      messageListRef.current?.scrollToMessage(msgId);
+
+    const tryFocus = () => {
+      const el = document.getElementById(`message-${msgId}`);
+      if (!el) return false;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      deepLinkPendingRef.current = null;
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
           next.delete('msg');
+          next.delete('hl');
           return next;
         },
         { replace: true },
       );
-      window.setTimeout(() => setHighlightMessageId(null), 2000);
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [activeId, messagesLoading, searchParams, setSearchParams]);
+      const clearMs = pending.highlight === 'report' ? 4500 : 2000;
+      window.setTimeout(() => {
+        setHighlightMessageId(null);
+        setHighlightVariant('brand');
+      }, clearMs);
+      return true;
+    };
+
+    // Wait for paint after messages render.
+    const raf = window.requestAnimationFrame(() => {
+      if (tryFocus()) return;
+      if (hasNextPage) {
+        void fetchNextPage();
+        return;
+      }
+      deepLinkPendingRef.current = null;
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('msg');
+          next.delete('hl');
+          return next;
+        },
+        { replace: true },
+      );
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [
+    activeId,
+    messagesLoading,
+    convLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    messagePages,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const handleSelect = (conversationId: string) => {
     setReplyTo(null);
@@ -597,6 +654,8 @@ export default function ChatPage() {
                 conversation={activeConversation}
                 members={members ?? []}
                 highlightMessageId={highlightMessageId}
+                highlightVariant={highlightVariant}
+                preserveDeepLinkScroll={!!highlightMessageId || !!deepLinkPendingRef.current}
                 pinnedIdsNewestFirst={orderedPinned.map((m) => m.id)}
                 onPinnedIndexChange={handlePinnedIndexFromScroll}
                 onPinnedScrollResume={handlePinnedScrollResume}
@@ -690,12 +749,17 @@ export default function ChatPage() {
         onForward={handleForward}
       />
 
-      {reportMessage && activeId && (
+      {reportMessage && activeId && activeConversation && (
         <ReportMessageModal
           open
           onClose={() => setReportMessage(null)}
           message={reportMessage}
           conversationId={activeId}
+          conversationTitle={getConversationDisplayTitle(
+            activeConversation,
+            user.id,
+            users ?? [],
+          )}
           userId={user.id}
         />
       )}

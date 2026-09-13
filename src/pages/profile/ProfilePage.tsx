@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Settings,
   Shield,
@@ -12,6 +13,8 @@ import { useCurrentUser, useAuthStore } from '@/stores/authStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAvatarMutations } from '@/hooks/useAvatarMutations';
 import { getRoleLabel, can, actsAsTeacher } from '@/permissions';
+import { api } from '@/services/api';
+import { countOpenSupportTickets } from '@/services/support/adminInbox';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -23,17 +26,32 @@ export default function ProfilePage() {
   const isOnline = useOnlineStatus();
   const { avatarError, uploadAvatarMutation, removeAvatarMutation } = useAvatarMutations(user.id);
 
-  const menuItems = [
+  const showAdminSupport = can(user, 'support:view-all-tickets');
+  const { data: openTickets } = useQuery({
+    queryKey: ['support', 'tickets', 'admin-open-count', user.id],
+    queryFn: () => api.support.getTickets({ requesterId: user.id, status: 'open' }),
+    enabled: showAdminSupport,
+  });
+  const adminBadge = countOpenSupportTickets(openTickets);
+
+  const menuItems: {
+    to: string;
+    icon: typeof Settings;
+    label: string;
+    badge?: number;
+  }[] = [
     { to: '/profile/settings', icon: Settings, label: 'Настройки' },
     ...(user.role === 'student' || actsAsTeacher(user.role)
       ? [{ to: '/profile/directions', icon: Music2, label: 'Направления' }]
       : []),
-    ...(can(user, 'support:view-faq') ? [{ to: '/profile/help', icon: HelpCircle, label: 'Помощь' }] : []),
+    ...(can(user, 'support:view-faq') && !can(user, 'support:view-all-tickets')
+      ? [{ to: '/profile/help', icon: HelpCircle, label: 'Помощь' }]
+      : []),
     ...(can(user, 'legal:view-own')
       ? [{ to: '/profile/legal', icon: FileText, label: 'Документы и согласия' }]
       : []),
     ...(can(user, 'admin:access')
-      ? [{ to: '/admin', icon: Shield, label: 'Администрирование' }]
+      ? [{ to: '/admin', icon: Shield, label: 'Администрирование', badge: adminBadge }]
       : []),
   ];
 
@@ -62,11 +80,19 @@ export default function ProfilePage() {
       </header>
 
       <div className="space-y-2">
-        {menuItems.map(({ to, icon: Icon, label }) => (
+        {menuItems.map(({ to, icon: Icon, label, badge }) => (
           <Link key={to} to={to}>
             <Card interactive className="flex items-center gap-3">
               <Icon className="h-5 w-5 text-text-muted" aria-hidden />
               <span className="flex-1 font-medium">{label}</span>
+              {badge != null && badge > 0 && (
+                <span
+                  className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-bold text-brand-contrast"
+                  aria-label={`${badge} открытых обращений`}
+                >
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              )}
               <ChevronRight className="h-4 w-4 text-text-muted" aria-hidden />
             </Card>
           </Link>

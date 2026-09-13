@@ -10,6 +10,7 @@ import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import { canManageEvents, canRegisterForEvents } from '@/services/events/access';
 import { EVENT_TYPE_LABELS } from '@/services/events/constants';
+import { isEventArchived } from '@/services/events/helpers';
 import {
   getEventRegisteredCount,
   isEventRegistrationFull,
@@ -21,6 +22,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CompetitionApplicationModal } from '@/components/events/CompetitionApplicationModal';
 import { EventFormModal } from '@/components/events/EventFormModal';
@@ -129,6 +131,20 @@ export default function EventDetailPage() {
   if (isLoading) return <div className="page-container"><Skeleton className="h-64" /></div>;
   if (error || !event) return <div className="page-container"><ErrorState onRetry={() => refetch()} /></div>;
 
+  const archived = isEventArchived(event);
+  if (archived && !canManage) {
+    return (
+      <div className="page-container">
+        <BackLink label="К мероприятиям" fallbackTo="/events" />
+        <EmptyState
+          icon={Music2}
+          title="Мероприятие в архиве"
+          description="Прошедшие мероприятия доступны только преподавателям"
+        />
+      </div>
+    );
+  }
+
   const isFull = isEventRegistrationFull(event);
 
   function invalidateEvent() {
@@ -152,7 +168,11 @@ export default function EventDetailPage() {
   return (
     <div className="page-container max-w-lg">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <BackLink label="К мероприятиям" fallbackTo="/events" className="mb-0" />
+        <BackLink
+          label={archived ? 'К архиву' : 'К мероприятиям'}
+          fallbackTo={archived ? '/events/archive' : '/events'}
+          className="mb-0"
+        />
         {canManage && (
           <div className="flex shrink-0 gap-1.5 overflow-visible p-0.5">
             <span className="relative inline-flex shrink-0 overflow-visible">
@@ -211,6 +231,11 @@ export default function EventDetailPage() {
       )}
 
       <Badge variant="brand" className="mb-3">{EVENT_TYPE_LABELS[event.type]}</Badge>
+      {archived && (
+        <Badge variant="default" className="mb-3 ml-2">
+          Архив
+        </Badge>
+      )}
       <h1 className="text-h1">{event.title}</h1>
 
       <Card className="mt-6 space-y-3">
@@ -263,12 +288,12 @@ export default function EventDetailPage() {
       )}
 
       <div className="mt-6">
-        {!isOnline && canRegister && (
+        {!archived && !isOnline && canRegister && (
           <p className="mb-4 text-sm text-danger" role="alert">
             {OFFLINE_NETWORK_MESSAGE}
           </p>
         )}
-        {canRegister && isRegistered && (
+        {!archived && canRegister && isRegistered && (
           <div className="space-y-3">
             <Button
               variant="secondary"
@@ -296,7 +321,7 @@ export default function EventDetailPage() {
             )}
           </div>
         )}
-        {canRegister && !isRegistered && (
+        {!archived && canRegister && !isRegistered && (
           <Button
             fullWidth
             disabled={isFull || !isOnline || registerMutation.isPending}

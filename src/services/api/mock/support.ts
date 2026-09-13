@@ -1,5 +1,14 @@
-import type { AppNotification, HelpArticle, SupportTicket, User } from '@/types';
+import type { AppNotification, Conversation, HelpArticle, Message, SupportTicket, User } from '@/types';
 import { canCreateTicket, canManageFaq, canReplyToTicket, canViewTicket } from '@/services/support/access';
+import {
+  adminHelpTicketPath,
+  supportTicketAdminNotifyTitle,
+} from '@/services/support/adminInbox';
+import {
+  applyEnrichedReportContext,
+  enrichReportContextFromSources,
+  reportContextNeedsEnrichment,
+} from '@/services/support/reportContext';
 import {
   filterFaqArticles,
   filterTickets,
@@ -27,6 +36,8 @@ export interface MockSupportDb {
   helpArticles: HelpArticle[];
   supportTickets: SupportTicket[];
   notifications: AppNotification[];
+  conversations?: Conversation[];
+  messages?: Message[];
 }
 
 function uid(prefix: string) {
@@ -71,7 +82,13 @@ export function createMockSupportApi(
     return admin;
   }
 
-  function pushSupportNotification(userId: string, title: string, body: string, link: string) {
+  function pushSupportNotification(
+    userId: string,
+    title: string,
+    body: string,
+    link: string,
+    options?: { urgent?: boolean },
+  ) {
     db.notifications.push({
       id: uid('notif'),
       userId,
@@ -81,7 +98,43 @@ export function createMockSupportApi(
       read: false,
       createdAt: new Date().toISOString(),
       link,
+      ...(options?.urgent ? { urgent: true } : {}),
     });
+  }
+
+  function notifyAdminsNewTicket(ticket: SupportTicket) {
+    const isReport = Boolean(ticket.reportContext);
+    const title = supportTicketAdminNotifyTitle(isReport);
+    const link = adminHelpTicketPath(ticket.id);
+    for (const admin of db.users.filter((u) => u.role === 'admin')) {
+      pushSupportNotification(admin.id, title, ticket.subject, link, { urgent: true });
+    }
+  }
+
+  /** Resolve chat title + message text without membership (admin report inbox). */
+  function enrichTicketReport(ticket: SupportTicket, viewerId: string): SupportTicket {
+    if (!ticket.reportContext || !reportContextNeedsEnrichment(ticket.reportContext)) {
+      return ticket;
+    }
+    const conversation = db.conversations?.find((c) => c.id === ticket.reportContext!.conversationId);
+    const message = db.messages?.find(
+      (m) =>
+        m.id === ticket.reportContext!.messageId &&
+        m.conversationId === ticket.reportContext!.conversationId,
+    );
+    const enriched = enrichReportContextFromSources(ticket.reportContext, {
+      conversation,
+      message,
+      users: db.users,
+      viewerId,
+    });
+    const next = applyEnrichedReportContext(ticket, enriched);
+    // Persist so subsequent reads / list stay human-readable
+    const idx = db.supportTickets.findIndex((t) => t.id === ticket.id);
+    if (idx >= 0) {
+      db.supportTickets[idx] = next;
+    }
+    return next;
   }
 
   return {
@@ -96,14 +149,14 @@ export function createMockSupportApi(
       let list = db.supportTickets.filter((ticket) => canViewTicket(user, ticket));
       list = filterTickets(list, { status: filters.status, category: filters.category });
       list = searchTickets(list, filters.query ?? '');
-      return sortTicketsByDate(list);
+      return sortTicketsByDate(list).map((ticket) => enrichTicketReport(ticket, filters.requesterId));
     },
 
     async getTicket(id, requesterId) {
       await delay();
       const ticket = getTicketById(id);
       assertViewAccess(ticket, requesterId);
-      return ticket;
+      return enrichTicketReport(ticket, requesterId);
     },
 
     async uploadSupportAttachment(input: UploadSupportAttachmentInput, userId) {
@@ -131,7 +184,7 @@ export function createMockSupportApi(
       validateCreateTicketInput(input);
 
       const now = new Date().toISOString();
-      const ticket: SupportTicket = {
+      let ticket: SupportTicket = {
         id: uid('ticket'),
         userId,
         subject: input.subject.trim(),
@@ -157,20 +210,10 @@ export function createMockSupportApi(
         if (duplicate) {
           throw new ApiError('Жалоба на это сообщение уже отправлена', 'CONFLICT', 409);
         }
+        ticket = enrichTicketReport(ticket, userId);
       }
       db.supportTickets.push(ticket);
-
-      if (input.reportContext) {
-        for (const admin of db.users.filter((u) => u.role === 'admin')) {
-          pushSupportNotification(
-            admin.id,
-            'Жалоба на сообщение в чате',
-            ticket.subject,
-            `/profile/help/${ticket.id}`,
-          );
-        }
-      }
-
+      notifyAdminsNewTicket(ticket);
       return ticket;
     },
 

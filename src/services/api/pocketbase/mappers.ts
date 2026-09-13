@@ -60,6 +60,7 @@ import {
   relId,
 } from '@/services/api/pocketbase/helpers';
 import { phoneFromSyntheticEmail } from '@/utils/phone';
+import { normalizeClockTime } from '@/utils/dates';
 import {
   extractSchoolExtrasFromContacts,
   normalizeSchoolSocialLinks,
@@ -366,14 +367,14 @@ export function mapEventRecord(record: PbEventRecord | RecordModel): SchoolEvent
     description: String(readRecordField(record, 'description') ?? r.description ?? ''),
     type: (readRecordField(record, 'type') ?? r.type) as EventType,
     date: normalizePbDate(readRecordField(record, 'date') ?? r.date),
-    startTime: String(readRecordField(record, 'startTime') ?? r.startTime ?? ''),
+    startTime: normalizeClockTime(String(readRecordField(record, 'startTime') ?? r.startTime ?? '')),
     location: String(readRecordField(record, 'location') ?? r.location ?? ''),
     registeredCount,
     registeredUserIds,
   };
 
-  const endTime = emptyToUndefined(
-    (readRecordField(record, 'endTime') ?? r.endTime) as string | undefined,
+  const endTime = normalizeClockTime(
+    emptyToUndefined((readRecordField(record, 'endTime') ?? r.endTime) as string | undefined) ?? '',
   );
   if (endTime) event.endTime = endTime;
 
@@ -678,8 +679,39 @@ export function mapSupportTicketRecord(record: PbSupportTicketRecord | RecordMod
     ticket.adminReply = r.adminReply;
   }
 
-  if (r.reportContext && typeof r.reportContext === 'object') {
-    ticket.reportContext = r.reportContext as SupportTicket['reportContext'];
+  if (r.reportContext != null) {
+    let raw: unknown = r.reportContext;
+    if (typeof raw === 'string') {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        raw = null;
+      }
+    }
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const ctx = raw as Record<string, unknown>;
+      const conversationId = typeof ctx.conversationId === 'string' ? ctx.conversationId : '';
+      const messageId = typeof ctx.messageId === 'string' ? ctx.messageId : '';
+      const reason = ctx.reason;
+      if (
+        conversationId &&
+        messageId &&
+        (reason === 'image_rights' ||
+          reason === 'harassment' ||
+          reason === 'spam' ||
+          reason === 'other')
+      ) {
+        ticket.reportContext = {
+          conversationId,
+          messageId,
+          reason,
+          ...(typeof ctx.conversationTitle === 'string'
+            ? { conversationTitle: ctx.conversationTitle }
+            : {}),
+          ...(typeof ctx.messagePreview === 'string' ? { messagePreview: ctx.messagePreview } : {}),
+        };
+      }
+    }
   }
 
   return ticket;

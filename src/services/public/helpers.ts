@@ -5,7 +5,7 @@ import type {
   SchoolEvent,
   User,
 } from '@/types';
-import { isSlotInPast } from '@/utils/dates';
+import { isEventArchived } from '@/services/events/helpers';
 
 export function toPublicTeacher(
   user: User,
@@ -25,7 +25,7 @@ export function toPublicTeacher(
 
 export function toPublicEvent(event: SchoolEvent, now = new Date()): PublicEvent | null {
   if (event.type === 'invited') return null;
-  if (isSlotInPast(event.date, event.startTime, now)) return null;
+  if (isEventArchived(event, now)) return null;
 
   const taken =
     typeof event.registeredCount === 'number'

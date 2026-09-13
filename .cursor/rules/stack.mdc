@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.167 Pending consent modal + legal bootstrap · 2026-09-13
+Версия: 1.173 StudentPicker Все/Направления + count fix · 2026-09-13
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -87,7 +87,7 @@ kvartira/
 │   │   ├── profile/             # ProfilePage, settings/*, AvailabilityPage, ProgressPage, HelpPage, SecurityPage
 │   │   ├── notifications/       # NotificationsPage
 │   │   ├── legal/               # LegalDocumentsPage, LegalDocumentDetailPage
-│   │   └── admin/               # AdminHub, AdminSchedule, AdminUsers, AdminLegal
+│   │   └── admin/               # AdminHub, AdminHelp, AdminSchedule, AdminUsers, AdminLegal
 │   ├── components/
 │   │   ├── ui/                  # design system
 │   │   ├── chat/                # ConversationList, MessageList, MessageComposer, …
@@ -285,6 +285,7 @@ kvartira/
 | `/profile/availability` | Redirect → `/lessons/availability` | Protected |
 | `/notifications` | Уведомления | Protected |
 | `/admin` | Админ-хаб настроек | AdminRoute (`admin:access`) + AppLayout |
+| `/admin/help`, `/admin/help/:id` | Inbox обращений / жалоб | AdminRoute (`support:view-all-tickets`) + AppLayout |
 | `/admin/schedule`, `/admin/users`, `/admin/directions`, `/admin/registration-qr` | Расписание / Пользователи / Направления / QR регистрации | AdminRoute + AppLayout |
 | `/admin/events` | Redirect → `/events` | AdminRoute (`admin:events`) |
 | `/legal`, `/legal/:id` | Публичные документы | — |
@@ -430,7 +431,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `slots.test.ts` | calculateSlots, slotsConflict, past slots, boundaries |
 | `availability.test.ts` | validation, period form, planningPeriod slots, permissions, exceptions, mock save (29 tests) |
 | `calendar.test.ts` | date ranges, IDOR filters, booking/reschedule/cancel → calendar data |
-| `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput, register count/notify/participants/unread (21 tests) |
+| `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput, register count/notify/participants/unread, image write-back (38 tests) |
 | `chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort by lastMessage, attachments, realtime, pagination, IDOR, notifications, cache isolation |
 | `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; admin as teacher; progress block (skipped when UI hidden, §85) |
 | `nav.test.tsx` | MobileHeader assignments + bell + «О школе»; SidebarNav без notifications + «О школе»; aria-current; admin active; BottomNav brand (15 tests) |
@@ -440,7 +441,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `offline.test.tsx` | BookLessonLink offline; AvailabilityPage save disabled offline (4 tests) |
 | `assignments.test.ts` | access, manage, groups CRUD/delete, create/update/delete IDOR, member helpers, content validation, home helpers (36 tests) |
 | `progress.test.ts` | access, helpers, summary, achievements, auto-unlock, teacher goals/skills CRUD, attendance (32 tests) |
-| `support.test.ts` | access, FAQ filter/CRUD, validation, tickets search/filters, attachments, IDOR, notifications, permissions (31 tests) |
+| `support.test.ts` | access, FAQ filter/CRUD, validation, tickets search/filters, attachments, IDOR, admin inbox, report copy/deep-link, notifications, permissions |
 | `public.test.ts` | public helpers, API, detail pages, no phone on teachers, event filtering (8 tests) |
 | `security.test.ts` | access, password change, multi-device sessions, resolveSecuritySessions, fingerprint, login notifications, IDOR (21 tests) |
 | `userPreview.test.tsx` | direction helpers, modal name/role/directions, trigger, photo lightbox (5 tests) |
@@ -464,7 +465,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 699 passed (48 files); booking cancel past-slot flake вне scope.
+**Итого:** 716 passed (48 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -609,6 +610,12 @@ services/chat/{access,messages,validation,realtime,helpers}
 | UI helper copy cleanup | ✅ 2026-09-12, см. §153 |
 | Chat list last-message sort | ✅ 2026-09-13, см. §156 |
 | Event image crop 16:9 on upload | ✅ 2026-09-13, см. §157 |
+| Event edit save + Home nearest sync | ✅ 2026-09-13, см. §168 |
+| Event invited student picker | ✅ 2026-09-13, см. §169 |
+| Home nearest event by datetime | ✅ 2026-09-13, см. §170 |
+| Events archive (staff) | ✅ 2026-09-13, см. §171 |
+| Admin help inbox + report message UX | ✅ 2026-09-13, см. §172 |
+| StudentPicker Все/Направления + count | ✅ 2026-09-13, см. §173 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1421,8 +1428,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **702** (48 files); booking cancel flake вне scope; §167 pending consent + bootstrap |
-| Graphify | 2830 nodes, 3121 edges, 440 communities |
+| Тесты | **720** (48 files); booking cancel / authStoreSync hookTimeout flake вне scope; §173 StudentPicker |
+| Graphify | 2876 nodes, 3186 edges, 444 communities |
 
 ### Фазы (кратко)
 
@@ -1444,7 +1451,152 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2830 nodes, 3121 edges, 440 communities (post-§167).
+**Graphify stats:** 2876 nodes, 3186 edges, 444 communities (post-§173).
+
+---
+
+## 173. StudentPicker — Все / Направления + count fix (2026-09-13)
+
+**Scope:** фильтр участников без ряда чипов направлений; фикс «Выбрать всех (N)» vs видимый список.
+
+**Graphify:** `StudentPickerList()` → `dedupeUsersById` / `filterStudentsByDirection` → AddGroupMembersModal · CreateChatModal · EventFormModal.
+
+### UI (✅)
+
+- Чипы направлений убраны → **Все** + **Направления** (раскрываемый список с анимацией grid-rows).
+- Выбор направления: чип показывает имя, фильтр как раньше.
+- Общий компонент — ДЗ «Добавить участников», создание чата, invited-события; **настройки группового чата** → та же `AddGroupMembersModal` (`ConversationSettings`).
+
+### Count fix (✅)
+
+- `dedupeUsersById` — дубликаты id не раздувают «Выбрать всех (N)».
+- Список: `max-h` + `popup-scroll`; EventForm wrapper — `flex` (не клип без скролла).
+
+### Tests
+
+`adminUsers` +1 dedupe; typecheck ✅; suite **720** (+ flake authStoreSync hookTimeout вне scope).
+
+**Graphify stats:** 2876 nodes, 3186 edges, 444 communities.
+
+---
+
+## 172. Admin help inbox + report deep-link (2026-09-13)
+
+**Scope:** обращения/жалобы только в `/admin/help`; бейджи Profile + Администрирование; карточка жалобы с названием чата и текстом сообщения; deep-link с красной обводкой.
+
+**Graphify:** `AdminHelpPage()` / `HelpTicketDetailPage()` → `reportContext` → `buildReportedMessageChatLink()` → `ChatPage` `hl=report` → `MessageBubble` danger ring.
+
+### Inbox (✅)
+
+- Create ticket / report → notify admins → link `/admin/help/:id` (mock + PB).
+- `AdminHubPage` + Profile «Администрирование» + BottomNav/Sidebar Profile badge = open tickets.
+- Профиль: пункт «Помощь» **скрыт** у admin; `/profile/help` → redirect `/admin/help`.
+- `/admin/help`: inbox обращений + **FAQ CMS** (добавить/править/удалить).
+- `/profile/help/:id` для admin → redirect `/admin/help/:id`.
+
+### Report UX (✅)
+
+- `reportContext`: snapshot `conversationTitle` + `messagePreview` при жалобе.
+- **Enrich on read/create** (mock + PB): подтягивает чат/сообщение **без** ChatApi membership — чинит старые жалобы с голыми id и личные чаты, куда админ не участник.
+- Деталь + список `/admin/help`: название чата + текст; клик → `/chat/:id?msg=&hl=report`.
+- Admin `getConversation`/`getMessages` by id разрешены (модерация); список чатов по-прежнему membership-based.
+- Chat deep-link: догружает старые страницы, пока не найдёт сообщение; красная обводка (~4.5 с).
+
+### Tests
+
+`support` report enrich; `chat` admin personal deep-link; typecheck ✅. Suite см. §42.
+
+---
+
+## 171. Events archive for staff (2026-09-13)
+
+**Scope:** прошедшие мероприятия скрыты из списков/Home/public; архив только teacher|admin.
+
+**Graphify:** `isEventArchived()` → `EventsPage` / `EventsArchivePage` / `getNextUpcomingEvent` / `toPublicEvent`.
+
+### Domain (✅)
+
+- Архив: `endTime` (иначе `startTime`) уже в прошлом.
+- `filterActiveEvents` / `filterArchivedEvents` / sort helpers.
+
+### UI (✅)
+
+- `/events`: иконка Archive рядом с «+» → `/events/archive` (staff).
+- Список `/events` и Home nearest — только active.
+- Архив: список прошедших; ученик → redirect `/events`.
+- Detail: ученик не открывает архивные; staff — badge «Архив», без записи.
+
+### Tests
+
+archive helpers + nearest excludes archived + route `/events/archive`. Suite см. §42.
+
+---
+
+## 170. Home nearest event by datetime (2026-09-13)
+
+**Scope:** блок «Ближайшее мероприятие» на `/home` — строго ближайшее по date+startTime; обновление после create/edit.
+
+**Graphify:** `getNextUpcomingEvent()` / `getEventStartMs()` → `HomePage()`; `normalizeClockTime()` → PB `mapEventRecord`.
+
+### Fix (✅)
+
+- Выбор nearest по epoch ms (не string-sort); invalid date/time отбрасываются.
+- `normalizeClockTime` + PB mapper `startTime`/`endTime` → `HH:mm`.
+- Home: `staleTime: 0`, `refetchOnMount: 'always'`, `key={nextEvent.id}` на карточке.
+- Save: полная замена события в `['events']` + `invalidateQueries(refetchType: 'all')`.
+- Staff видит invited-события в списке (`canViewSchoolEvent` + role).
+
+### Tests
+
+`home` nearest across days / HH:mm:ss; `events` staff invited view. Suite **713** (48 files).
+
+**Graphify stats:** 2849 nodes, 3144 edges, 443 communities.
+
+---
+
+## 169. Event invited student picker (2026-09-13)
+
+**Scope:** тип «По приглашению» — выбор учеников вместо ручного ввода ID.
+
+**Graphify:** `EventFormModal()` → `StudentPickerList()` → `filterStudentsByDirection` / `filterUsersBySearchQuery`.
+
+### UI (✅)
+
+- При `type === invited`: `StudentPickerList` (Все / направления, поиск по имени/фамилии, multi-select + «Выбрать всех»).
+- Данные: `['users']` + `['directions']` при открытой форме invited.
+- Submit без выбора → ошибка «Выберите хотя бы одного…»; edit сохраняет `invitedUserIds`.
+
+### Tests
+
+typecheck ✅; suite **709** (48 files).
+
+**Graphify stats:** 2845 nodes, 3135 edges, 443 communities.
+
+---
+
+## 168. Event edit save + Home nearest sync (2026-09-13)
+
+**Scope:** редактирование мероприятия не сохранялось; ближайшее на `/home` не обновлялось.
+
+**Graphify:** `EventFormModal()` → `resolveEventImageWriteInput()` → mock/PB `updateEvent` → `['events']` cache → `getNextUpcomingEvent` / `HomeEventCard`.
+
+### Root cause (✅)
+
+- При edit форма всегда слала `imageUrl` с **resolved signed URL** (после `presentPbEvent`).
+- `validateEventInput` отклонял http(s) > 500 символов → save падал до invalidate.
+- Даже при коротком URL запись signed URL поверх `pbfile:` ломала storage (max 255).
+
+### Fix (✅)
+
+- `EventFormModal`: `imageUrl` только при смене/удалении фото; omit при неизменённом.
+- `resolveEventImageWriteInput` — signed/display URL не затирает `pbfile:` (mock + PB).
+- `onSuccess`: `setQueryData` / `setQueriesData` для `['event']` и `['events']` + invalidate → Home сразу видит nearest.
+
+### Tests
+
+`events` image write-back + long URL validation; suite **707** (48 files). typecheck ✅.
+
+**Graphify stats:** 2832 nodes, 3122 edges, 436 communities.
 
 ---
 

@@ -90,6 +90,12 @@ describe('BottomNav active state', () => {
     expect(lessonsLink).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /Профиль/ })).not.toHaveAttribute('aria-current');
   });
+
+  it('shows profile badge when provided', () => {
+    renderWithProviders(<BottomNav chatBadge={0} profileBadge={3} />, '/home');
+    const profileLink = screen.getByRole('link', { name: /Профиль/ });
+    expect(profileLink).toHaveTextContent('3');
+  });
 });
 
 describe('MobileHeader active state', () => {

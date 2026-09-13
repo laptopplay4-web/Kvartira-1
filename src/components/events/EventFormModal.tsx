@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import type { EventType, SchoolEvent } from '@/types';
 import { api } from '@/services/api';
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { EventImageCropModal } from '@/components/events/EventImageCropModal';
+import { StudentPickerList } from '@/components/users/StudentPickerList';
 
 const TYPE_OPTIONS: { value: EventType; label: string }[] = (
   Object.entries(EVENT_TYPE_LABELS) as [EventType, string][]
@@ -46,8 +47,32 @@ export function EventFormModal({ open, onClose, adminId, event, onSaved }: Event
   const [cropImage, setCropImage] = useState<HTMLImageElement | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [maxParticipants, setMaxParticipants] = useState('');
-  const [invitedUserIds, setInvitedUserIds] = useState('');
+  const [invitedUserIds, setInvitedUserIds] = useState<string[]>([]);
   const [error, setError] = useState('');
+
+  const needsInvitePicker = open && type === 'invited';
+
+  const { data: directions = [] } = useQuery({
+    queryKey: ['directions'],
+    queryFn: () => api.lessons.getDirections(),
+    enabled: needsInvitePicker,
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => api.users.getAllUsers(adminId),
+    enabled: needsInvitePicker,
+  });
+
+  const students = useMemo(
+    () =>
+      users
+        .filter((u) => u.role === 'student')
+        .sort((a, b) =>
+          `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'ru'),
+        ),
+    [users],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -64,22 +89,26 @@ export function EventFormModal({ open, onClose, adminId, event, onSaved }: Event
     setCropImage(null);
     setCropOpen(false);
     setMaxParticipants(event?.maxParticipants?.toString() ?? '');
-    setInvitedUserIds(event?.invitedUserIds?.join(', ') ?? '');
+    setInvitedUserIds(event?.invitedUserIds ? [...event.invitedUserIds] : []);
     setError('');
   }, [open, event]);
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      let imageUrl: string | undefined;
-      if (imageRemoved) {
-        imageUrl = undefined;
-      } else if (imageDataUrl) {
-        imageUrl = imageDataUrl;
-      } else if (isEdit) {
-        imageUrl = event?.imageUrl;
-      }
-
-      const payload = {
+      // Не отправляем resolved signed URL с карточки: иначе валидация (max 500)
+      // и запись поверх pbfile: ломают update. imageUrl — только при смене/удалении.
+      const payload: {
+        title: string;
+        description: string;
+        type: EventType;
+        date: string;
+        startTime: string;
+        endTime?: string;
+        location: string;
+        imageUrl?: string;
+        maxParticipants?: number;
+        invitedUserIds?: string[];
+      } = {
         title,
         description,
         type,
@@ -87,23 +116,32 @@ export function EventFormModal({ open, onClose, adminId, event, onSaved }: Event
         startTime,
         endTime: endTime || undefined,
         location,
-        imageUrl,
         maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
-        invitedUserIds:
-          type === 'invited'
-            ? invitedUserIds
-                .split(',')
-                .map((id) => id.trim())
-                .filter(Boolean)
-            : undefined,
+        invitedUserIds: type === 'invited' ? invitedUserIds : undefined,
       };
+
+      if (imageRemoved) {
+        payload.imageUrl = undefined;
+      } else if (imageDataUrl) {
+        payload.imageUrl = imageDataUrl;
+      }
+
       return isEdit
         ? api.events.updateEvent(event!.id, payload, adminId)
         : api.events.createEvent(payload, adminId);
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      queryClient.setQueryData(['event', saved.id], saved);
+      queryClient.setQueriesData<SchoolEvent[]>({ queryKey: ['events'] }, (prev) => {
+        if (!prev) return [saved];
+        const idx = prev.findIndex((item) => item.id === saved.id);
+        if (idx === -1) return [saved, ...prev];
+        const next = prev.slice();
+        next[idx] = saved;
+        return next;
+      });
       void queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      void queryClient.invalidateQueries({ queryKey: ['events'] });
+      void queryClient.invalidateQueries({ queryKey: ['events'], refetchType: 'all' });
       onSaved();
       onClose();
     },
@@ -157,6 +195,10 @@ export function EventFormModal({ open, onClose, adminId, event, onSaved }: Event
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isOnline) return;
+    if (type === 'invited' && invitedUserIds.length === 0) {
+      setError('Выберите хотя бы одного приглашённого участника');
+      return;
+    }
     setError('');
     saveMutation.mutate();
   }
@@ -287,13 +329,33 @@ export function EventFormModal({ open, onClose, adminId, event, onSaved }: Event
             onChange={(e) => setMaxParticipants(e.target.value)}
           />
           {type === 'invited' && (
-            <Input
-              label="ID приглашённых"
-              hint="Через запятую, например user-student"
-              value={invitedUserIds}
-              onChange={(e) => setInvitedUserIds(e.target.value)}
-              required
-            />
+            <div className="flex min-h-0 flex-col gap-2" data-invalid={invitedUserIds.length === 0 || undefined}>
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-label text-text-secondary">Приглашённые участники</p>
+                {invitedUserIds.length > 0 && (
+                  <p className="text-caption text-text-muted">Выбрано: {invitedUserIds.length}</p>
+                )}
+              </div>
+              {usersLoading ? (
+                <p className="py-6 text-center text-body-sm text-text-muted">Загрузка учеников…</p>
+              ) : (
+                <div className="flex min-h-48 max-h-72 flex-col overflow-hidden rounded-xl border border-border bg-surface-elevated/40 p-3">
+                  <StudentPickerList
+                    students={students}
+                    directions={directions}
+                    selectedIds={invitedUserIds}
+                    onChange={(ids) => {
+                      setInvitedUserIds(ids);
+                      if (ids.length > 0 && error.startsWith('Выберите хотя бы')) setError('');
+                    }}
+                    mode="multiple"
+                    disabled={!isOnline || saveMutation.isPending}
+                    emptyAllLabel="Нет учеников для приглашения"
+                    searchPlaceholder="Поиск по имени или фамилии"
+                  />
+                </div>
+              )}
+            </div>
           )}
           {error && (
             <p className="text-body-sm text-danger" role="alert">

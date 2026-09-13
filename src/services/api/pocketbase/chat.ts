@@ -234,8 +234,13 @@ async function assertConversationAccess(
     throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
   }
   const conversation = await loadConversationOrThrow(conversationId);
-  if (user.role === 'admin' && conversation.type !== 'personal') {
-    await ensureAdminGroupMembershipPb(userId, [conversation]);
+  if (user.role === 'admin') {
+    // Moderation / report deep-link: admin may open any chat by id (list stays membership-based).
+    if (conversation.type !== 'personal') {
+      await ensureAdminGroupMembershipPb(userId, [conversation]);
+    }
+    const members = await loadMembers(conversationId);
+    return { user, conversation, members };
   }
   const members = await loadMembers(conversationId);
   if (!canAccessConversation(user, conversation, members)) {

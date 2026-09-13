@@ -97,6 +97,145 @@ describe('support helpers', () => {
   });
 });
 
+describe('admin support inbox helpers', () => {
+  it('counts open tickets and builds admin notify links', async () => {
+    const {
+      countOpenSupportTickets,
+      isSupportAdminNotification,
+      adminHelpTicketPath,
+      supportTicketAdminNotifyTitle,
+    } = await import('@/services/support/adminInbox');
+
+    expect(countOpenSupportTickets([{ status: 'open' }, { status: 'closed' }])).toBe(1);
+    expect(adminHelpTicketPath('ticket-1')).toBe('/admin/help/ticket-1');
+    expect(supportTicketAdminNotifyTitle(true)).toBe('Жалоба на сообщение в чате');
+    expect(supportTicketAdminNotifyTitle(false)).toBe('Новое обращение в поддержку');
+    expect(
+      isSupportAdminNotification({ link: '/admin/help/ticket-1', read: false, type: 'system' }),
+    ).toBe(true);
+    expect(isSupportAdminNotification({ link: '/profile/help/ticket-1', read: false })).toBe(false);
+  });
+});
+
+describe('report context enrichment', () => {
+  it('fills human titles for legacy id-only reportContext', async () => {
+    const {
+      enrichReportContextFromSources,
+      looksLikeOpaqueId,
+      resolveReportDisplayLabels,
+      formatReportTicketListPreview,
+    } = await import('@/services/support/reportContext');
+    const { conversations, messages, users } = await import('@/mocks/seed');
+
+    expect(looksLikeOpaqueId('9e5rbrqs5fyet5s')).toBe(true);
+    expect(looksLikeOpaqueId('Общий чат')).toBe(false);
+
+    const conv = conversations.find((c) => c.id === 'conv-1')!;
+    const msg = messages.find((m) => m.conversationId === 'conv-1' && m.text?.trim())!;
+    const enriched = enrichReportContextFromSources(
+      {
+        conversationId: conv.id,
+        messageId: msg.id,
+        reason: 'spam',
+      },
+      { conversation: conv, message: msg, users, viewerId: 'user-admin' },
+    );
+    expect(enriched.conversationTitle).toBeTruthy();
+    expect(looksLikeOpaqueId(enriched.conversationTitle)).toBe(false);
+    expect(enriched.messagePreview).toBe(msg.text);
+    expect(looksLikeOpaqueId(enriched.messagePreview)).toBe(false);
+
+    const ticket = {
+      id: 't1',
+      userId: 'user-student',
+      subject: 'Жалоба',
+      message: `Причина: Спам\nЧат: ${conv.id}\nСообщение: ${msg.id}`,
+      category: 'chat' as const,
+      status: 'open' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      attachments: [],
+      reportContext: enriched,
+    };
+    const labels = resolveReportDisplayLabels(ticket);
+    expect(labels.conversationTitle).not.toMatch(/^[a-z0-9]{10,20}$/i);
+    expect(formatReportTicketListPreview(ticket)).toContain(msg.text);
+  });
+
+  it('enriches legacy report ticket on getTicket for admin', async () => {
+    const { conversations, messages } = await import('@/mocks/seed');
+    const conv = conversations.find((c) => c.id === 'conv-1')!;
+    const msg = messages.find((m) => m.conversationId === 'conv-1' && m.text?.trim())!;
+    const db = {
+      ...createTestDb(),
+      conversations: structuredClone(conversations),
+      messages: structuredClone(messages),
+    };
+    const api = createMockSupportApi(db, async () => undefined);
+    const ticketId = 'ticket-legacy-report';
+    db.supportTickets.push({
+      id: ticketId,
+      userId: 'user-student',
+      subject: 'Жалоба на сообщение: Спам',
+      message: `Причина: Спам\nЧат: ${conv.id}\nСообщение: ${msg.id}`,
+      category: 'chat',
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      attachments: [],
+      reportContext: {
+        conversationId: conv.id,
+        messageId: msg.id,
+        reason: 'spam',
+      },
+    });
+
+    const ticket = await api.getTicket(ticketId, 'user-admin');
+    expect(ticket.reportContext?.conversationTitle).toBeTruthy();
+    expect(ticket.reportContext?.messagePreview).toBe(msg.text);
+    expect(ticket.message).toContain(msg.text);
+    expect(ticket.message).not.toContain(msg.id);
+  });
+});
+
+describe('report message copy helpers', () => {
+  it('builds human-readable report body and chat deep-link', async () => {
+    const {
+      buildReportTicketMessage,
+      buildReportedMessageChatLink,
+      extractReportComment,
+      formatReportedMessagePreview,
+    } = await import('@/services/support/reportMessage');
+
+    const body = buildReportTicketMessage('spam', 'Лишний шум', {
+      conversationId: 'conv-x',
+      messageId: 'msg-x',
+      conversationTitle: 'Общий чат',
+      messagePreview: 'Привет всем',
+    });
+    expect(body).toContain('Чат: Общий чат');
+    expect(body).toContain('Сообщение: Привет всем');
+    expect(body).not.toContain('conv-x');
+    expect(body).not.toContain('msg-x');
+    expect(extractReportComment(body)).toBe('Лишний шум');
+    expect(buildReportedMessageChatLink({ conversationId: 'conv-1', messageId: 'msg-2' })).toBe(
+      '/chat/conv-1?msg=msg-2&hl=report',
+    );
+    expect(
+      formatReportedMessagePreview({
+        id: 'm1',
+        conversationId: 'c1',
+        senderId: 'u1',
+        text: 'Текст',
+        createdAt: new Date().toISOString(),
+        status: 'sent',
+        readBy: [],
+        attachments: [],
+      }),
+    ).toBe('Текст');
+  });
+});
+
 describe('support validation', () => {
   it('rejects short message', () => {
     expect(() =>
@@ -221,6 +360,27 @@ describe('mock support api', () => {
     expect(ticket.attachments).toHaveLength(1);
   });
 
+  it('notifies admins on regular help ticket', async () => {
+    const before = db.notifications.filter((n) => n.userId === admin.id).length;
+    const ticket = await api.createTicket(
+      {
+        subject: 'Не получается записаться',
+        message: 'На экране записи нет свободных слотов на завтра',
+        category: 'booking',
+      },
+      student.id,
+    );
+    const adminNotifs = db.notifications.filter(
+      (n) =>
+        n.userId === admin.id &&
+        n.link === `/admin/help/${ticket.id}` &&
+        n.title === 'Новое обращение в поддержку' &&
+        n.urgent === true,
+    );
+    expect(adminNotifs.length).toBeGreaterThanOrEqual(1);
+    expect(db.notifications.filter((n) => n.userId === admin.id).length).toBeGreaterThan(before);
+  });
+
   it('blocks IDOR on getTicket', async () => {
     await expect(api.getTicket(otherTicket.id, student.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
@@ -246,21 +406,32 @@ describe('mock support api', () => {
     const ticket = await api.createTicket(
       {
         subject: 'Жалоба на сообщение: Спам',
-        message: 'Причина: Спам\nЧат: conv-1\nСообщение: msg-report-1',
+        message:
+          'Причина: Спам\nЧат: Общий чат\nСообщение: Привет, это спам\n\nКомментарий:\nЛишний шум',
         category: 'chat',
         reportContext: {
           conversationId: 'conv-1',
           messageId: 'msg-report-1',
           reason: 'spam',
+          conversationTitle: 'Общий чат',
+          messagePreview: 'Привет, это спам',
         },
       },
       student.id,
     );
     expect(ticket.reportContext?.messageId).toBe('msg-report-1');
     expect(ticket.reportContext?.reason).toBe('spam');
-    expect(db.notifications.some((n) => n.userId === admin.id && n.link?.includes(ticket.id))).toBe(
-      true,
-    );
+    expect(ticket.reportContext?.conversationTitle).toBe('Общий чат');
+    expect(ticket.reportContext?.messagePreview).toBe('Привет, это спам');
+    expect(
+      db.notifications.some(
+        (n) =>
+          n.userId === admin.id &&
+          n.link === `/admin/help/${ticket.id}` &&
+          n.title === 'Жалоба на сообщение в чате' &&
+          n.urgent === true,
+      ),
+    ).toBe(true);
   });
 
   it('rejects duplicate open report for the same message', async () => {

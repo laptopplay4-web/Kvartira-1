@@ -4,13 +4,12 @@ import { actsAsTeacher, can } from '@/permissions';
 import { getPocketBase } from '@/services/api/pocketbase/client';
 import { withPbError } from '@/services/api/pocketbase/errors';
 import { mapAvailabilityRecord, mapUserRecord } from '@/services/api/pocketbase/mappers';
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 import { validateTeacherAvailability } from '@/services/availability/validateAvailability';
 import type { TeacherAvailability } from '@/types';
 
 async function assertAvailabilityAccess(teacherId: string, requesterId: string): Promise<void> {
-  const pb = getPocketBase();
-  const requesterRecord = await pb.collection('users').getOne(requesterId);
-  const requester = mapUserRecord(requesterRecord);
+  const requester = await getRequesterUser(requesterId);
 
   if (!can(requester, 'availability:manage')) {
     throw new ApiError('Нет доступа к графику работы', 'FORBIDDEN', 403);

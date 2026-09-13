@@ -8,7 +8,7 @@ import { ApiError } from '@/services/api/types';
 import { publicSchoolInfo as defaultSchoolInfo } from '@/mocks/seed';
 import { getPocketBase } from '@/services/api/pocketbase/client';
 import { withPbError } from '@/services/api/pocketbase/errors';
-import { mapSchoolSettingsRecord, mapUserRecord } from '@/services/api/pocketbase/mappers';
+import { mapSchoolSettingsRecord } from '@/services/api/pocketbase/mappers';
 import {
   deleteStoredFiles,
   resolveStoredFileUrl,
@@ -30,20 +30,8 @@ import {
   toRegistrationInviteInfo,
   type RegistrationInviteSecret,
 } from '@/services/registration/invite';
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 import type { PublicSchoolInfo, SchoolDirectionsVideo, User } from '@/types';
-
-async function getRequesterUser(requesterId: string): Promise<User> {
-  const pb = getPocketBase();
-  try {
-    const record = await pb.collection('users').getOne(requesterId);
-    return mapUserRecord(record);
-  } catch (error) {
-    if (error instanceof ClientResponseError && error.status === 404) {
-      throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
-    }
-    throw error;
-  }
-}
 
 async function assertSchoolSettingsManage(requesterId: string): Promise<User> {
   const user = await getRequesterUser(requesterId);

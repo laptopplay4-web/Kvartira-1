@@ -1,6 +1,7 @@
 import type { RecordModel } from 'pocketbase';
 import type {
   Assignment,
+  Conversation,
   Message,
   MessageAttachment,
   SupportTicket,
@@ -8,6 +9,7 @@ import type {
 } from '@/types';
 import type { User } from '@/types';
 import { getPocketBase } from '@/services/api/pocketbase/client';
+import { pbEqOr } from '@/services/api/pocketbase/helpers';
 
 export const PB_FILE_URL_PREFIX = 'pbfile:';
 
@@ -71,28 +73,59 @@ function getSignedUrl(record: KvartiraFileRecord): string {
   return pb.files.getURL(record, record.file, token ? { token } : undefined);
 }
 
-async function loadFileRecord(fileId: string): Promise<KvartiraFileRecord> {
+/** Max ids per PB OR-filter to stay under filter length limits. */
+export const KVARTIRA_FILE_ID_CHUNK = 50;
+
+async function loadFileRecordsByIds(ids: string[]): Promise<Map<string, KvartiraFileRecord>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  const byId = new Map<string, KvartiraFileRecord>();
+  if (unique.length === 0) return byId;
+
   const pb = getPocketBase();
-  return pb.collection('kvartira_files').getOne<KvartiraFileRecord>(fileId);
+  for (let i = 0; i < unique.length; i += KVARTIRA_FILE_ID_CHUNK) {
+    const chunk = unique.slice(i, i + KVARTIRA_FILE_ID_CHUNK);
+    const filter = pbEqOr('id', chunk);
+    if (!filter) continue;
+    try {
+      const records = await pb.collection('kvartira_files').getFullList<KvartiraFileRecord>({
+        filter,
+      });
+      for (const record of records) {
+        byId.set(record.id, record);
+      }
+    } catch {
+      /* fall through — unresolved refs stay as pbfile: */
+    }
+  }
+  return byId;
+}
+
+/** Resolve many `pbfile:` refs in as few list requests as possible (order preserved). */
+export async function resolveStoredFileUrls(
+  urls: Array<string | undefined>,
+): Promise<Array<string | undefined>> {
+  const ids = collectStoredFileIds(...urls);
+  const records = await loadFileRecordsByIds(ids);
+
+  return urls.map((url) => {
+    if (!url) return undefined;
+    if (!isStoredFileRef(url)) return url;
+    const fileId = parseStoredFileRef(url);
+    if (!fileId) return url;
+    const record = records.get(fileId);
+    return record ? getSignedUrl(record) : url;
+  });
 }
 
 export async function resolveStoredFileUrl(url: string | undefined): Promise<string | undefined> {
-  if (!url) return undefined;
-  if (!isStoredFileRef(url)) return url;
-  const fileId = parseStoredFileRef(url);
-  if (!fileId) return url;
-  try {
-    const record = await loadFileRecord(fileId);
-    return getSignedUrl(record);
-  } catch {
-    return url;
-  }
+  const [resolved] = await resolveStoredFileUrls([url]);
+  return resolved;
 }
 
 export async function resolveUserAvatars(user: User): Promise<User> {
-  const [avatarUrl, avatarOriginalUrl] = await Promise.all([
-    resolveStoredFileUrl(user.avatarUrl),
-    resolveStoredFileUrl(user.avatarOriginalUrl),
+  const [avatarUrl, avatarOriginalUrl] = await resolveStoredFileUrls([
+    user.avatarUrl,
+    user.avatarOriginalUrl,
   ]);
 
   if (avatarUrl === user.avatarUrl && avatarOriginalUrl === user.avatarOriginalUrl) {
@@ -108,7 +141,35 @@ export async function resolveUserAvatars(user: User): Promise<User> {
 }
 
 export async function resolveUsersAvatars(users: User[]): Promise<User[]> {
-  return Promise.all(users.map(resolveUserAvatars));
+  if (users.length === 0) return users;
+  const flatUrls = users.flatMap((u) => [u.avatarUrl, u.avatarOriginalUrl]);
+  const resolvedFlat = await resolveStoredFileUrls(flatUrls);
+  return users.map((user, index) => {
+    const avatarUrl = resolvedFlat[index * 2];
+    const avatarOriginalUrl = resolvedFlat[index * 2 + 1];
+    if (avatarUrl === user.avatarUrl && avatarOriginalUrl === user.avatarOriginalUrl) {
+      return user;
+    }
+    const resolved: User = { ...user };
+    if (avatarUrl) resolved.avatarUrl = avatarUrl;
+    else delete resolved.avatarUrl;
+    if (avatarOriginalUrl) resolved.avatarOriginalUrl = avatarOriginalUrl;
+    else delete resolved.avatarOriginalUrl;
+    return resolved;
+  });
+}
+
+/** Batch-resolve conversation avatar `pbfile:` refs. */
+export async function resolveConversationAvatars(
+  conversations: Conversation[],
+): Promise<Conversation[]> {
+  if (conversations.length === 0) return conversations;
+  const resolvedUrls = await resolveStoredFileUrls(conversations.map((c) => c.avatarUrl));
+  return conversations.map((conv, index) => {
+    const resolved = resolvedUrls[index];
+    if (!resolved || resolved === conv.avatarUrl) return conv;
+    return { ...conv, avatarUrl: resolved };
+  });
 }
 
 export async function deleteStoredFiles(...urls: Array<string | undefined>): Promise<void> {

@@ -30,6 +30,7 @@ import {
 } from '@/services/events/validation';
 import { resolveEventImageWriteInput } from '@/services/events/imageWrite';
 import { sanitizeUserPhoneForViewer } from '@/services/users/helpers';
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 import type { SchoolEvent, User } from '@/types';
 
 function relIdFromPb(value: unknown): string {
@@ -38,11 +39,6 @@ function relIdFromPb(value: unknown): string {
     return String((value as { id: string }).id);
   }
   return '';
-}
-async function getRequesterUser(requesterId: string): Promise<User> {
-  const pb = getPocketBase();
-  const record = await pb.collection('users').getOne(requesterId);
-  return mapUserRecord(record);
 }
 
 async function assertEventsAdminAccess(requesterId: string): Promise<User> {

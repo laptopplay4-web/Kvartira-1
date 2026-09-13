@@ -37,6 +37,7 @@ import {
 } from '@/services/chat/access';
 import {
   computeUnreadCount,
+  conversationPreviewFromMessage,
   getConversationDisplayTitle,
   isValidMessageText,
   matchesMessageSearch,
@@ -59,10 +60,7 @@ import {
   SCHOOL_WIDE_CHAT_DEFAULT_TITLE,
 } from '@/services/chat/constants';
 import { detectAttachmentType, validateAttachment, validateMessageContent } from '@/services/chat/validation';
-import {
-  getAttachmentsPreviewLabel,
-  isSyntheticMediaCaption,
-} from '@/services/chat/attachments';
+import { getAttachmentsPreviewLabel } from '@/services/chat/attachments';
 import { chatRealtimeService } from '@/services/chat/realtime';
 import { findConversationForLesson } from '@/services/lessons/helpers';
 import { ensureSchoolWideMembership, isSchoolWideConversation } from '@/services/chat/schoolWide';
@@ -157,25 +155,28 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         !isMessageHiddenForUser(m, userId),
     );
     const unreadCount = computeUnreadCount(conv.id, userId, convMessages, member);
-    const lastMessage = [...convMessages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
+    const lastFromScan = [...convMessages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
+
+    let lastMessage = conv.lastMessage;
+    if (lastMessage) {
+      const storedMsg = db.messages.find((m) => m.id === lastMessage!.id);
+      if (
+        storedMsg &&
+        (storedMsg.deletedAt || isMessageHiddenForUser(storedMsg, userId))
+      ) {
+        lastMessage = undefined;
+      }
+    }
+    if (!lastMessage && lastFromScan) {
+      lastMessage = conversationPreviewFromMessage(lastFromScan);
+    }
+
     return {
       ...conv,
       unreadCount,
       viewerPinnedAt: member?.pinnedAt ?? null,
       viewerMuted: member ? isMemberMuted(member) : false,
-      lastMessage: lastMessage
-        ? {
-            id: lastMessage.id,
-            text:
-              lastMessage.text && !isSyntheticMediaCaption(lastMessage.text, lastMessage.attachments)
-                ? lastMessage.text
-                : getAttachmentsPreviewLabel(lastMessage.attachments) ||
-                  lastMessage.text ||
-                  'Вложение',
-            senderId: lastMessage.senderId,
-            createdAt: lastMessage.createdAt,
-          }
-        : undefined,
+      lastMessage,
       lastMessageAt: lastMessage?.createdAt ?? conv.lastMessageAt,
       updatedAt: lastMessage?.createdAt ?? conv.updatedAt,
     };
@@ -191,12 +192,10 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
     if (last) {
       conv.lastMessageAt = last.createdAt;
       conv.updatedAt = last.createdAt;
-      conv.lastMessage = {
-        id: last.id,
-        text: last.text,
-        senderId: last.senderId,
-        createdAt: last.createdAt,
-      };
+      conv.lastMessage = conversationPreviewFromMessage(last);
+    } else {
+      delete conv.lastMessage;
+      delete conv.lastMessageAt;
     }
   }
 

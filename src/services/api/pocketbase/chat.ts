@@ -20,6 +20,7 @@ import {
   mapUserRecord,
 } from '@/services/api/pocketbase/mappers';
 import { escapePbFilter, pbEqOr, relId } from '@/services/api/pocketbase/helpers';
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 import { isSchoolWideConversation } from '@/services/chat/schoolWide';
 import { compareIsoDates } from '@/utils/dates';
 import {
@@ -27,6 +28,7 @@ import {
   isStoredFileRef,
   linkStoredFilesToContext,
   parseStoredFileRef,
+  resolveConversationAvatars,
   resolveMessage,
   resolveMessages,
   resolveStoredFileUrl,
@@ -51,6 +53,7 @@ import {
 } from '@/services/chat/access';
 import {
   computeUnreadCount,
+  conversationPreviewFromMessage,
   getConversationDisplayTitle,
   isValidMessageText,
   matchesMessageSearch,
@@ -77,10 +80,7 @@ import {
   SCHOOL_WIDE_CHAT_DEFAULT_TITLE,
 } from '@/services/chat/constants';
 import { detectAttachmentType, validateAttachment, validateMessageContent } from '@/services/chat/validation';
-import {
-  getAttachmentsPreviewLabel,
-  isSyntheticMediaCaption,
-} from '@/services/chat/attachments';
+import { getAttachmentsPreviewLabel } from '@/services/chat/attachments';
 import { chatRealtimeService } from '@/services/chat/realtime';
 import { findConversationForLesson } from '@/services/lessons/helpers';
 import type {
@@ -99,19 +99,6 @@ const openConversations = new Map<string, string>();
 function uid(prefix: string): string {
   const suffix = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   return `${prefix}-${suffix}`;
-}
-
-async function getRequesterUser(userId: string): Promise<User> {
-  const pb = getPocketBase();
-  try {
-    const record = await pb.collection('users').getOne(userId);
-    return mapUserRecord(record);
-  } catch (error) {
-    if (error instanceof ClientResponseError && error.status === 404) {
-      throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
-    }
-    throw error;
-  }
 }
 
 async function loadConversationOrThrow(conversationId: string): Promise<Conversation> {
@@ -203,12 +190,121 @@ async function ensureAdminGroupMembershipPb(
   }
 }
 
-async function loadMessagesForConversations(conversationIds: string[]): Promise<Message[]> {
+/**
+ * PocketBase filter for messages that may count as unread for `userId`.
+ * Does not load full history — only candidates after each membership lastReadAt.
+ */
+export function buildUnreadCandidateFilter(
+  conversationIds: string[],
+  userId: string,
+  members: ConversationMember[],
+): string {
+  if (conversationIds.length === 0) return '';
+
+  const memberByConv = new Map<string, ConversationMember>();
+  for (const m of members) {
+    if (m.userId === userId) memberByConv.set(m.conversationId, m);
+  }
+
+  const clauses = conversationIds.map((id) => {
+    const member = memberByConv.get(id);
+    const base = `conversation = "${escapePbFilter(id)}"`;
+    if (member?.lastReadAt) {
+      return `(${base} && created > "${escapePbFilter(member.lastReadAt)}")`;
+    }
+    return `(${base})`;
+  });
+
+  return `(${clauses.join(' || ')}) && sender != "${escapePbFilter(userId)}" && messageType != "system"`;
+}
+
+const UNREAD_CANDIDATE_CONV_CHUNK = 30;
+
+async function loadUnreadCandidateMessages(
+  conversationIds: string[],
+  userId: string,
+  members: ConversationMember[],
+): Promise<Message[]> {
   if (conversationIds.length === 0) return [];
   const pb = getPocketBase();
-  const filter = pbEqOr('conversation', conversationIds);
-  const records = await pb.collection('messages').getFullList({ filter });
-  return records.map(mapMessageRecord);
+  const out: Message[] = [];
+
+  for (let i = 0; i < conversationIds.length; i += UNREAD_CANDIDATE_CONV_CHUNK) {
+    const chunk = conversationIds.slice(i, i + UNREAD_CANDIDATE_CONV_CHUNK);
+    const filter = buildUnreadCandidateFilter(chunk, userId, members);
+    if (!filter) continue;
+    const records = await pb.collection('messages').getFullList({ filter });
+    out.push(...records.map(mapMessageRecord));
+  }
+
+  return out;
+}
+
+async function loadMessagesByIds(ids: string[]): Promise<Message[]> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return [];
+  const pb = getPocketBase();
+  const out: Message[] = [];
+  for (let i = 0; i < unique.length; i += UNREAD_CANDIDATE_CONV_CHUNK) {
+    const chunk = unique.slice(i, i + UNREAD_CANDIDATE_CONV_CHUNK);
+    const filter = pbEqOr('id', chunk);
+    if (!filter) continue;
+    const records = await pb.collection('messages').getFullList({ filter });
+    out.push(...records.map(mapMessageRecord));
+  }
+  return out;
+}
+
+/** Recent messages for rare cases (e.g. last preview hidden for viewer). */
+async function loadRecentMessagesForConversations(
+  conversationIds: string[],
+  limit = 40,
+): Promise<Message[]> {
+  if (conversationIds.length === 0) return [];
+  const pb = getPocketBase();
+  const out: Message[] = [];
+  for (const id of conversationIds) {
+    const result = await pb.collection('messages').getList(1, limit, {
+      filter: `conversation = "${escapePbFilter(id)}"`,
+      sort: '-created,-id',
+    });
+    out.push(...result.items.map(mapMessageRecord));
+  }
+  return out;
+}
+
+/**
+ * Unread candidates + lastMessage rows (+ recent fallback when last is hidden for viewer).
+ */
+async function loadMessagesForConversationEnrichment(
+  conversations: Conversation[],
+  userId: string,
+  members: ConversationMember[],
+): Promise<Message[]> {
+  const conversationIds = conversations.map((c) => c.id);
+  const unread = await loadUnreadCandidateMessages(conversationIds, userId, members);
+  const byId = new Map(unread.map((m) => [m.id, m]));
+
+  const lastIds = conversations
+    .map((c) => c.lastMessage?.id)
+    .filter((id): id is string => !!id && !byId.has(id));
+  const previewRows = await loadMessagesByIds(lastIds);
+  for (const m of previewRows) byId.set(m.id, m);
+
+  const needRecent: string[] = [];
+  for (const conv of conversations) {
+    if (!conv.lastMessage) continue;
+    const msg = byId.get(conv.lastMessage.id);
+    if (msg && (msg.deletedAt || isMessageHiddenForUser(msg, userId))) {
+      needRecent.push(conv.id);
+    }
+  }
+  if (needRecent.length > 0) {
+    const recent = await loadRecentMessagesForConversations(needRecent);
+    for (const m of recent) byId.set(m.id, m);
+  }
+
+  return [...byId.values()];
 }
 
 async function findMemberRecord(conversationId: string, userId: string) {
@@ -249,6 +345,11 @@ async function assertConversationAccess(
   return { user, conversation, members };
 }
 
+/**
+ * Enrich list/detail conversation row.
+ * `messages` should be unread candidates (+ lastMessage rows), not full history.
+ * Preview uses stored `lastMessage` when visible; falls back to scanned messages.
+ */
 function enrichConversation(
   conv: Conversation,
   userId: string,
@@ -263,47 +364,39 @@ function enrichConversation(
       !isMessageHiddenForUser(m, userId),
   );
   const unreadCount = computeUnreadCount(conv.id, userId, convMessages, member);
-  const lastMessage = [...convMessages]
-    .sort((a, b) => compareIsoDates(a.createdAt, b.createdAt))
-    .at(-1);
   const localPinAt = getLocalPinnedAtMap(userId);
   const viewerPinnedAt = member?.pinnedAt ?? localPinAt.get(conv.id) ?? null;
+
+  let lastMessage = conv.lastMessage;
+  if (lastMessage) {
+    const storedMsg = messages.find((m) => m.id === lastMessage!.id);
+    if (storedMsg && (storedMsg.deletedAt || isMessageHiddenForUser(storedMsg, userId))) {
+      lastMessage = undefined;
+    }
+  }
+  if (!lastMessage && convMessages.length > 0) {
+    const last = [...convMessages]
+      .sort((a, b) => compareIsoDates(a.createdAt, b.createdAt))
+      .at(-1)!;
+    lastMessage = conversationPreviewFromMessage(last);
+  }
+
+  const lastMessageAt = lastMessage?.createdAt ?? conv.lastMessageAt;
 
   return {
     ...conv,
     unreadCount,
     viewerPinnedAt,
     viewerMuted: member ? isMemberMuted(member) : false,
-    lastMessage: lastMessage
-      ? {
-          id: lastMessage.id,
-          text:
-            lastMessage.text && !isSyntheticMediaCaption(lastMessage.text, lastMessage.attachments)
-              ? lastMessage.text
-              : getAttachmentsPreviewLabel(lastMessage.attachments) ||
-                lastMessage.text ||
-                'Вложение',
-          senderId: lastMessage.senderId,
-          createdAt: lastMessage.createdAt,
-        }
-      : undefined,
-    lastMessageAt: lastMessage?.createdAt ?? conv.lastMessageAt,
-    updatedAt: lastMessage?.createdAt ?? conv.updatedAt,
+    lastMessage,
+    lastMessageAt,
+    updatedAt: lastMessageAt ?? conv.updatedAt,
   };
 }
 
 async function resolveConversationAvatar(conv: Conversation): Promise<Conversation> {
-  if (!conv.avatarUrl) return conv;
-  const resolved = await resolveStoredFileUrl(conv.avatarUrl);
-  if (!resolved) {
-    if (isStoredFileRef(conv.avatarUrl)) {
-      const { avatarUrl: _drop, ...rest } = conv;
-      return rest;
-    }
-    return conv;
-  }
-  if (resolved === conv.avatarUrl) return conv;
-  return { ...conv, avatarUrl: resolved };
+  const [resolved] = await resolveConversationAvatars([conv]);
+  return resolved ?? conv;
 }
 
 function isPbUrlFieldError(error: unknown): boolean {
@@ -430,18 +523,22 @@ export const pocketbaseChatApi: ChatApi = {
       }
       const userMembers = await loadUserMembers(userId);
       const accessible = conversations.filter((c) => canAccessConversation(user, c, userMembers));
-      const messages = await loadMessagesForConversations(accessible.map((c) => c.id));
+      const messages = await loadMessagesForConversationEnrichment(
+        accessible,
+        userId,
+        userMembers,
+      );
 
       const enriched = accessible.map((c) => enrichConversation(c, userId, messages, userMembers));
       const sorted = sortConversationsWithPins(enriched, userMembers, userId);
-      return Promise.all(sorted.map((c) => resolveConversationAvatar(c)));
+      return resolveConversationAvatars(sorted);
     });
   },
 
   async getConversation(conversationId, userId) {
     return withPbError(async () => {
       const { conversation, members } = await assertConversationAccess(conversationId, userId);
-      const messages = await loadMessagesForConversations([conversationId]);
+      const messages = await loadMessagesForConversationEnrichment([conversation], userId, members);
       return resolveConversationAvatar(enrichConversation(conversation, userId, messages, members));
     });
   },
@@ -765,7 +862,7 @@ export const pocketbaseChatApi: ChatApi = {
         });
         if (existing) {
           const members = await loadMembers(existing.id);
-          const messages = await loadMessagesForConversations([existing.id]);
+          const messages = await loadMessagesForConversationEnrichment([existing], userId, members);
           return enrichConversation(existing, userId, messages, members);
         }
       } else {
@@ -1051,7 +1148,7 @@ export const pocketbaseChatApi: ChatApi = {
         });
       }
 
-      const messages = await loadMessagesForConversations([conversationId]);
+      const messages = await loadMessagesForConversationEnrichment([updated], userId, members);
       chatRealtimeService.emit({ type: 'conversation.updated', conversationId, conversation: updated });
       return enrichConversation(updated, userId, messages, members);
     });
@@ -1096,7 +1193,7 @@ export const pocketbaseChatApi: ChatApi = {
         pinnedMessageIds: next,
       });
       const updated = mapConversationRecord(record);
-      const messages = await loadMessagesForConversations([conversationId]);
+      const messages = await loadMessagesForConversationEnrichment([updated], userId, members);
       chatRealtimeService.emit({ type: 'conversation.updated', conversationId, conversation: updated });
       return enrichConversation(updated, userId, messages, members);
     });
@@ -1115,7 +1212,7 @@ export const pocketbaseChatApi: ChatApi = {
         pinnedMessageIds: next,
       });
       const updated = mapConversationRecord(record);
-      const messages = await loadMessagesForConversations([conversationId]);
+      const messages = await loadMessagesForConversationEnrichment([updated], userId, members);
       chatRealtimeService.emit({ type: 'conversation.updated', conversationId, conversation: updated });
       return enrichConversation(updated, userId, messages, members);
     });

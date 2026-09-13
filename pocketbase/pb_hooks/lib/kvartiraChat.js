@@ -27,6 +27,59 @@ function isDeletedMessage(record) {
 }
 
 /**
+ * @param {unknown} attachments
+ * @returns {string}
+ */
+function attachmentsPreviewLabel(attachments) {
+  if (!Array.isArray(attachments) || attachments.length === 0) return 'Вложение';
+  if (attachments.length !== 1) return 'Вложение';
+  const a = attachments[0];
+  if (!a || typeof a !== 'object') return 'Вложение';
+  const type = String(/** @type {{ type?: string }} */ (a).type || '');
+  const filename = String(/** @type {{ filename?: string }} */ (a).filename || '');
+  const kind = String(/** @type {{ kind?: string }} */ (a).kind || '');
+  if (type === 'image') return 'Фото';
+  if (type === 'video') return 'Видео';
+  if (kind === 'voice' || (type === 'audio' && filename.startsWith('voice-'))) return 'Голосовое';
+  if (type === 'audio') return filename || 'Аудио';
+  return filename || 'Файл';
+}
+
+/**
+ * @param {string} text
+ * @param {unknown} attachments
+ * @returns {boolean}
+ */
+function isSyntheticMediaCaption(text, attachments) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed || !Array.isArray(attachments) || attachments.length === 0) return false;
+  const placeholders = new Set(['Вложение', 'Фото', 'Видео', 'Голосовое', 'Аудио', 'Файл']);
+  if (placeholders.has(trimmed)) return true;
+  return attachments.some(
+    (a) => a && typeof a === 'object' && String(/** @type {{ filename?: string }} */ (a).filename || '') === trimmed,
+  );
+}
+
+/**
+ * @param {core.Record} record
+ * @returns {string}
+ */
+function previewTextFromMessage(record) {
+  const text = record.getString('text');
+  /** @type {unknown} */
+  let attachments = record.get('attachments');
+  if (typeof attachments === 'string') {
+    try {
+      attachments = JSON.parse(attachments);
+    } catch {
+      attachments = [];
+    }
+  }
+  if (text && !isSyntheticMediaCaption(text, attachments)) return text;
+  return attachmentsPreviewLabel(attachments) || text || 'Вложение';
+}
+
+/**
  * Keep conversations.lastMessage in sync so the chat list does not need
  * to scan every message (mirrors mock syncConversationMeta).
  *
@@ -58,7 +111,7 @@ function syncConversationLastMessage(app, conversationId) {
     if (last) {
       conv.set('lastMessage', {
         id: last.id,
-        text: last.getString('text'),
+        text: previewTextFromMessage(last),
         senderId: relId(last.get('sender')),
         createdAt: String(last.get('created') || ''),
       });

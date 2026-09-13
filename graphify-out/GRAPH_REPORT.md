@@ -1,12 +1,12 @@
 # Graph Report - Kvartira 1  (2026-09-13)
 
 ## Corpus Check
-- 458 files · ~212,813 words
+- 459 files · ~213,852 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2876 nodes · 3186 edges · 444 communities (296 shown, 148 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 122 edges (avg confidence: 0.55)
+- 2879 nodes · 3193 edges · 440 communities (294 shown, 146 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 123 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -110,7 +110,7 @@
 - ConsentCheckbox.tsx
 - SelectableTile.tsx
 - Sheet.tsx
-- parseSchoolContacts
+- mapMessageRecord
 - securityHardening.test.ts
 - 1790227200_kvartira_drop_progress.js
 - 1790313600_kvartira_narrow_user_directory.js
@@ -307,14 +307,9 @@
 - zod
 - ReportMessageModal.tsx
 - kvartiraInvite.js
-- kvartiraSecurity.js
-- pocketbase
-- kvartiraNotifications.js
 - adminInbox.ts
 - kvartiraLegalBootstrap.js
 - clsx
-- 1792400000_kvartira_legal_docs_bootstrap.js
-- 1789104000_kvartira_all_autodate.js
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
@@ -343,7 +338,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (444 total, 148 thin omitted)
+## Communities (440 total, 146 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -569,9 +564,9 @@ Nodes (4): Обязательно до запуска с реальными по
 Cohesion: 0.40
 Nodes (3): SHEET_SIZE_CLASS, SheetProps, SheetSize
 
-### Community 128 - "parseSchoolContacts"
-Cohesion: 0.67
-Nodes (3): coerceJsonObjectFromContacts(), mapSchoolSettingsRecord(), parseSchoolContacts()
+### Community 128 - "mapMessageRecord"
+Cohesion: 0.47
+Nodes (6): buildUnreadCandidateFilter(), loadMessagesByIds(), loadMessagesForConversationEnrichment(), loadRecentMessagesForConversations(), loadUnreadCandidateMessages(), mapMessageRecord()
 
 ### Community 140 - "reportContext.ts"
 Cohesion: 0.39
@@ -727,23 +722,23 @@ Nodes (5): extractPbFieldError(), mapPocketBaseError(), PB_FIELD_MESSAGE_MAP, PB
 
 ### Community 242 - "mappers.ts"
 Cohesion: 0.05
-Nodes (26): mapUserRecord(), MapUserRecordOptions, parseDirectionIds(), PbAssignmentGroupRecord, PbAssignmentRecord, PbAvailabilityRecord, PbConversationMemberRecord, PbConversationRecord (+18 more)
+Nodes (29): coerceJsonObjectFromContacts(), mapSchoolSettingsRecord(), mapUserRecord(), MapUserRecordOptions, parseDirectionIds(), parseSchoolContacts(), PbAssignmentGroupRecord, PbAssignmentRecord (+21 more)
 
 ### Community 249 - "pocketbase/helpers.ts"
-Cohesion: 0.15
+Cohesion: 0.17
 Nodes (10): ensureGeneralAssignmentGroup(), pocketbaseAssignmentGroupsApi, resolveAssignmentGroupIdForWrite(), escapePbFilter(), getPbRecordCreatedAt(), getPbRecordUpdatedAt(), normalizePbDateTime(), pbEqOr() (+2 more)
 
 ### Community 251 - "events.ts"
-Cohesion: 0.21
-Nodes (9): assertCanViewEvent(), assertEventsAdminAccess(), getRequesterUser(), loadEventOrThrow(), loadOwnRegisteredEventIds(), pocketbaseEventsApi, presentPbEvent(), relIdFromPb() (+1 more)
+Cohesion: 0.19
+Nodes (7): assertCanViewEvent(), loadEventOrThrow(), loadOwnRegisteredEventIds(), pocketbaseEventsApi, presentPbEvent(), relIdFromPb(), resolveEventImage()
 
 ### Community 252 - "kvartiraEvents.js"
 Cohesion: 0.23
 Nodes (9): assertRegistrationCapacity(), assertRegistrationCreate(), notifyStaffEventRegistration(), notifyStaffEventUnregistration(), pendingUnregistrationNotifies, purgingEventIds, relId(), stashUnregistrationNotify() (+1 more)
 
 ### Community 254 - "kvartiraChat.js"
-Cohesion: 0.26
-Nodes (12): assertConversationPinUpdate(), ensureMemberInConversation(), isDeletedMessage(), isSchoolWideMetadata(), isUsersAuth(), joinAdminsToGroupConversation(), joinAdminToAllGroupChats(), joinUserToSchoolWideChats() (+4 more)
+Cohesion: 0.22
+Nodes (15): assertConversationPinUpdate(), attachmentsPreviewLabel(), ensureMemberInConversation(), isDeletedMessage(), isSchoolWideMetadata(), isSyntheticMediaCaption(), isUsersAuth(), joinAdminsToGroupConversation() (+7 more)
 
 ### Community 257 - "pocketbase/public.ts"
 Cohesion: 0.33
@@ -755,7 +750,7 @@ Nodes (11): assertAssignmentCreate(), assertAssignmentGroupCreate(), assertAssig
 
 ### Community 260 - "pocketbase/chat.ts"
 Cohesion: 0.14
-Nodes (14): assertConversationAccess(), createConversationWithAvatar(), ensureAdminGroupMembershipPb(), ensureSchoolWideMembershipPb(), getRequesterUser(), isPbUrlFieldError(), loadConversationOrThrow(), loadMembers() (+6 more)
+Nodes (13): assertConversationAccess(), createConversationWithAvatar(), ensureAdminGroupMembershipPb(), ensureSchoolWideMembershipPb(), isPbUrlFieldError(), loadConversationOrThrow(), loadMembers(), loadUserMembers() (+5 more)
 
 ### Community 261 - "Готовность к выкладке на сервер"
 Cohesion: 0.25
@@ -763,7 +758,7 @@ Nodes (7): Готовность к выкладке на сервер, Крит�
 
 ### Community 262 - "lessons.ts"
 Cohesion: 0.25
-Nodes (5): assertLessonAccess(), getRequesterUser(), loadTeacherLessons(), pocketbaseLessonsApi, mapLessonRecord()
+Nodes (3): loadTeacherLessons(), pocketbaseLessonsApi, mapLessonRecord()
 
 ### Community 265 - "listPins.ts"
 Cohesion: 0.83
@@ -774,24 +769,24 @@ Cohesion: 0.60
 Nodes (5): api(), auth(), base, listAll(), main()
 
 ### Community 268 - "pocketbase/support.ts"
-Cohesion: 0.25
-Nodes (8): assertViewAccess(), enrichTicketReport(), getRequesterUser(), loadReportSources(), loadTicketOrThrow(), notifyAdminsNewTicket(), pocketbaseSupportApi, pushSupportNotification()
+Cohesion: 0.27
+Nodes (7): assertViewAccess(), enrichTicketReport(), loadReportSources(), loadTicketOrThrow(), notifyAdminsNewTicket(), pocketbaseSupportApi, pushSupportNotification()
 
 ### Community 272 - "kvartiraLegal.js"
 Cohesion: 0.40
 Nodes (10): assertConsentCreate(), assertLegalDocumentUpdate(), clientIp(), guardianOf(), isUsersAuth(), relId(), requestInfoSafe(), revokeConsentRecord() (+2 more)
 
 ### Community 274 - "pocketbase/security.ts"
-Cohesion: 0.29
+Cohesion: 0.33
 Nodes (3): getPasswordChangedAt(), pocketbaseSecurityApi, userFilter()
 
 ### Community 277 - "pocketbase/notifications.ts"
-Cohesion: 0.40
+Cohesion: 0.50
 Nodes (3): getPreferencesRecord(), pocketbaseNotificationsApi, userFilter()
 
 ### Community 279 - "pocketbase/files.ts"
-Cohesion: 0.13
-Nodes (23): collectStoredFileIds(), dataUrlToFile(), deleteStoredFiles(), getSignedUrl(), isStoredFileRef(), KvartiraFileRecord, loadFileRecord(), parseStoredFileRef() (+15 more)
+Cohesion: 0.12
+Nodes (26): collectStoredFileIds(), dataUrlToFile(), deleteStoredFiles(), getSignedUrl(), isStoredFileRef(), KVARTIRA_FILE_ID_CHUNK, KvartiraFileRecord, loadFileRecordsByIds() (+18 more)
 
 ### Community 285 - "push/helpers.ts"
 Cohesion: 0.16
@@ -834,12 +829,12 @@ Cohesion: 0.32
 Nodes (11): assignmentIdFromNotificationLink(), collectNewAssignmentIdsFromNotifications(), countUnreadAssignments(), ensureAssignmentViewedSeed(), getUnreadAssignmentIds(), getViewedAssignmentIds(), isUnreadAssignmentNotification(), markAssignmentViewedLocal() (+3 more)
 
 ### Community 317 - "pocketbase/schoolSettings.ts"
-Cohesion: 0.24
-Nodes (5): assertSchoolSettingsManage(), findSchoolSettingsRecord(), getRequesterUser(), loadOrCreateSchoolSettingsRecord(), pocketbaseSchoolSettingsApi
+Cohesion: 0.25
+Nodes (3): findSchoolSettingsRecord(), loadOrCreateSchoolSettingsRecord(), pocketbaseSchoolSettingsApi
 
 ### Community 318 - "asIdList"
-Cohesion: 0.29
-Nodes (7): loadMessagesForConversations(), asIdList(), mapConversationRecord(), mapEventRecord(), mapLastMessage(), mapMessageRecord(), readRecordField()
+Cohesion: 0.40
+Nodes (5): asIdList(), mapConversationRecord(), mapEventRecord(), mapLastMessage(), readRecordField()
 
 ### Community 323 - "kvartiraUsers.js"
 Cohesion: 0.27
@@ -954,29 +949,17 @@ Cohesion: 0.24
 Nodes (10): acceptCookieConsent(), buildPreferences(), decideCookieConsent(), getCookieConsentPreferences(), hasAcceptedCookieConsent(), hasCookieConsentDecision(), parseStored(), preferencesFromDecision() (+2 more)
 
 ### Community 429 - "kvartiraInvite.js"
-Cohesion: 0.36
-Nodes (11): asObject(), assertRegistrationInviteOnUserCreate(), decodeJsonField(), findSchoolSettingsRecord(), isDevEnvironment(), isValidInviteToken(), readInviteFromRequest(), readJsonObjectField() (+3 more)
-
-### Community 433 - "kvartiraSecurity.js"
-Cohesion: 0.31
-Nodes (8): assertSecuritySessionCreate(), assertSecuritySessionUpdate(), auth, fingerprintToken(), markOnlyCurrentSession(), recordSecuritySession(), relId(), trimSecuritySessions()
-
-### Community 435 - "kvartiraNotifications.js"
-Cohesion: 0.36
-Nodes (6): assertNotificationCreate(), assertNotificationPreferencesCreate(), assertNotificationPreferencesUpdate(), isUsersAuth(), relId(), teacherSharesContextWith()
+Cohesion: 0.06
+Nodes (30): PURPOSES, asObject(), assertRegistrationInviteOnUserCreate(), decodeJsonField(), findSchoolSettingsRecord(), isDevEnvironment(), isValidInviteToken(), readInviteFromRequest() (+22 more)
 
 ### Community 437 - "kvartiraLegalBootstrap.js"
 Cohesion: 0.67
 Nodes (3): DOCS, ensureRequiredLegalDocuments(), findExisting()
 
-### Community 440 - "1792400000_kvartira_legal_docs_bootstrap.js"
-Cohesion: 0.40
-Nodes (3): BOOTSTRAP_DOCS, bootstrapMissingLegalDocuments(), findExisting()
-
 ## Knowledge Gaps
-- **946 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+941 more)
+- **947 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+942 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **148 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **146 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -988,7 +971,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _946 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _947 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

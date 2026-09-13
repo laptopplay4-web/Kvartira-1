@@ -461,6 +461,50 @@ describe('total unread', () => {
   });
 });
 
+describe('conversation list enrichment (perf-safe)', () => {
+  beforeEach(() => {
+    resetMockDatabase();
+  });
+
+  it('uses synced lastMessage preview on getConversations after send', async () => {
+    await mockChatApi.sendMessage('conv-1', 'user-teacher-1', 'Превью списка');
+    const list = await mockChatApi.getConversations('user-student');
+    const conv = list.find((c) => c.id === 'conv-1');
+    expect(conv?.lastMessage?.text).toBe('Превью списка');
+  });
+
+  it('attachment-only lastMessage uses media preview label', async () => {
+    await mockChatApi.sendMessage('conv-1', 'user-teacher-1', 'Фото', {
+      attachments: [
+        {
+          id: 'att-list-1',
+          type: 'image',
+          filename: 'shot.jpg',
+          mimeType: 'image/jpeg',
+          size: 12,
+          url: 'data:image/jpeg;base64,AA==',
+        },
+      ],
+    });
+    const list = await mockChatApi.getConversations('user-student');
+    const conv = list.find((c) => c.id === 'conv-1');
+    expect(conv?.lastMessage?.text).toBe('Фото');
+  });
+
+  it('unread parity: hide/system/own do not inflate unread', async () => {
+    await mockChatApi.markAsRead('conv-1', 'user-student');
+    await mockChatApi.sendMessage('conv-1', 'user-student', 'Моё');
+    await mockChatApi.sendMessage('conv-1', 'user-teacher-1', 'Чужое непрочитанное');
+    const before = await mockChatApi.getConversations('user-student');
+    const unreadBefore = before.find((c) => c.id === 'conv-1')?.unreadCount ?? 0;
+    expect(unreadBefore).toBeGreaterThan(0);
+
+    await mockChatApi.markAsRead('conv-1', 'user-student');
+    const after = await mockChatApi.getConversations('user-student');
+    expect(after.find((c) => c.id === 'conv-1')?.unreadCount ?? 0).toBe(0);
+  });
+});
+
 describe('message pagination', () => {
   beforeEach(() => {
     resetMockDatabase();

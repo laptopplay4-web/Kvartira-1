@@ -1,5 +1,5 @@
 import { ClientResponseError } from 'pocketbase';
-import type { Assignment, AssignmentContentType, User } from '@/types';
+import type { Assignment, AssignmentContentType } from '@/types';
 import { ApiError } from '@/services/api/types';
 import type {
   AssignmentsApi,
@@ -9,10 +9,7 @@ import type {
 } from '@/services/api/types';
 import { getPocketBase } from '@/services/api/pocketbase/client';
 import { withPbError } from '@/services/api/pocketbase/errors';
-import {
-  mapAssignmentRecord,
-  mapUserRecord,
-} from '@/services/api/pocketbase/mappers';
+import { mapAssignmentRecord } from '@/services/api/pocketbase/mappers';
 import {
   collectStoredFileIds,
   linkStoredFilesToContext,
@@ -27,19 +24,7 @@ import {
 import { MAX_CONTENT_BLOCKS_PER_ASSIGNMENT } from '@/services/assignments/constants';
 import { sortAssignmentsByDate } from '@/services/assignments/helpers';
 import { validateAssignmentContentFile, validateContentBlock } from '@/services/assignments/validation';
-
-async function getRequesterUser(userId: string): Promise<User> {
-  const pb = getPocketBase();
-  try {
-    const record = await pb.collection('users').getOne(userId);
-    return mapUserRecord(record);
-  } catch (error) {
-    if (error instanceof ClientResponseError && error.status === 404) {
-      throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
-    }
-    throw error;
-  }
-}
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 
 export const pocketbaseAssignmentsApi: AssignmentsApi = {
   async getAssignments(filters) {

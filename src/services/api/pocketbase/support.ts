@@ -51,6 +51,7 @@ import {
   validateReplyInput,
   validateSupportAttachment,
 } from '@/services/support/validation';
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 import type {
   Conversation,
   Message,
@@ -64,19 +65,6 @@ import type {
 function uid(prefix: string): string {
   const suffix = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   return `${prefix}-${suffix}`;
-}
-
-async function getRequesterUser(userId: string): Promise<User> {
-  const pb = getPocketBase();
-  try {
-    const record = await pb.collection('users').getOne(userId);
-    return mapUserRecord(record);
-  } catch (error) {
-    if (error instanceof ClientResponseError && error.status === 404) {
-      throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
-    }
-    throw error;
-  }
 }
 
 async function loadTicketOrThrow(id: string): Promise<SupportTicket> {

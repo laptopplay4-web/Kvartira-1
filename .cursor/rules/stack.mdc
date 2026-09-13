@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.173 StudentPicker Все/Направления + count fix · 2026-09-13
+Версия: 1.174 Chat list load speed (unread candidates + batch files) · 2026-09-13
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -616,6 +616,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Events archive (staff) | ✅ 2026-09-13, см. §171 |
 | Admin help inbox + report message UX | ✅ 2026-09-13, см. §172 |
 | StudentPicker Все/Направления + count | ✅ 2026-09-13, см. §173 |
+| Chat list load speed (unread + batch files) | ✅ 2026-09-13, см. §174 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1428,8 +1429,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **720** (48 files); booking cancel / authStoreSync hookTimeout flake вне scope; §173 StudentPicker |
-| Graphify | 2876 nodes, 3186 edges, 444 communities |
+| Тесты | **727** (48 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §174 chat load |
+| Graphify | 2879 nodes, 3193 edges, 440 communities |
 
 ### Фазы (кратко)
 
@@ -1451,7 +1452,32 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2876 nodes, 3186 edges, 444 communities (post-§173).
+**Graphify stats:** 2879 nodes, 3193 edges, 440 communities (post-§174).
+
+---
+
+## 174. Chat list load speed (2026-09-13)
+
+**Scope:** ускорить загрузку списка чатов / бейджа без смены RBAC и правил unread.
+
+**Graphify:** `getConversations()` → `buildUnreadCandidateFilter` / `loadMessagesForConversationEnrichment` → `enrichConversation`; `resolveStoredFileUrls` → `resolveUsersAvatars`; `getRequesterUser` ← authStore.
+
+### API (✅)
+
+- Список чатов больше не тянет всю историю: unread-кандидаты + lastMessage ids (+ recent fallback если last скрыт «у себя»).
+- Превью из `conversations.lastMessage` (sync mock + PB `previewTextFromMessage` для вложений).
+- `resolveStoredFileUrls` / `resolveConversationAvatars` — batch `kvartira_files` через `pbEqOr`.
+- Общий `getRequesterUser` из authStore (без лишнего `getOne` для себя).
+
+### Tests
+
+`chat` list enrichment +3; `pocketbaseAdapter` filter/requester/batch wiring +3; typecheck ✅. Suite **727** (flakes authStoreSync / routes вне scope).
+
+### Deploy
+
+Обновить фронт + `pb_hooks/lib/kvartiraChat.js`; **перезапуск PocketBase**.
+
+**Graphify stats:** 2879 nodes, 3193 edges, 440 communities.
 
 ---
 

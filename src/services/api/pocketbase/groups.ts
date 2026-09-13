@@ -11,6 +11,7 @@ import { withPbError } from '@/services/api/pocketbase/errors';
 import { mapAssignmentGroupRecord, mapUserRecord } from '@/services/api/pocketbase/mappers';
 import { resolveUsersAvatars } from '@/services/api/pocketbase/files';
 import { pbEqOr, escapePbFilter } from '@/services/api/pocketbase/helpers';
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 import {
   canEditAssignmentGroup,
   canManageAssignmentGroups,
@@ -23,19 +24,6 @@ import {
   isKindGeneralGroup,
 } from '@/services/assignments/groups/helpers';
 import { validateGroupName } from '@/services/assignments/validation';
-
-async function getRequesterUser(userId: string): Promise<User> {
-  const pb = getPocketBase();
-  try {
-    const record = await pb.collection('users').getOne(userId);
-    return mapUserRecord(record);
-  } catch (error) {
-    if (error instanceof ClientResponseError && error.status === 404) {
-      throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
-    }
-    throw error;
-  }
-}
 
 async function loadGroupOrThrow(id: string): Promise<AssignmentGroup> {
   const pb = getPocketBase();

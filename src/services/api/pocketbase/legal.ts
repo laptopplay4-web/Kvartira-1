@@ -12,7 +12,6 @@ import { escapePbFilter } from '@/services/api/pocketbase/helpers';
 import {
   mapLegalDocumentRecord,
   mapUserConsentRecord,
-  mapUserRecord,
   type PbUserConsentRecord,
 } from '@/services/api/pocketbase/mappers';
 import {
@@ -30,20 +29,8 @@ import {
   validatePublishLegalVersionInput,
   validateUpdateLegalDocumentInput,
 } from '@/services/legal/validation';
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 import type { LegalDocument, User, UserConsent } from '@/types';
-
-async function getRequesterUser(userId: string): Promise<User> {
-  const pb = getPocketBase();
-  try {
-    const record = await pb.collection('users').getOne(userId);
-    return mapUserRecord(record);
-  } catch (error) {
-    if (error instanceof ClientResponseError && error.status === 404) {
-      throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
-    }
-    throw error;
-  }
-}
 
 async function loadDocumentOrThrow(id: string): Promise<LegalDocument> {
   const pb = getPocketBase();

@@ -4,12 +4,12 @@ import { ApiError } from '@/services/api/types';
 import { getPocketBase } from '@/services/api/pocketbase/client';
 import { withPbError } from '@/services/api/pocketbase/errors';
 import { escapePbFilter } from '@/services/api/pocketbase/helpers';
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 import {
   mapLoginHistoryRecord,
   mapSecurityAlertRecord,
   mapSecuritySessionRecord,
   getSecuritySessionTokenFingerprint,
-  mapUserRecord,
 } from '@/services/api/pocketbase/mappers';
 import {
   canChangePassword,
@@ -24,19 +24,6 @@ import {
 import { fingerprintAuthToken } from '@/services/security/sessionFingerprint';
 import { MIN_PASSWORD_LENGTH } from '@/services/security/constants';
 import type { SecurityOverview, SecuritySession, User } from '@/types';
-
-async function getRequesterUser(userId: string): Promise<User> {
-  const pb = getPocketBase();
-  try {
-    const record = await pb.collection('users').getOne(userId);
-    return mapUserRecord(record);
-  } catch (error) {
-    if (error instanceof ClientResponseError && error.status === 404) {
-      throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
-    }
-    throw error;
-  }
-}
 
 function assertViewAccess(requesterId: string, user: User): void {
   if (!canViewSecurity(user, requesterId)) {

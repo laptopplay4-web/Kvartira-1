@@ -24,120 +24,57 @@ import {
   validateDirectionInput,
 } from '@/services/directions/validation';
 import type { Direction, Lesson, LessonHistoryEntry, User } from '@/types';
-
-
+import { getRequesterUser } from '@/services/api/pocketbase/requester';
 
 function buildLessonsFilter(filters?: {
-
   studentId?: string;
-
   teacherId?: string;
-
   directionId?: string;
-
   status?: Lesson['status'];
-
   from?: string;
-
   to?: string;
-
 }): string | undefined {
-
   if (!filters) return undefined;
 
-
-
   const parts: string[] = [];
-
   if (filters.studentId) parts.push(`student = "${filters.studentId}"`);
-
   if (filters.teacherId) parts.push(`teacher = "${filters.teacherId}"`);
-
   if (filters.directionId) parts.push(`direction = "${filters.directionId}"`);
-
   if (filters.status) parts.push(`status = "${filters.status}"`);
-
   if (filters.from) parts.push(`date >= "${filters.from}"`);
-
   if (filters.to) parts.push(`date <= "${filters.to}"`);
 
-
-
   return parts.length > 0 ? parts.join(' && ') : undefined;
-
 }
-
-
 
 function applyLessonTimeFilters(
-
   lessons: Lesson[],
-
   filters?: { upcoming?: boolean; past?: boolean },
-
 ): Lesson[] {
-
   if (!filters?.upcoming && !filters?.past) return lessons;
 
-
-
   const now = new Date();
-
   return lessons.filter((lesson) => {
-
     const lessonDate = new Date(`${lesson.date}T${lesson.startTime}`);
-
     if (
-
       filters.upcoming &&
-
       lessonDate < now &&
-
       lesson.status !== 'scheduled' &&
-
       lesson.status !== 'confirmed'
-
     ) {
-
       return false;
-
     }
-
     if (
-
       filters.past &&
-
       lessonDate >= now &&
-
       lesson.status !== 'completed' &&
-
       lesson.status !== 'cancelled'
-
     ) {
-
       return false;
-
     }
-
     return true;
-
   });
-
 }
-
-
-
-async function getRequesterUser(requesterId: string): Promise<User> {
-
-  const pb = getPocketBase();
-
-  const record = await pb.collection('users').getOne(requesterId);
-
-  return mapUserRecord(record);
-
-}
-
-
 
 async function assertLessonAccess(lesson: Lesson, userId: string): Promise<User> {
 

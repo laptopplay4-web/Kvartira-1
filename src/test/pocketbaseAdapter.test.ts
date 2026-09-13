@@ -672,11 +672,65 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).toContain('assertConversationPinUpdate');
     expect(hook).toContain('joinAdminsToGroupConversation');
     expect(lib).toContain('syncConversationLastMessage');
+    expect(lib).toContain('previewTextFromMessage');
+    expect(lib).toContain('attachmentsPreviewLabel');
     expect(lib).toMatch(/findRecordsByFilter\(\s*'messages'[\s\S]*?'-created'/);
     expect(lib).toContain('syncReadReceipts');
     expect(lib).toContain('assertConversationPinUpdate');
     expect(lib).toContain('joinAdminsToGroupConversation');
     expect(lib).toContain('joinAdminToAllGroupChats');
+  });
+
+  it('chat list loads unread candidates instead of full message history', () => {
+    const chatApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/chat.ts'), 'utf8');
+    expect(chatApi).toContain('buildUnreadCandidateFilter');
+    expect(chatApi).toContain('loadUnreadCandidateMessages');
+    expect(chatApi).toContain('loadMessagesForConversationEnrichment');
+    expect(chatApi).not.toMatch(/async function loadMessagesForConversations\(/);
+  });
+
+  it('buildUnreadCandidateFilter scopes by lastReadAt and excludes own/system', async () => {
+    const { buildUnreadCandidateFilter } = await import('@/services/api/pocketbase/chat');
+    const filter = buildUnreadCandidateFilter(
+      ['c1', 'c2'],
+      'user-1',
+      [
+        {
+          conversationId: 'c1',
+          userId: 'user-1',
+          role: 'member',
+          joinedAt: '2026-01-01T00:00:00.000Z',
+          muted: false,
+          lastReadAt: '2026-01-01T12:00:00.000Z',
+        },
+        {
+          conversationId: 'c2',
+          userId: 'user-1',
+          role: 'member',
+          joinedAt: '2026-01-01T00:00:00.000Z',
+          muted: false,
+        },
+      ],
+    );
+    expect(filter).toContain('conversation = "c1"');
+    expect(filter).toContain('created > "2026-01-01T12:00:00.000Z"');
+    expect(filter).toContain('conversation = "c2"');
+    expect(filter).toContain('sender != "user-1"');
+    expect(filter).toContain('messageType != "system"');
+  });
+
+  it('requester helper prefers authStore for self and getOne for others', () => {
+    const requester = readFileSync(
+      resolve(ROOT, 'src/services/api/pocketbase/requester.ts'),
+      'utf8',
+    );
+    expect(requester).toContain('authStore.record');
+    expect(requester).toContain('ownRecord: true');
+    expect(requester).toContain("collection('users').getOne");
+
+    const chatApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/chat.ts'), 'utf8');
+    expect(chatApi).toContain("from '@/services/api/pocketbase/requester'");
+    expect(chatApi).not.toMatch(/async function getRequesterUser\(/);
   });
 
   it('mapAssignmentRecord maps group, dates and content blocks', () => {
@@ -1236,6 +1290,9 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     const filesApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/files.ts'), 'utf8');
 
     expect(filesApi).toContain('resolveUsersAvatars');
+    expect(filesApi).toContain('resolveStoredFileUrls');
+    expect(filesApi).toContain('KVARTIRA_FILE_ID_CHUNK');
+    expect(filesApi).toContain('resolveConversationAvatars');
     expect(usersApi).toContain('resolveUsersAvatars');
     expect(usersApi).toContain('updateUserRole');
     expect(usersApi).toContain('getUserRoleChangeError');

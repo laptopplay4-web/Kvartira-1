@@ -1467,19 +1467,14 @@ export const pocketbaseChatApi: ChatApi = {
     });
   },
 
-  async forwardMessage(sourceConversationId, messageId, userId, targetConversationIds) {
+  async forwardMessage(sourceConversationId, messageId, userId, targetConversationId) {
     return withPbError(async () => {
       await assertConversationAccess(sourceConversationId, userId);
       const source = await pocketbaseChatApi.getMessage(sourceConversationId, messageId, userId);
       if (source.deletedAt) throw new ApiError('Сообщение удалено', 'NOT_FOUND', 404);
-      const created: Message[] = [];
-      for (const targetId of targetConversationIds) {
-        const forwarded = await pocketbaseChatApi.sendMessage(targetId, userId, source.text, {
-          attachments: source.attachments,
-        });
-        created.push(forwarded);
-      }
-      return created;
+      return pocketbaseChatApi.sendMessage(targetConversationId, userId, source.text, {
+        attachments: source.attachments,
+      });
     });
   },
 

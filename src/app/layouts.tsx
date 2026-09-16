@@ -12,6 +12,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuthSessionSync } from '@/hooks/useAuthSessionSync';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useMarkPassiveNotificationsOnLeave } from '@/hooks/useMarkPassiveNotificationsOnLeave';
+import { useWarmAppCache } from '@/hooks/useWarmAppCache';
 import { countUnreadAssignments } from '@/services/assignments/unread';
 import { countUnreadEventParticipationsForNav } from '@/services/events/unread';
 import { countInboxUnreadNotifications } from '@/services/notifications/helpers';
@@ -27,6 +28,8 @@ export function AppLayout() {
 
   // Живёт в layout: NotificationsPage при уходе размонтируется и не видит новую location.
   useMarkPassiveNotificationsOnLeave(user?.id);
+  // Cold start: idle-prefetch вкладок + последних чатов (persist — в providers).
+  useWarmAppCache(user);
 
   const { data: conversations } = useQuery({
     queryKey: ['conversations', user?.id],

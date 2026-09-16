@@ -464,26 +464,21 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       return msg;
     },
 
-    async forwardMessage(sourceConversationId, messageId, userId, targetConversationIds) {
+    async forwardMessage(sourceConversationId, messageId, userId, targetConversationId) {
       await delay(100);
       const user = getUserById(userId);
       assertConversationAccess(sourceConversationId, userId);
       const source = getMessageOrThrow(sourceConversationId, messageId);
       if (source.deletedAt) throw new ApiError('Сообщение удалено', 'NOT_FOUND', 404);
 
-      const created: Message[] = [];
-      for (const targetId of targetConversationIds) {
-        const conv = assertConversationAccess(targetId, userId);
-        if (!canSendToConversation(user, conv, db.conversationMembers)) {
-          throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
-        }
-        const forwarded = await api.sendMessage(targetId, userId, source.text, {
-          attachments: source.attachments,
-          suppressNotification: false,
-        });
-        created.push(forwarded);
+      const conv = assertConversationAccess(targetConversationId, userId);
+      if (!canSendToConversation(user, conv, db.conversationMembers)) {
+        throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
       }
-      return created;
+      return api.sendMessage(targetConversationId, userId, source.text, {
+        attachments: source.attachments,
+        suppressNotification: false,
+      });
     },
 
     async markAsRead(conversationId, userId) {

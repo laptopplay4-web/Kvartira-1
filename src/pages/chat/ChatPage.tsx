@@ -9,6 +9,7 @@ import { ApiError } from '@/services/api/types';
 import { useChatConversations, useChatConversation } from '@/hooks/useChatConversations';
 import { flattenMessages, useChatMessages } from '@/hooks/useChatMessages';
 import { createClientMutationId, useSendMessage } from '@/hooks/useSendMessage';
+import { useForwardMessage } from '@/hooks/useForwardMessage';
 import { useEditMessage } from '@/hooks/useEditMessage';
 import { useDeleteMessage } from '@/hooks/useDeleteMessage';
 import { useChatDraft } from '@/hooks/useChatDraft';
@@ -111,6 +112,7 @@ export default function ChatPage() {
   const { data: searchResults, isLoading: searchLoading } = useSearchMessages(user.id, search);
 
   const sendMutation = useSendMessage();
+  const forwardMutation = useForwardMessage();
   const editMutation = useEditMessage();
   const deleteMutation = useDeleteMessage();
   const canCreate = canManageChats(user);
@@ -461,14 +463,18 @@ export default function ChatPage() {
     freezePinnedScrollSyncRef.current = false;
   }, []);
 
-  const handleForward = (targetIds: string[]) => {
+  const handleForward = (targetConversationId: string) => {
     if (!activeId || !forwardMessage) return;
-    void api.chat
-      .forwardMessage(activeId, forwardMessage.id, user.id, targetIds)
-      .then(() => {
-        setForwardMessage(null);
-        queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
-      });
+    const source = forwardMessage;
+    // Close immediately — request continues with optimistic cache update.
+    setForwardMessage(null);
+    forwardMutation.mutate({
+      sourceConversationId: activeId,
+      messageId: source.id,
+      userId: user.id,
+      targetConversationId,
+      sourceMessage: source,
+    });
   };
 
   const handleRetryMessage = (message: Message) => {

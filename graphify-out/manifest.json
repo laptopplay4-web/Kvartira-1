@@ -5,18 +5,18 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1789562106.653546,
-    "ast_hash": "ed3fab3445e78f90af51c01b4bd582cd",
+    "mtime": 1789567036.9009347,
+    "ast_hash": "9646d526c948efc8912d00cef6364c10",
     "semantic_hash": ""
   },
   "src/app/layouts.tsx": {
-    "mtime": 1789562077.284755,
-    "ast_hash": "257e2f73b913fc7e7ce73ef71ca89aad",
+    "mtime": 1789567114.5576653,
+    "ast_hash": "cf36f3428f1492d9c4790656bfedd777",
     "semantic_hash": ""
   },
   "src/app/providers.tsx": {
-    "mtime": 1789562077.2852702,
-    "ast_hash": "56787aeea1ce59305e42407807ef57ba",
+    "mtime": 1789567113.1058338,
+    "ast_hash": "e6a72e5d8b065ec821c3dbbe8cc06ab5",
     "semantic_hash": ""
   },
   "src/app/router.tsx": {
@@ -185,8 +185,8 @@
     "semantic_hash": ""
   },
   "src/services/api/types.ts": {
-    "mtime": 1789562942.311425,
-    "ast_hash": "d2c13072291be95c238806ec6d9a2fbd",
+    "mtime": 1789566645.9559126,
+    "ast_hash": "6777b22ba17f08372dcdaa4dd1697890",
     "semantic_hash": ""
   },
   "src/services/slots/calculateSlots.ts": {
@@ -195,8 +195,8 @@
     "semantic_hash": ""
   },
   "src/stores/authStore.ts": {
-    "mtime": 1789562077.408861,
-    "ast_hash": "2d17a8b6ed775ade7bbc853e61b5bc10",
+    "mtime": 1789567126.1309328,
+    "ast_hash": "2c99bea070492074b27919a3d9d4c50e",
     "semantic_hash": ""
   },
   "src/test/auth.test.ts": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "src/pages/chat/ChatPage.tsx": {
-    "mtime": 1789565516.0413938,
-    "ast_hash": "6d351f270d359debd24f35efb416e0fb",
+    "mtime": 1789566709.2680233,
+    "ast_hash": "5088121212befa412206ab49c8bf599f",
     "semantic_hash": ""
   },
   "src/services/chat/access.ts": {
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "src/test/chat.test.ts": {
-    "mtime": 1789565730.9912887,
-    "ast_hash": "bca5281024bb0978a18ee7c911cc85ad",
+    "mtime": 1789566668.041038,
+    "ast_hash": "7e5020e9ef039b285ea7b4bafdc370cf",
     "semantic_hash": ""
   },
   "src/components/chat/AttachmentList.tsx": {
@@ -560,8 +560,8 @@
     "semantic_hash": ""
   },
   "src/services/api/mock/chat.ts": {
-    "mtime": 1789565542.9525442,
-    "ast_hash": "00d6ec2ae922af4650084232c73924a9",
+    "mtime": 1789566649.31481,
+    "ast_hash": "51e9ead6c3caded68ab3ebbb1048690d",
     "semantic_hash": ""
   },
   "src/services/chat/attachments.ts": {
@@ -585,8 +585,8 @@
     "semantic_hash": ""
   },
   "src/app/queryClient.ts": {
-    "mtime": 1788127196.93264,
-    "ast_hash": "f6162a8ee235863ec9fe8c64c6d718ae",
+    "mtime": 1789567094.1313834,
+    "ast_hash": "f8f82a63c690edb450e494dd8a389c46",
     "semantic_hash": ""
   },
   "src/services/events/helpers.ts": {
@@ -1290,8 +1290,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/chat.ts": {
-    "mtime": 1789565560.9198334,
-    "ast_hash": "776ce1e5f35b77c7cc03a4f1e5f1a842",
+    "mtime": 1789566659.3132823,
+    "ast_hash": "8cb65831d825797c09a1fbad3859551f",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/assignments.pb.js": {
@@ -1520,8 +1520,8 @@
     "semantic_hash": ""
   },
   "src/test/authSessionSync.test.ts": {
-    "mtime": 1789562077.41186,
-    "ast_hash": "b127aaf329ec5bd5603be0d0ff90a553",
+    "mtime": 1789567166.432209,
+    "ast_hash": "5539aa35fbdb144967ad2d6ae1cff9b2",
     "semantic_hash": ""
   },
   "src/components/assignments/AssignmentContentEditor.tsx": {
@@ -1675,8 +1675,8 @@
     "semantic_hash": ""
   },
   "src/test/authStoreSync.test.ts": {
-    "mtime": 1789562077.41186,
-    "ast_hash": "12e05167403043dea3dde3cb4fff83ea",
+    "mtime": 1789567162.1400337,
+    "ast_hash": "ffab2adb85a115867ccdd23612c07d7f",
     "semantic_hash": ""
   },
   "src/services/auth/bootstrapSession.ts": {
@@ -1980,8 +1980,8 @@
     "semantic_hash": ""
   },
   "src/components/chat/ForwardMessageModal.tsx": {
-    "mtime": 1789562077.2967713,
-    "ast_hash": "3024fecb49f5915f658ea162d9610ed5",
+    "mtime": 1789566660.976102,
+    "ast_hash": "6fd11761639b4fc15c1dd722cf9f83ac",
     "semantic_hash": ""
   },
   "src/components/chat/VoiceRecorder.tsx": {
@@ -2312,6 +2312,31 @@
   "src/services/chat/messageCache.ts": {
     "mtime": 1789565664.2112195,
     "ast_hash": "5744329c8379c71a02f78dfc4ba96634",
+    "semantic_hash": ""
+  },
+  "src/hooks/useForwardMessage.ts": {
+    "mtime": 1789566638.310376,
+    "ast_hash": "cdae2e245c237595d59b1c40f7307937",
+    "semantic_hash": ""
+  },
+  "src/app/queryPersist.ts": {
+    "mtime": 1789567087.1424165,
+    "ast_hash": "dc0ca8935232034f44fbd197084ad907",
+    "semantic_hash": ""
+  },
+  "src/hooks/useWarmAppCache.ts": {
+    "mtime": 1789567160.5205035,
+    "ast_hash": "d975dce39558fad7867fb61502c0d0e4",
+    "semantic_hash": ""
+  },
+  "src/services/cache/warmAppCache.ts": {
+    "mtime": 1789567107.2937083,
+    "ast_hash": "6bfdb4941e287ab355d0bea9c354c556",
+    "semantic_hash": ""
+  },
+  "src/test/warmAppCache.test.ts": {
+    "mtime": 1789567170.6658773,
+    "ast_hash": "743d5bb18b222275cf1ec16b6e6e5e2b",
     "semantic_hash": ""
   }
 }

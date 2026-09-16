@@ -1,8 +1,9 @@
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useEffect, useState, type ReactNode } from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { queryClient } from './queryClient';
+import { queryPersistOptions } from './queryPersist';
 import { useAuthStore } from '@/stores/authStore';
 import { ToastProvider } from '@/components/ui/Toast';
 import { UserPreviewProvider } from '@/components/users/UserPreviewProvider';
@@ -31,7 +32,7 @@ function AuthHydrationGate({ children }: { children: ReactNode }) {
 
 export function AppProviders() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={queryPersistOptions}>
       <ToastProvider>
         <AuthHydrationGate>
           <UserPreviewProvider>
@@ -39,6 +40,6 @@ export function AppProviders() {
           </UserPreviewProvider>
         </AuthHydrationGate>
       </ToastProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

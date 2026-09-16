@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthSession, User } from '@/types';
 import { api } from '@/services/api';
-import { queryClient } from '@/app/queryClient';
+import { clearAppQueryCache } from '@/app/queryPersist';
 import {
   sanitizePersistedUser,
 } from '@/services/auth/sessionStorage';
@@ -85,7 +85,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const session = withSessionPhone(await api.auth.login(phone, password), phone);
-          queryClient.clear();
+          await clearAppQueryCache();
           if (isPocketBaseMode()) setPocketBaseAuth(session.token, session.user);
           set({ session, isLoading: false });
         } catch (e) {
@@ -101,7 +101,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const session = withSessionPhone(await api.auth.demoLogin(role));
-          queryClient.clear();
+          await clearAppQueryCache();
           if (isPocketBaseMode()) setPocketBaseAuth(session.token, session.user);
           set({ session, isLoading: false });
         } catch (e) {
@@ -124,7 +124,7 @@ export const useAuthStore = create<AuthState>()(
             ),
             phone,
           );
-          queryClient.clear();
+          await clearAppQueryCache();
           if (isPocketBaseMode()) setPocketBaseAuth(session.token, session.user);
           set({ session, isLoading: false });
         } catch (e) {
@@ -138,7 +138,7 @@ export const useAuthStore = create<AuthState>()(
         await api.auth.logout();
         if (userId) clearPersistedLoginPhone(userId);
         if (isPocketBaseMode()) clearPocketBaseAuth();
-        queryClient.clear();
+        await clearAppQueryCache();
         set({ session: null });
       },
 
@@ -174,7 +174,7 @@ export const useAuthStore = create<AuthState>()(
             const roleChanged =
               state.session?.user.role != null &&
               state.session.user.role !== merged.user.role;
-            if (roleChanged) queryClient.clear();
+            if (roleChanged) void clearAppQueryCache();
             return { session: merged };
           });
 
@@ -184,7 +184,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           if (error instanceof ApiError && [401, 403, 404].includes(error.status ?? 0)) {
             if (isPocketBaseMode()) clearPocketBaseAuth();
-            queryClient.clear();
+            await clearAppQueryCache();
             set({ session: null });
           }
         }

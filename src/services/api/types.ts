@@ -254,8 +254,8 @@ export interface ChatApi {
     sourceConversationId: string,
     messageId: string,
     userId: string,
-    targetConversationIds: string[],
-  ): Promise<Message[]>;
+    targetConversationId: string,
+  ): Promise<Message>;
   deleteConversation(conversationId: string, userId: string): Promise<void>;
   getConversationForLesson(lessonId: string, userId: string): Promise<Conversation | null>;
   uploadAttachment(

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import type { Conversation, User } from '@/types';
@@ -12,8 +12,8 @@ interface ForwardMessageModalProps {
   currentUserId: string;
   users: User[];
   excludeConversationId?: string;
-  onForward: (conversationIds: string[]) => void;
-  loading?: boolean;
+  /** Single target chat — modal closes immediately when parent handles this. */
+  onForward: (conversationId: string) => void;
 }
 
 export function ForwardMessageModal({
@@ -24,9 +24,12 @@ export function ForwardMessageModal({
   users,
   excludeConversationId,
   onForward,
-  loading,
 }: ForwardMessageModalProps) {
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) setSelected(null);
+  }, [open]);
 
   const options = useMemo(
     () =>
@@ -36,37 +39,29 @@ export function ForwardMessageModal({
     [conversations, currentUserId, excludeConversationId],
   );
 
-  const toggle = (id: string) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const handleClose = () => {
+    setSelected(null);
+    onClose();
   };
 
   return (
     <Modal
       open={open}
-      onClose={() => {
-        setSelected([]);
-        onClose();
-      }}
+      onClose={handleClose}
       title="Переслать"
       footer={
         <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            className="min-h-11 flex-1"
-            onClick={() => {
-              setSelected([]);
-              onClose();
-            }}
-          >
+          <Button variant="ghost" className="min-h-11 flex-1" onClick={handleClose}>
             Отмена
           </Button>
           <Button
             className="min-h-11 flex-1"
-            disabled={selected.length === 0 || loading}
-            loading={loading}
+            disabled={!selected}
             onClick={() => {
-              onForward(selected);
-              setSelected([]);
+              if (!selected) return;
+              const targetId = selected;
+              setSelected(null);
+              onForward(targetId);
             }}
           >
             Переслать
@@ -75,16 +70,20 @@ export function ForwardMessageModal({
       }
     >
       <div className="space-y-3">
-        <p className="text-body-sm text-text-secondary">Выберите чат — сообщение скопируется без указания автора.</p>
+        <p className="text-body-sm text-text-secondary">
+          Выберите один чат — сообщение скопируется без указания автора.
+        </p>
         <ul className="space-y-1">
           {options.map((conv) => {
             const title = getConversationDisplayTitle(conv, currentUserId, users);
-            const active = selected.includes(conv.id);
+            const active = selected === conv.id;
             return (
               <li key={conv.id}>
                 <button
                   type="button"
-                  onClick={() => toggle(conv.id)}
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setSelected(conv.id)}
                   className={cn(
                     'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left focus-ring',
                     active ? 'bg-brand-muted text-brand' : 'hover:bg-surface-elevated',

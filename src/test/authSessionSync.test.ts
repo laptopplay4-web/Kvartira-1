@@ -25,7 +25,7 @@ describe('auth session sync (PocketBase role refresh)', () => {
     expect(source).toContain('syncSession');
     expect(source).toContain('refreshSession');
     expect(source).toContain('roleChanged');
-    expect(source).toContain('queryClient.clear');
+    expect(source).toContain('clearAppQueryCache');
     expect(source).toContain('resolveBootstrapSession');
     expect(source).not.toContain('if (!session) {\n          if (isPocketBaseMode()) clearPocketBaseAuth();');
   });

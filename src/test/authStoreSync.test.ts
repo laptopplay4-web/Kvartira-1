@@ -15,6 +15,10 @@ vi.mock('@/services/api/pocketbase/client', () => ({
   clearPocketBaseAuth: vi.fn(),
 }));
 
+vi.mock('@/app/queryPersist', () => ({
+  clearAppQueryCache: vi.fn(async () => undefined),
+}));
+
 vi.mock('@/app/queryClient', () => ({
   queryClient: { clear: vi.fn() },
 }));

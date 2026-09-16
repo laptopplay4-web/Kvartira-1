@@ -1,12 +1,12 @@
-# Graph Report - Kvartira 1  (2026-09-16)
+# Graph Report - Kvartira 1  (2026-09-17)
 
 ## Corpus Check
-- 460 files · ~216,262 words
+- 465 files · ~217,961 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2893 nodes · 3216 edges · 446 communities (297 shown, 149 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 123 edges (avg confidence: 0.56)
+- 2920 nodes · 3245 edges · 449 communities (298 shown, 151 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 124 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -184,7 +184,7 @@
 - pocketbaseSchema.test.ts
 - kvartiraInvite.js
 - pocketbaseAuth.test.ts
-- providers.tsx
+- queryPersist.ts
 - AvailabilityMonthCalendar.tsx
 - layouts.tsx
 - AvailabilityIntervalModal.tsx
@@ -197,7 +197,7 @@
 - errors.ts
 - mappers.ts
 - auth.ts
-- users.ts
+- @/services/api
 - pocketbaseAdapter.test.ts
 - pocketbase/helpers.ts
 - events.ts
@@ -287,10 +287,10 @@
 - useMarkEventParticipationViewed.ts
 - EventParticipationDeltaBadges.tsx
 - dependencies
-- orientation.ts
+- kvartiraSecurity.js
 - package.json
 - pb-serve.mjs
-- @hookform/resolvers
+- pocketbase
 - imageCrop.ts
 - analytics.ts
 - CookieConsentBanner.tsx
@@ -298,25 +298,27 @@
 - react-hook-form
 - cookies/types.ts
 - reportMessage.ts
-- zustand
+- useForwardMessage.ts
 - adminGroups.ts
 - lucide-react
 - date-fns
 - cookies/constants.ts
-- react
+- kvartiraNotifications.js
 - cookies/helpers.ts
 - zod
 - ReportMessageModal.tsx
 - kvartiraAuth.js
-- kvartiraSecurity.js
-- pocketbase
-- adminInbox.ts
-- kvartiraLegalBootstrap.js
-- clsx
-- kvartiraNotifications.js
 - 1792400000_kvartira_legal_docs_bootstrap.js
 - 1789104000_kvartira_all_autodate.js
+- adminInbox.ts
+- kvartiraLegalBootstrap.js
+- warmAppCache.ts
+- pocketbase
+- qrcode
+- @tanstack/query-sync-storage-persister
 - messageCache.ts
+- @tanstack/react-query
+- @tanstack/react-query-persist-client
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
@@ -345,7 +347,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (446 total, 149 thin omitted)
+## Communities (449 total, 151 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -628,8 +630,8 @@ Cohesion: 0.11
 Nodes (18): 10. Changelog roadmap, 1. Критерий «приложение закончено», 2. Текущий статус (2026-09-09), 3. Принятые решения, 4. Протокол сессии (кратко), 5. Архитектура пути к production, 6. Фазы, 7. Вне scope (явно отложено) (+10 more)
 
 ### Community 177 - "theme/constants.ts"
-Cohesion: 0.38
-Nodes (6): applyThemePreference(), getStoredThemePreference(), initThemePreference(), THEME_OPTIONS, THEME_STORAGE_KEY, ThemePreference
+Cohesion: 0.21
+Nodes (11): getOrientationLock(), initPortraitOrientationLock(), lockPortraitOrientation(), OrientationLockFn, PORTRAIT_ORIENTATION_LOCK, applyThemePreference(), getStoredThemePreference(), initThemePreference() (+3 more)
 
 ### Community 178 - "lessonDetail.test.ts"
 Cohesion: 0.33
@@ -699,9 +701,9 @@ Nodes (11): asObject(), assertRegistrationInviteOnUserCreate(), decodeJsonField(
 Cohesion: 0.18
 Nodes (10): AUTH_HOOK, AUTH_LIB, AUTH_MIGRATION, BOOL_MIGRATION, FORGOT_PAGE, LOGIN_PAGE, REGISTER_PAGE, ROOT (+2 more)
 
-### Community 230 - "providers.tsx"
-Cohesion: 0.38
-Nodes (3): AppProviders(), queryClient, router
+### Community 230 - "queryPersist.ts"
+Cohesion: 0.15
+Nodes (11): AppProviders(), queryClient, createBrowserPersister(), createNoopPersister(), PERSIST_ROOT_KEYS, QUERY_CACHE_MAX_AGE_MS, QUERY_CACHE_STORAGE_KEY, queryPersister (+3 more)
 
 ### Community 231 - "AvailabilityMonthCalendar.tsx"
 Cohesion: 0.40
@@ -896,16 +898,16 @@ Cohesion: 0.33
 Nodes (5): resolveTarget(), UserPreviewContext, UserPreviewContextValue, UserPreviewProvider(), UserPreviewTarget
 
 ### Community 382 - "runSeed"
-Cohesion: 0.25
-Nodes (9): ID_ALIASES, IdMap, passwordForPhone(), patchRecordTimestamps(), phoneToEmail(), remapLink(), remapMetadata(), runSeed() (+1 more)
+Cohesion: 0.23
+Nodes (10): ID_ALIASES, IdMap, passwordForPhone(), patchRecordTimestamps(), phoneToEmail(), remapLink(), remapMetadata(), runSeed() (+2 more)
 
 ### Community 383 - "PbClient"
 Cohesion: 0.21
 Nodes (7): ensureLegalDocuments(), env(), main(), PbClient, PbRecord, env(), main()
 
 ### Community 384 - "notifications/helpers.ts"
-Cohesion: 0.17
-Nodes (12): NotificationsPage(), countInboxUnreadNotifications(), createDefaultNotificationPreferences(), didLeaveNotificationsRoute(), isMessageNotificationForChat(), isNotificationsRoute(), isPassiveUnreadNotification(), isSupportAdminInboxNotification() (+4 more)
+Cohesion: 0.18
+Nodes (11): NotificationsPage(), countInboxUnreadNotifications(), didLeaveNotificationsRoute(), isMessageNotificationForChat(), isNotificationsRoute(), isPassiveUnreadNotification(), isSupportAdminInboxNotification(), markChatMessageNotificationsReadInList() (+3 more)
 
 ### Community 391 - "registration.ts"
 Cohesion: 0.53
@@ -920,12 +922,12 @@ Cohesion: 0.67
 Nodes (3): EventParticipationDeltaBadges(), EventParticipationDeltaBadgesProps, formatDelta()
 
 ### Community 400 - "dependencies"
-Cohesion: 0.15
-Nodes (13): class-variance-authority, dependencies, class-variance-authority, pocketbase, qrcode, react-router-dom, tailwind-merge, @tanstack/react-query (+5 more)
+Cohesion: 0.13
+Nodes (15): class-variance-authority, clsx, @hookform/resolvers, dependencies, class-variance-authority, clsx, @hookform/resolvers, react (+7 more)
 
-### Community 401 - "orientation.ts"
-Cohesion: 0.47
-Nodes (5): getOrientationLock(), initPortraitOrientationLock(), lockPortraitOrientation(), OrientationLockFn, PORTRAIT_ORIENTATION_LOCK
+### Community 401 - "kvartiraSecurity.js"
+Cohesion: 0.31
+Nodes (8): assertSecuritySessionCreate(), assertSecuritySessionUpdate(), auth, fingerprintToken(), markOnlyCurrentSession(), recordSecuritySession(), relId(), trimSecuritySessions()
 
 ### Community 402 - "package.json"
 Cohesion: 0.40
@@ -951,6 +953,10 @@ Nodes (3): AdminGroupMembershipDb, listAdminUserIds(), withAdminsInParticipants(
 Cohesion: 0.33
 Nodes (5): COOKIE_CONSENT_BODY, COOKIE_CONSENT_LABELS, COOKIE_CONSENT_STORAGE_KEY, COOKIE_CONSENT_TITLE, COOKIE_CONSENT_VERSION
 
+### Community 421 - "kvartiraNotifications.js"
+Cohesion: 0.36
+Nodes (6): assertNotificationCreate(), assertNotificationPreferencesCreate(), assertNotificationPreferencesUpdate(), isUsersAuth(), relId(), teacherSharesContextWith()
+
 ### Community 422 - "cookies/helpers.ts"
 Cohesion: 0.24
 Nodes (10): acceptCookieConsent(), buildPreferences(), decideCookieConsent(), getCookieConsentPreferences(), hasAcceptedCookieConsent(), hasCookieConsentDecision(), parseStored(), preferencesFromDecision() (+2 more)
@@ -959,42 +965,38 @@ Nodes (10): acceptCookieConsent(), buildPreferences(), decideCookieConsent(), ge
 Cohesion: 0.28
 Nodes (11): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+3 more)
 
-### Community 434 - "kvartiraSecurity.js"
-Cohesion: 0.31
-Nodes (8): assertSecuritySessionCreate(), assertSecuritySessionUpdate(), auth, fingerprintToken(), markOnlyCurrentSession(), recordSecuritySession(), relId(), trimSecuritySessions()
+### Community 434 - "1792400000_kvartira_legal_docs_bootstrap.js"
+Cohesion: 0.40
+Nodes (3): BOOTSTRAP_DOCS, bootstrapMissingLegalDocuments(), findExisting()
 
 ### Community 437 - "kvartiraLegalBootstrap.js"
 Cohesion: 0.67
 Nodes (3): DOCS, ensureRequiredLegalDocuments(), findExisting()
 
-### Community 440 - "kvartiraNotifications.js"
-Cohesion: 0.36
-Nodes (6): assertNotificationCreate(), assertNotificationPreferencesCreate(), assertNotificationPreferencesUpdate(), isUsersAuth(), relId(), teacherSharesContextWith()
-
-### Community 441 - "1792400000_kvartira_legal_docs_bootstrap.js"
-Cohesion: 0.40
-Nodes (3): BOOTSTRAP_DOCS, bootstrapMissingLegalDocuments(), findExisting()
+### Community 438 - "warmAppCache.ts"
+Cohesion: 0.50
+Nodes (4): selectConversationsForMessageWarm(), WARM_CHAT_MESSAGE_LIMIT, warmAppCache(), WarmAppCacheUser
 
 ### Community 445 - "messageCache.ts"
 Cohesion: 0.60
 Nodes (4): appendMessagesInInfiniteCache(), MessagesInfiniteData, sameSystemEvent(), upsertMessageInInfiniteCache()
 
 ## Knowledge Gaps
-- **948 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+943 more)
+- **958 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+953 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **149 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **151 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
   _High betweenness centrality (0.002) - this node is a cross-community bridge._
-- **Why does `AssignmentGroupsApi` connect `AssignmentGroupsApi` to `types.ts`?**
-  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
+- **Why does `NotificationsApi` connect `NotificationsApi` to `types.ts`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _948 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _958 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

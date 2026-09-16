@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.178 Chat UX: system msgs / send / mute · 2026-09-16
+Версия: 1.180 Cold start: persist RQ + warm prefetch · 2026-09-16
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -21,7 +21,7 @@ alwaysApply: true
 | Сборка | Vite | 6.x |
 | UI | React | 19.x |
 | Роутинг | React Router | 7.x |
-| Серверный стейт | TanStack Query | 5.x |
+| Серверный стейт | TanStack Query 5 + persist (localStorage) | 5.x |
 | Клиентский стейт | Zustand | 5.x (auth) |
 | Стили | Tailwind CSS 4 + CSS variables | 4.x |
 | UI variants | class-variance-authority + tailwind-merge | — |
@@ -100,6 +100,7 @@ kvartira/
 │   │   ├── useChatConversations.ts
 │   │   ├── useChatMessages.ts
 │   │   ├── useSendMessage.ts
+│   │   ├── useForwardMessage.ts
 │   │   ├── useEditMessage.ts
 │   │   ├── useDeleteMessage.ts
 │   │   ├── useChatRealtime.ts
@@ -109,6 +110,7 @@ kvartira/
 │   │   ├── useConversationMembers.ts
 │   │   ├── useCreateConversation.ts
 │   │   ├── useMarkPassiveNotificationsOnLeave.ts
+│   │   ├── useWarmAppCache.ts
 │   │   └── useBackNavigation.ts
 │   ├── services/
 │   │   ├── api/
@@ -117,6 +119,8 @@ kvartira/
 │   │   │   └── mock/
 │   │   │       ├── index.ts     # mock DB, booking lock
 │   │   │       └── chat.ts      # mock ChatApi (edit/delete/reply/attachments/group/mute/pin)
+│   │   ├── cache/
+│   │   │   └── warmAppCache.ts  # cold-start prefetch shell + recent chats
 │   │   ├── calendar/
 │   │   │   └── helpers.ts       # groupLessonsByDate, isLessonPast, …
 │   │   ├── slots/
@@ -197,7 +201,10 @@ kvartira/
 | `src/pages/admin/AdminHubPage.tsx` | Хаб админ-настроек `/admin` (без мероприятий — CRUD в `/events`) |
 | `src/stores/authStore.ts` | Сессия, login, demoLogin, `syncSession`, `queryClient.clear()` |
 | `src/hooks/useAuthSessionSync.ts` | PB realtime + focus: автообновление роли/профиля без relogin |
-| `src/app/queryClient.ts` | Singleton QueryClient для Provider и auth cache isolation |
+| `src/app/queryClient.ts` | Singleton QueryClient (login/logout cache clear) |
+| `src/app/queryPersist.ts` | Persist RQ cache (localStorage) + `clearAppQueryCache` |
+| `src/hooks/useWarmAppCache.ts` | Idle prefetch shell tabs + recent chat threads |
+| `src/services/cache/warmAppCache.ts` | `warmAppCache` / `selectConversationsForMessageWarm` |
 | `src/pages/assignments/CreateAssignmentPage.tsx` | `AssignmentFormPage` — create/edit 2-step wizard |
 | `src/pages/assignments/EditAssignmentPage.tsx` | Edit route wrapper → `AssignmentFormPage mode=edit` |
 | `src/components/assignments/AssignmentContentEditor.tsx` | Скрепка + immediate file picker |
@@ -237,7 +244,7 @@ kvartira/
 | `src/hooks/useEditMessage.ts` | Optimistic edit + rollback |
 | `src/hooks/useDeleteMessage.ts` | Soft-delete optimistic |
 | `src/hooks/useMarkPassiveNotificationsOnLeave.ts` | Leave `/notifications` → mark passive as read (urgent keep) |
-| `src/test/chat.test.ts` | 90 tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch |
+| `src/test/chat.test.ts` | 92 tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch, forward |
 
 ---
 
@@ -329,8 +336,8 @@ Lesson ← getLessons({ from, to, requesterId }) ← LessonCalendar (day/week/mo
 ```
 ChatPage (/chat, /chat/:id)
   ↓
-hooks: useChatConversations, useChatMessages, useSendMessage, useEditMessage,
-       useDeleteMessage, useChatRealtime, useChatDraft, useTypingIndicator, useSearchMessages
+hooks: useChatConversations, useChatMessages, useSendMessage, useForwardMessage, useEditMessage,
+ useDeleteMessage, useChatRealtime, useChatDraft, useTypingIndicator, useSearchMessages
   ↓
 ChatApi (CRUD messages, attachments, search, group mgmt, mute, pin, typing)
   ↓
@@ -464,8 +471,9 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `authSessionStorage.test.ts` | sanitize persisted session/user, invalid role rejection (4 tests) |
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
+| `warmAppCache.test.ts` | persist filter, conversation warm select, shell + messages prefetch (5 tests) |
 
-**Итого:** 734 passed (48 files); booking cancel past-slot flake вне scope.
+**Итого:** 739 passed (49 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -621,6 +629,8 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Chat delete purge + member count heal | ✅ 2026-09-16, см. §176 |
 | Chat create unique race + optimistic UX | ✅ 2026-09-16, см. §177 |
 | Chat UX: system msgs / send / mute | ✅ 2026-09-16, см. §178 |
+| Chat forward: optimistic / single target | ✅ 2026-09-16, см. §179 |
+| Cold start: RQ persist + warm prefetch | ✅ 2026-09-16, см. §180 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1433,8 +1443,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **734** (48 files); booking cancel flake вне scope; §178 chat UX |
-| Graphify | 2893 nodes, 3216 edges, 446 communities |
+| Тесты | **739** (49 files); booking cancel flake вне scope; §180 cold start |
+| Graphify | 2920 nodes, 3245 edges, 449 communities |
 
 ### Фазы (кратко)
 
@@ -1456,7 +1466,63 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2893 nodes, 3216 edges, 446 communities (post-§178).
+**Graphify stats:** 2920 nodes, 3245 edges, 449 communities (post-§180).
+
+---
+
+## 180. Cold start — persist RQ + warm prefetch (2026-09-16)
+
+**Scope:** после F5 / закрытия PWA всё грузилось заново, пока пользователь не «прогреет» вкладки и чаты.
+
+**Graphify:** `PersistQueryClientProvider` → `queryPersist.ts` → `useWarmAppCache()` → `warmAppCache()` → AppLayout.
+
+### Persist (✅)
+
+- `@tanstack/react-query-persist-client` + sync localStorage persister (`kvartira-query-cache`).
+- Dehydrate только shell-ключи (conversations, lessons, events, assignments, …); **не** messages/security/slots.
+- `staleTime` 60s · `gcTime` 24h; после restore UI сразу из кэша, сеть — background revalidate.
+- Login/logout/role-change → `clearAppQueryCache()` (memory + storage).
+
+### Warm prefetch (✅)
+
+- `useWarmAppCache` в `AppLayout`: `requestIdleCallback` после auth.
+- Параллельный prefetch Home/Lessons/Events/Assignments/directions/teachers/(users)/school-settings.
+- Первая страница сообщений для **8** последних чатов (`prefetchInfiniteQuery`).
+
+### Tests
+
+`warmAppCache.test.ts` +5; authSessionSync clearAppQueryCache; suite **739**. typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2920 nodes, 3245 edges, 449 communities.
+
+---
+
+## 179. Chat forward — optimistic / single target (2026-09-16)
+
+**Scope:** пересылка ждала API и держала модалку; multi-select нескольких чатов.
+
+**Graphify:** `ForwardMessageModal()` → `useForwardMessage()` → `ChatApi.forwardMessage` → mock/PB.
+
+### Behavior (✅)
+
+- UI: один чат за запрос (`role=radio`); кнопка «Переслать» сразу закрывает модалку.
+- `useForwardMessage`: optimistic upsert в кэш целевого чата + `bumpConversationInList` (паттерн send).
+- Контракт: `forwardMessage(..., targetConversationId: string): Promise<Message>` (mock + PB).
+- Без invalidate списка чатов на success — только patch + unread.
+
+### Tests
+
+`chat` forward single target; typecheck ✅; suite **734**.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2896 nodes, 3218 edges, 442 communities.
 
 ---
 

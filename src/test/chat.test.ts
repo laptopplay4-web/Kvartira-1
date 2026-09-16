@@ -744,16 +744,22 @@ describe('message reactions and forward', () => {
     );
   });
 
-  it('forwards message without author attribution', async () => {
+  it('forwards message without author attribution to a single chat', async () => {
     const msg = await mockChatApi.sendMessage('conv-1', 'user-student', 'Перешлите');
     const group = await mockChatApi.createConversation('user-teacher-1', {
       type: 'group',
       title: 'Цель',
       participantIds: ['user-student', 'user-teacher-1'],
     });
-    const [forwarded] = await mockChatApi.forwardMessage('conv-1', msg.id, 'user-teacher-1', [group.id]);
+    const forwarded = await mockChatApi.forwardMessage(
+      'conv-1',
+      msg.id,
+      'user-teacher-1',
+      group.id,
+    );
     expect(forwarded.text).toBe('Перешлите');
     expect(forwarded.senderId).toBe('user-teacher-1');
+    expect(forwarded.conversationId).toBe(group.id);
   });
 
   it('pins conversation for self', async () => {

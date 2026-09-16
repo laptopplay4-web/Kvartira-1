@@ -217,8 +217,10 @@ export const pocketbaseAssignmentGroupsApi: AssignmentGroupsApi = {
   },
 
   async addMember(groupId, studentId, requesterId) {
-    const user = await getRequesterUser(requesterId);
-    const group = await loadGroupOrThrow(groupId);
+    const [user, group] = await Promise.all([
+      getRequesterUser(requesterId),
+      loadGroupOrThrow(groupId),
+    ]);
     if (!canEditAssignmentGroup(user, group)) {
       throw new ApiError('Нет прав на управление группой', 'FORBIDDEN', 403);
     }
@@ -242,8 +244,10 @@ export const pocketbaseAssignmentGroupsApi: AssignmentGroupsApi = {
   },
 
   async removeMember(groupId, studentId, requesterId) {
-    const user = await getRequesterUser(requesterId);
-    const group = await loadGroupOrThrow(groupId);
+    const [user, group] = await Promise.all([
+      getRequesterUser(requesterId),
+      loadGroupOrThrow(groupId),
+    ]);
     if (!canEditAssignmentGroup(user, group)) {
       throw new ApiError('Нет прав на управление группой', 'FORBIDDEN', 403);
     }

@@ -99,10 +99,11 @@ export const pocketbaseNotificationsApi: NotificationsApi = {
         filter: `${userFilter(userId)} && read = false`,
       });
 
-      for (const record of records) {
-        if (notificationRequiresAction(mapNotificationRecord(record))) continue;
-        await pb.collection('notifications').update(record.id, { read: true });
-      }
+      await Promise.all(
+        records
+          .filter((record) => !notificationRequiresAction(mapNotificationRecord(record)))
+          .map((record) => pb.collection('notifications').update(record.id, { read: true })),
+      );
     });
   },
 

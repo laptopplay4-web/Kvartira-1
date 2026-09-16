@@ -32,6 +32,7 @@
 | P1 | Серверная проверка слотов при book | клиент уже считает; на сервере — второй замок |
 | P2 | HttpOnly cookie вместо token в localStorage | XSS-устойчивее; большая переделка PB auth |
 | P2 | Сжатие/CDN для чанка `index` ~676 KB | быстрее первый заход на мобильном |
+| P2 | Long-cache hashed `/assets/` | подключить `deploy/static-cache.conf` рядом с security-headers; CDN — origin pull `dist/` |
 
 ## Что убрать / не трогать
 

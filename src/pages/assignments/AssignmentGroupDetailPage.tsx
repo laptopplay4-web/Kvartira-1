@@ -8,6 +8,7 @@ import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatu
 import { isUserAmongMembers, isManagedAssignmentGroup } from '@/services/assignments/groups/helpers';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
+import type { AssignmentGroupDetail, User } from '@/types';
 import { AddGroupMembersModal } from '@/components/assignments/AddGroupMembersModal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -16,17 +17,33 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
+import { useToast } from '@/components/ui/Toast';
 import { formatUserName } from '@/utils';
+import {
+  invalidateQueryKeys,
+  restoreQuerySnapshots,
+  snapshotQueries,
+} from '@/utils/optimisticMutation';
 
 export default function AssignmentGroupDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useCurrentUser()!;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { pushToast } = useToast();
   const isOnline = useOnlineStatus();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  const groupKeys = useMemo(
+    () =>
+      [
+        ['assignment-group', id, user.id] as const,
+        ['assignment-groups'] as const,
+      ] as const,
+    [id, user.id],
+  );
 
   const { data: group, isLoading, error, refetch } = useQuery({
     queryKey: ['assignment-group', id, user.id],
@@ -46,29 +63,72 @@ export default function AssignmentGroupDetailPage() {
 
   const addMembersMutation = useMutation({
     mutationFn: async (studentIds: string[]) => {
-      for (const studentId of studentIds) {
-        await api.assignmentGroups.addMember(id!, studentId, user.id);
-      }
+      await Promise.all(
+        studentIds.map((studentId) => api.assignmentGroups.addMember(id!, studentId, user.id)),
+      );
     },
-    onSuccess: () => {
+    onMutate: async (studentIds) => {
+      const keys = [...groupKeys];
+      const snapshots = await snapshotQueries(queryClient, keys);
+      const byId = new Map((users ?? []).map((u) => [u.id, u]));
+      const toAdd = studentIds
+        .map((sid) => byId.get(sid))
+        .filter((u): u is User => !!u && u.role === 'student');
+      queryClient.setQueryData<AssignmentGroupDetail>(
+        ['assignment-group', id, user.id],
+        (old) => {
+          if (!old) return old;
+          const existing = new Set(old.memberIds);
+          const newMembers = toAdd.filter((u) => !existing.has(u.id));
+          return {
+            ...old,
+            memberIds: [...old.memberIds, ...newMembers.map((m) => m.id)],
+            members: [...old.members, ...newMembers],
+          };
+        },
+      );
       setActionError('');
-      void queryClient.invalidateQueries({ queryKey: ['assignment-group', id] });
-      void queryClient.invalidateQueries({ queryKey: ['assignment-groups'] });
+      return { snapshots };
     },
-    onError: (e) => {
-      setActionError(e instanceof ApiError ? e.message : 'Не удалось добавить участников');
+    onError: (e, _ids, ctx) => {
+      restoreQuerySnapshots(queryClient, [...groupKeys], ctx?.snapshots);
+      const message = e instanceof ApiError ? e.message : 'Не удалось добавить участников';
+      setActionError(message);
+      pushToast({ title: message, tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [...groupKeys]);
     },
   });
 
   const removeMutation = useMutation({
     mutationFn: (studentId: string) =>
       api.assignmentGroups.removeMember(id!, studentId, user.id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['assignment-group', id] });
-      void queryClient.invalidateQueries({ queryKey: ['assignment-groups'] });
+    onMutate: async (studentId) => {
+      const keys = [...groupKeys];
+      const snapshots = await snapshotQueries(queryClient, keys);
+      queryClient.setQueryData<AssignmentGroupDetail>(
+        ['assignment-group', id, user.id],
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            memberIds: old.memberIds.filter((mid) => mid !== studentId),
+            members: old.members.filter((m) => m.id !== studentId),
+          };
+        },
+      );
+      setActionError('');
+      return { snapshots };
     },
-    onError: (e) => {
-      setActionError(e instanceof ApiError ? e.message : 'Не удалось исключить участника');
+    onError: (e, _id, ctx) => {
+      restoreQuerySnapshots(queryClient, [...groupKeys], ctx?.snapshots);
+      const message = e instanceof ApiError ? e.message : 'Не удалось исключить участника';
+      setActionError(message);
+      pushToast({ title: message, tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [...groupKeys]);
     },
   });
 
@@ -213,10 +273,9 @@ export default function AssignmentGroupDetailPage() {
         onClose={() => setAddModalOpen(false)}
         students={availableStudents}
         directions={directions ?? []}
-        loading={addMembersMutation.isPending}
-        disabled={!isOnline}
-        onAdd={async (studentIds) => {
-          await addMembersMutation.mutateAsync(studentIds);
+        disabled={!isOnline || addMembersMutation.isPending}
+        onAdd={(studentIds) => {
+          addMembersMutation.mutate(studentIds);
         }}
       />
 

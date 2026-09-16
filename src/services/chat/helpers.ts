@@ -68,6 +68,24 @@ export function conversationPreviewFromMessage(message: Message): ConversationLa
   };
 }
 
+/** Remove one conversation from the list cache (optimistic delete). */
+export function removeConversationFromList(
+  conversations: Conversation[],
+  conversationId: string,
+): Conversation[] {
+  return conversations.filter((c) => c.id !== conversationId);
+}
+
+/** Re-insert after a failed delete — does not wipe sibling optimistic removes. */
+export function restoreConversationInList(
+  conversations: Conversation[],
+  conversation: Conversation,
+  currentUserId: string,
+): Conversation[] {
+  if (conversations.some((c) => c.id === conversation.id)) return conversations;
+  return sortConversationsWithPins([...conversations, conversation], [], currentUserId);
+}
+
 /**
  * Messenger-style list bump: update last message + re-sort.
  * Pinned chats stay above unpinned; among unpinned, newest activity rises to top.

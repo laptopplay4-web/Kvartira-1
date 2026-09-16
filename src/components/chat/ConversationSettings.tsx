@@ -24,6 +24,7 @@ import {
   type MessagesInfiniteData,
 } from '@/services/chat/messageCache';
 import { useConversationMembers } from '@/hooks/useConversationMembers';
+import { useDeleteConversation } from '@/hooks/useDeleteConversation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { Avatar } from '@/components/ui/Avatar';
 import { Bell, BellOff, LogOut, Pin, Search, Trash2, UserPlus } from 'lucide-react';
@@ -389,31 +390,7 @@ export function ConversationSettings({
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => api.chat.deleteConversation(conversation.id, currentUser.id),
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['conversations', currentUser.id] });
-      const previous = queryClient.getQueryData<Conversation[]>([
-        'conversations',
-        currentUser.id,
-      ]);
-      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
-        (old ?? []).filter((c) => c.id !== conversation.id),
-      );
-      onClose();
-      onDeleted?.();
-      return { previous };
-    },
-    onError: (_err, _void, ctx) => {
-      if (ctx?.previous) {
-        queryClient.setQueryData(['conversations', currentUser.id], ctx.previous);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
-      void queryClient.invalidateQueries({ queryKey: ['chat-unread', currentUser.id] });
-    },
-  });
+  const deleteMutation = useDeleteConversation(currentUser.id);
 
   const memberUsers = useMemo(() => {
     const rows: { member: ConversationMember; user: User }[] = [];
@@ -597,8 +574,14 @@ export function ConversationSettings({
             <Button
               variant="secondary"
               className="w-full justify-start text-danger"
-              onClick={() => deleteMutation.mutate()}
-              loading={deleteMutation.isPending}
+              onClick={() => {
+                onClose();
+                onDeleted?.();
+                deleteMutation.mutate(conversation.id);
+              }}
+              loading={
+                deleteMutation.isPending && deleteMutation.variables === conversation.id
+              }
             >
               <Trash2 className="h-4 w-4" />
               Удалить чат

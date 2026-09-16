@@ -1,11 +1,11 @@
 # Graph Report - Kvartira 1  (2026-09-17)
 
 ## Corpus Check
-- 465 files · ~217,961 words
+- 467 files · ~218,617 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2920 nodes · 3245 edges · 449 communities (298 shown, 151 thin omitted)
+- 2930 nodes · 3262 edges · 451 communities (300 shown, 151 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 124 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
@@ -146,7 +146,7 @@
 - legal/constants.ts
 - LegalDocumentEditModal.tsx
 - Квартира — Production Roadmap
-- theme/constants.ts
+- providers.tsx
 - lessonDetail.test.ts
 - lessons/helpers.ts
 - HomeAssignmentsBlock.tsx
@@ -313,12 +313,13 @@
 - adminInbox.ts
 - kvartiraLegalBootstrap.js
 - warmAppCache.ts
-- pocketbase
-- qrcode
-- @tanstack/query-sync-storage-persister
+- deleteTombstones.ts
+- theme/constants.ts
+- clsx
 - messageCache.ts
-- @tanstack/react-query
-- @tanstack/react-query-persist-client
+- @hookform/resolvers
+- react
+- zustand
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
@@ -347,7 +348,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (449 total, 151 thin omitted)
+## Communities (451 total, 151 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -455,7 +456,7 @@ Nodes (12): buildLegalDocuments(), documentFilter(), EnsureLegalResult, escapeFi
 
 ### Community 46 - "chat/helpers.ts"
 Cohesion: 0.10
-Nodes (19): buildMessageListWithSeparators(), bumpConversationInList(), ChatFilter, ChatListEntry, DateSeparator, filterConversations(), getConversationDisplayTitle(), groupMessagesForDisplay() (+11 more)
+Nodes (20): buildMessageListWithSeparators(), bumpConversationInList(), ChatFilter, ChatListEntry, DateSeparator, filterConversations(), getConversationDisplayTitle(), groupMessagesForDisplay() (+12 more)
 
 ### Community 47 - "chat/constants.ts"
 Cohesion: 0.08
@@ -629,9 +630,9 @@ Nodes (7): CONSENT_ADULT_AGE, CONSENT_PURPOSE_DESCRIPTIONS, CONSENT_PURPOSE_LABE
 Cohesion: 0.11
 Nodes (18): 10. Changelog roadmap, 1. Критерий «приложение закончено», 2. Текущий статус (2026-09-09), 3. Принятые решения, 4. Протокол сессии (кратко), 5. Архитектура пути к production, 6. Фазы, 7. Вне scope (явно отложено) (+10 more)
 
-### Community 177 - "theme/constants.ts"
-Cohesion: 0.21
-Nodes (11): getOrientationLock(), initPortraitOrientationLock(), lockPortraitOrientation(), OrientationLockFn, PORTRAIT_ORIENTATION_LOCK, applyThemePreference(), getStoredThemePreference(), initThemePreference() (+3 more)
+### Community 177 - "providers.tsx"
+Cohesion: 0.22
+Nodes (8): AppProviders(), queryClient, router, getOrientationLock(), initPortraitOrientationLock(), lockPortraitOrientation(), OrientationLockFn, PORTRAIT_ORIENTATION_LOCK
 
 ### Community 178 - "lessonDetail.test.ts"
 Cohesion: 0.33
@@ -670,12 +671,12 @@ Cohesion: 0.10
 Nodes (21): AVATAR_EXT_TO_MIME, AvatarCropState, AvatarCropZoomBounds, AvatarUploadInput, clampCropState(), getCoverScale(), getCropZoomBounds(), getInitialCropState() (+13 more)
 
 ### Community 210 - "messages.ts"
-Cohesion: 0.15
-Nodes (14): isGroupConversation(), getReplyPreviewText(), canDeleteMessage(), canDeleteMessageForEveryone(), canDeleteMessageForMe(), canEditMessage(), DELETED_MESSAGE_TEXT, DeleteMessageScope (+6 more)
+Cohesion: 0.16
+Nodes (12): isGroupConversation(), canDeleteMessage(), canDeleteMessageForEveryone(), canDeleteMessageForMe(), canEditMessage(), DELETED_MESSAGE_TEXT, DeleteMessageScope, isMessageDeleted() (+4 more)
 
 ### Community 211 - "attachments.ts"
-Cohesion: 0.21
-Nodes (9): createAttachmentFromFile(), getAttachmentPreviewLabel(), getAttachmentsPreviewLabel(), isSyntheticMediaCaption(), isVoiceAttachment(), MEDIA_CAPTION_PLACEHOLDERS, conversationPreviewFromMessage(), detectAttachmentType() (+1 more)
+Cohesion: 0.17
+Nodes (11): createAttachmentFromFile(), getAttachmentPreviewLabel(), getAttachmentsPreviewLabel(), isSyntheticMediaCaption(), isVoiceAttachment(), MEDIA_CAPTION_PLACEHOLDERS, conversationPreviewFromMessage(), getReplyPreviewText() (+3 more)
 
 ### Community 212 - "AvatarCropModal.tsx"
 Cohesion: 0.43
@@ -702,8 +703,8 @@ Cohesion: 0.18
 Nodes (10): AUTH_HOOK, AUTH_LIB, AUTH_MIGRATION, BOOL_MIGRATION, FORGOT_PAGE, LOGIN_PAGE, REGISTER_PAGE, ROOT (+2 more)
 
 ### Community 230 - "queryPersist.ts"
-Cohesion: 0.15
-Nodes (11): AppProviders(), queryClient, createBrowserPersister(), createNoopPersister(), PERSIST_ROOT_KEYS, QUERY_CACHE_MAX_AGE_MS, QUERY_CACHE_STORAGE_KEY, queryPersister (+3 more)
+Cohesion: 0.24
+Nodes (13): canUseLocalStorage(), clearAppQueryCache(), PERSIST_ROOT_KEYS, PersistedQueryCache, QUERY_CACHE_MAX_AGE_MS, QUERY_CACHE_STORAGE_KEY, QueryCachePersistBridge(), readPersistedQueryCache() (+5 more)
 
 ### Community 231 - "AvailabilityMonthCalendar.tsx"
 Cohesion: 0.40
@@ -898,16 +899,16 @@ Cohesion: 0.33
 Nodes (5): resolveTarget(), UserPreviewContext, UserPreviewContextValue, UserPreviewProvider(), UserPreviewTarget
 
 ### Community 382 - "runSeed"
-Cohesion: 0.23
-Nodes (10): ID_ALIASES, IdMap, passwordForPhone(), patchRecordTimestamps(), phoneToEmail(), remapLink(), remapMetadata(), runSeed() (+2 more)
+Cohesion: 0.25
+Nodes (9): ID_ALIASES, IdMap, passwordForPhone(), patchRecordTimestamps(), phoneToEmail(), remapLink(), remapMetadata(), runSeed() (+1 more)
 
 ### Community 383 - "PbClient"
 Cohesion: 0.21
 Nodes (7): ensureLegalDocuments(), env(), main(), PbClient, PbRecord, env(), main()
 
 ### Community 384 - "notifications/helpers.ts"
-Cohesion: 0.18
-Nodes (11): NotificationsPage(), countInboxUnreadNotifications(), didLeaveNotificationsRoute(), isMessageNotificationForChat(), isNotificationsRoute(), isPassiveUnreadNotification(), isSupportAdminInboxNotification(), markChatMessageNotificationsReadInList() (+3 more)
+Cohesion: 0.17
+Nodes (12): NotificationsPage(), countInboxUnreadNotifications(), createDefaultNotificationPreferences(), didLeaveNotificationsRoute(), isMessageNotificationForChat(), isNotificationsRoute(), isPassiveUnreadNotification(), isSupportAdminInboxNotification() (+4 more)
 
 ### Community 391 - "registration.ts"
 Cohesion: 0.53
@@ -922,8 +923,8 @@ Cohesion: 0.67
 Nodes (3): EventParticipationDeltaBadges(), EventParticipationDeltaBadgesProps, formatDelta()
 
 ### Community 400 - "dependencies"
-Cohesion: 0.13
-Nodes (15): class-variance-authority, clsx, @hookform/resolvers, dependencies, class-variance-authority, clsx, @hookform/resolvers, react (+7 more)
+Cohesion: 0.15
+Nodes (13): class-variance-authority, dependencies, class-variance-authority, pocketbase, qrcode, react-router-dom, tailwind-merge, @tanstack/react-query (+5 more)
 
 ### Community 401 - "kvartiraSecurity.js"
 Cohesion: 0.31
@@ -977,12 +978,16 @@ Nodes (3): DOCS, ensureRequiredLegalDocuments(), findExisting()
 Cohesion: 0.50
 Nodes (4): selectConversationsForMessageWarm(), WARM_CHAT_MESSAGE_LIMIT, warmAppCache(), WarmAppCacheUser
 
+### Community 441 - "theme/constants.ts"
+Cohesion: 0.38
+Nodes (6): applyThemePreference(), getStoredThemePreference(), initThemePreference(), THEME_OPTIONS, THEME_STORAGE_KEY, ThemePreference
+
 ### Community 445 - "messageCache.ts"
 Cohesion: 0.60
 Nodes (4): appendMessagesInInfiniteCache(), MessagesInfiniteData, sameSystemEvent(), upsertMessageInInfiniteCache()
 
 ## Knowledge Gaps
-- **958 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+953 more)
+- **957 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+952 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **151 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -991,12 +996,12 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
   _High betweenness centrality (0.002) - this node is a cross-community bridge._
+- **Why does `LessonsApi` connect `LessonsApi` to `types.ts`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `NotificationsApi` connect `NotificationsApi` to `types.ts`?**
-  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _958 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _957 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

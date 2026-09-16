@@ -12,6 +12,7 @@ import { createClientMutationId, useSendMessage } from '@/hooks/useSendMessage';
 import { useForwardMessage } from '@/hooks/useForwardMessage';
 import { useEditMessage } from '@/hooks/useEditMessage';
 import { useDeleteMessage } from '@/hooks/useDeleteMessage';
+import { useDeleteConversation } from '@/hooks/useDeleteConversation';
 import { useChatDraft } from '@/hooks/useChatDraft';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
@@ -65,7 +66,7 @@ export default function ChatPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('all');
   const [createOpen, setCreateOpen] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
   const [settingsConversation, setSettingsConversation] = useState<Conversation | null>(null);
   const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
   const [reportMessage, setReportMessage] = useState<Message | null>(null);
@@ -117,30 +118,7 @@ export default function ChatPage() {
   const deleteMutation = useDeleteMessage();
   const canCreate = canManageChats(user);
 
-  const deleteConversationMutation = useMutation({
-    mutationFn: (conversationId: string) => api.chat.deleteConversation(conversationId, user.id),
-    onMutate: async (conversationId) => {
-      await queryClient.cancelQueries({ queryKey: ['conversations', user.id] });
-      const previous = queryClient.getQueryData<Conversation[]>(['conversations', user.id]);
-      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
-        (old ?? []).filter((c) => c.id !== conversationId),
-      );
-      setPendingDeleteId(null);
-      if (activeId === conversationId) {
-        navigate('/chat');
-      }
-      return { previous };
-    },
-    onError: (_err, _id, ctx) => {
-      if (ctx?.previous) {
-        queryClient.setQueryData(['conversations', user.id], ctx.previous);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
-      void queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
-    },
-  });
+  const deleteConversationMutation = useDeleteConversation(user.id);
 
   const muteConversationMutation = useMutation({
     mutationFn: ({ conversationId, muted }: { conversationId: string; muted: boolean }) =>
@@ -216,12 +194,7 @@ export default function ChatPage() {
     },
   });
 
-  const pendingDeleteConversation = pendingDeleteId
-    ? (conversations ?? []).find((c) => c.id === pendingDeleteId)
-    : undefined;
-  const pendingDeleteTitle = pendingDeleteConversation
-    ? getConversationDisplayTitle(pendingDeleteConversation, user.id, users ?? [])
-    : 'чат';
+  const pendingDeleteTitle = pendingDelete?.title ?? 'чат';
   const { data: members } = useConversationMembers(activeId, user.id);
 
   const messages = flattenMessages(messagePages?.pages);
@@ -554,8 +527,10 @@ export default function ChatPage() {
             onSelect={handleSelect}
             onEdit={(conv) => setSettingsConversation(conv)}
             onDelete={(conv) => {
-              if (deleteConversationMutation.isPending) return;
-              setPendingDeleteId(conv.id);
+              setPendingDelete({
+                id: conv.id,
+                title: getConversationDisplayTitle(conv, user.id, users ?? []),
+              });
             }}
             onPin={(conv, pinned) => {
               pinConversationMutation.mutate({ conversationId: conv.id, pinned });
@@ -780,17 +755,17 @@ export default function ChatPage() {
       )}
 
       <ConfirmDialog
-        open={!!pendingDeleteId}
+        open={!!pendingDelete}
         onClose={() => {
-          if (deleteConversationMutation.isPending) return;
-          setPendingDeleteId(null);
+          setPendingDelete(null);
           deleteConversationMutation.reset();
         }}
         title="Удалить чат?"
         description={
           <>
             <p>«{pendingDeleteTitle}» будет удалён без возможности восстановления.</p>
-            {deleteConversationMutation.error && (
+            {deleteConversationMutation.error &&
+              deleteConversationMutation.variables === pendingDelete?.id && (
               <p className="mt-2 text-caption text-danger" role="alert">
                 {deleteConversationMutation.error instanceof ApiError
                   ? deleteConversationMutation.error.message
@@ -801,11 +776,17 @@ export default function ChatPage() {
         }
         confirmLabel="Удалить"
         tone="destructive"
-        loading={deleteConversationMutation.isPending}
-        disabled={!isOnline || !pendingDeleteId}
+        loading={
+          deleteConversationMutation.isPending &&
+          deleteConversationMutation.variables === pendingDelete?.id
+        }
+        disabled={!isOnline || !pendingDelete}
         onConfirm={() => {
-          if (!pendingDeleteId || deleteConversationMutation.isPending) return;
-          deleteConversationMutation.mutate(pendingDeleteId);
+          if (!pendingDelete) return;
+          const { id } = pendingDelete;
+          setPendingDelete(null);
+          if (activeId === id) navigate('/chat');
+          deleteConversationMutation.mutate(id);
         }}
       />
 

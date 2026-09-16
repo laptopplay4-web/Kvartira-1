@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.180 Cold start: persist RQ + warm prefetch · 2026-09-16
+Версия: 1.181 Chat delete concurrent tombstones · 2026-09-17
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -103,6 +103,7 @@ kvartira/
 │   │   ├── useForwardMessage.ts
 │   │   ├── useEditMessage.ts
 │   │   ├── useDeleteMessage.ts
+│   │   ├── useDeleteConversation.ts
 │   │   ├── useChatRealtime.ts
 │   │   ├── useChatDraft.ts
 │   │   ├── useTypingIndicator.ts
@@ -137,6 +138,7 @@ kvartira/
 │   │   └── chat/
 │   │       ├── access.ts        # canAccessConversation, canManageMembers, mute, …
 │   │       ├── helpers.ts       # filter, sort, grouping, message search helpers
+│   │       ├── deleteTombstones.ts # in-flight delete ids (concurrent-safe)
 │   │       ├── constants.ts     # limits, MIME, typing debounce, draft prefix
 │   │       ├── messages.ts      # canEditMessage, canDeleteMessage, read receipts
 │   │       ├── validation.ts    # attachment + message server-side validation rules
@@ -243,8 +245,9 @@ kvartira/
 | `src/hooks/useChatDraft.ts` | localStorage drafts per conversation |
 | `src/hooks/useEditMessage.ts` | Optimistic edit + rollback |
 | `src/hooks/useDeleteMessage.ts` | Soft-delete optimistic |
+| `src/hooks/useDeleteConversation.ts` | Concurrent-safe conversation delete + tombstones |
 | `src/hooks/useMarkPassiveNotificationsOnLeave.ts` | Leave `/notifications` → mark passive as read (urgent keep) |
-| `src/test/chat.test.ts` | 92 tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch, forward |
+| `src/test/chat.test.ts` | 94 tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch, forward, delete tombstones |
 
 ---
 
@@ -473,7 +476,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 | `warmAppCache.test.ts` | persist filter, conversation warm select, shell + messages prefetch (5 tests) |
 
-**Итого:** 739 passed (49 files); booking cancel past-slot flake вне scope.
+**Итого:** 741 passed (49 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -631,6 +634,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Chat UX: system msgs / send / mute | ✅ 2026-09-16, см. §178 |
 | Chat forward: optimistic / single target | ✅ 2026-09-16, см. §179 |
 | Cold start: RQ persist + warm prefetch | ✅ 2026-09-16, см. §180 |
+| Chat delete concurrent tombstones | ✅ 2026-09-17, см. §181 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1443,8 +1447,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **739** (49 files); booking cancel flake вне scope; §180 cold start |
-| Graphify | 2920 nodes, 3245 edges, 449 communities |
+| Тесты | **741** (49 files); booking cancel flake вне scope; §181 chat delete |
+| Graphify | 2930 nodes, 3262 edges, 451 communities |
 
 ### Фазы (кратко)
 
@@ -1466,7 +1470,38 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2920 nodes, 3245 edges, 449 communities (post-§180).
+**Graphify stats:** 2930 nodes, 3262 edges, 451 communities (post-§181).
+
+---
+
+## 181. Chat delete — concurrent tombstones (2026-09-17)
+
+**Scope:** последовательное удаление чатов ломалось: второй delete ждал `isPending`, а rollback полного `previous` / invalidate возвращал уже удалённый чат → клик → «чат не найден».
+
+**Graphify:** `useDeleteConversation()` → `deleteTombstones` → `ChatPage` / `ConversationSettings` → `ChatApi.deleteConversation`.
+
+### Root cause (✅)
+
+- Один `useMutation` + guard `isPending` блокировал второе удаление.
+- `onError` восстанавливал весь snapshot списка → воскрешал соседние optimistic deletes.
+- `onSettled` invalidate во время purge PB мог вернуть ещё не удалённый на сервере чат в UI.
+
+### Fix (✅)
+
+- `useDeleteConversation` + `deleteTombstones` (in-flight ids per user).
+- Rollback только failed id (`restoreConversationInList`); refetch фильтрует tombstones.
+- Убран `isPending`-блок на confirm/меню; параллельные delete ок.
+- `useChatConversations` / realtime bump — strip tombstones.
+
+### Tests
+
+`chat.test.ts` +2 (restore sibling / tombstone filter) → **94** в файле; suite **741**. typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2930 nodes, 3262 edges, 451 communities.
 
 ---
 

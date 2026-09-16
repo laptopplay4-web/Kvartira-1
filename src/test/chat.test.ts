@@ -5,9 +5,17 @@ import {
   bumpConversationInList,
   filterConversations,
   orderPinnedMessagesNewestFirst,
+  removeConversationFromList,
   resolvePinnedIndexForViewport,
+  restoreConversationInList,
   sortConversationsWithPins,
 } from '@/services/chat/helpers';
+import {
+  clearAllConversationDeletePending,
+  clearConversationDeletePending,
+  filterDeletedConversations,
+  markConversationDeletePending,
+} from '@/services/chat/deleteTombstones';
 import {
   appendMessagesInInfiniteCache,
   upsertMessageInInfiniteCache,
@@ -962,6 +970,75 @@ describe('message reactions and forward', () => {
       'u1',
     );
     expect(same).toBe(list);
+  });
+
+  it('restoreConversationInList does not resurrect sibling deletes', () => {
+    const a: Conversation = {
+      id: 'a',
+      type: 'personal',
+      title: 'A',
+      participantIds: ['u1', 'u2'],
+      createdAt: '2026-01-01T08:00:00.000Z',
+      updatedAt: '2026-01-01T10:00:00.000Z',
+      lastMessageAt: '2026-01-01T10:00:00.000Z',
+      unreadCount: 0,
+    };
+    const b: Conversation = {
+      id: 'b',
+      type: 'personal',
+      title: 'B',
+      participantIds: ['u1', 'u3'],
+      createdAt: '2026-01-01T08:00:00.000Z',
+      updatedAt: '2026-01-01T11:00:00.000Z',
+      lastMessageAt: '2026-01-01T11:00:00.000Z',
+      unreadCount: 0,
+    };
+    const afterA = removeConversationFromList([a, b], 'a');
+    expect(afterA.map((c) => c.id)).toEqual(['b']);
+    const afterB = removeConversationFromList(afterA, 'b');
+    expect(afterB).toEqual([]);
+    // Failed delete of B must not bring A back
+    const restored = restoreConversationInList(afterB, b, 'u1');
+    expect(restored.map((c) => c.id)).toEqual(['b']);
+  });
+
+  it('delete tombstones survive list refetch until cleared', () => {
+    clearAllConversationDeletePending();
+    markConversationDeletePending('u1', 'a');
+    markConversationDeletePending('u1', 'b');
+    const list: Conversation[] = [
+      {
+        id: 'a',
+        type: 'personal',
+        title: 'A',
+        participantIds: ['u1'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T08:00:00.000Z',
+        unreadCount: 0,
+      },
+      {
+        id: 'b',
+        type: 'personal',
+        title: 'B',
+        participantIds: ['u1'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T08:00:00.000Z',
+        unreadCount: 0,
+      },
+      {
+        id: 'c',
+        type: 'personal',
+        title: 'C',
+        participantIds: ['u1'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T08:00:00.000Z',
+        unreadCount: 0,
+      },
+    ];
+    expect(filterDeletedConversations('u1', list).map((c) => c.id)).toEqual(['c']);
+    clearConversationDeletePending('u1', 'a');
+    expect(filterDeletedConversations('u1', list).map((c) => c.id)).toEqual(['a', 'c']);
+    clearAllConversationDeletePending();
   });
 
   it('sendMessage moves conversation to top of list', async () => {

@@ -7,6 +7,7 @@ import {
   bumpConversationInList,
   conversationPreviewFromMessage,
 } from '@/services/chat/helpers';
+import { filterDeletedConversations } from '@/services/chat/deleteTombstones';
 import {
   upsertMessageInInfiniteCache,
   type MessagesInfiniteData,
@@ -28,15 +29,18 @@ export function useChatRealtime(userId: string | undefined, activeConversationId
             const isActive = event.conversationId === activeConversationId;
             queryClient.setQueryData<Conversation[]>(['conversations', userId], (old) => {
               if (!old) return old;
-              return bumpConversationInList(
-                old,
-                event.conversationId,
-                {
-                  lastMessageAt: event.message!.createdAt,
-                  lastMessage: conversationPreviewFromMessage(event.message!),
-                  unreadDelta: !isOwn && !isActive ? 1 : 0,
-                },
+              return filterDeletedConversations(
                 userId,
+                bumpConversationInList(
+                  old,
+                  event.conversationId,
+                  {
+                    lastMessageAt: event.message!.createdAt,
+                    lastMessage: conversationPreviewFromMessage(event.message!),
+                    unreadDelta: !isOwn && !isActive ? 1 : 0,
+                  },
+                  userId,
+                ),
               );
             });
             // Merge into open message caches — avoid full refetch (2–3s lag after send).

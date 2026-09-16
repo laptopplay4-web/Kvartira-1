@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
+import { filterDeletedConversations } from '@/services/chat/deleteTombstones';
 
 export function useChatConversations(userId: string) {
   return useQuery({
     queryKey: ['conversations', userId],
-    queryFn: () => api.chat.getConversations(userId),
+    queryFn: async () => {
+      const list = await api.chat.getConversations(userId);
+      return filterDeletedConversations(userId, list);
+    },
     enabled: !!userId,
   });
 }

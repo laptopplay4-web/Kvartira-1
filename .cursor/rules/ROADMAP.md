@@ -40,9 +40,9 @@ Production-ready, когда выполнены **все** условия:
 | Production backend | ⏳ фазы 3.4–6 |
 | Frontend polish (фаза 0) | ✅ |
 | **Текущая фаза** | **6** — Deploy (после optional 3.4) |
-| **Следующий шаг** | Figma §126: следующий элемент → уточнения по одному → план → «можно внедрять»; или Deploy |
-| Тесты | 579 (46 files) |
-| Graphify | 2473 / 2635 / 372 — `stack.mdc` §126 |
+| **Следующий шаг** | Deploy §176 (миграция YClients + hooks) или Figma §126; live YClients после credentials |
+| Тесты | 744 (50 files) |
+| Graphify | 2879 / 3193 / 440 — обновить локально после §176 |
 
 Полный чеклист реализации — `stack.mdc` §16. РКН — `docs/ROSKOMNADZOR_CHECKLIST.md`.
 

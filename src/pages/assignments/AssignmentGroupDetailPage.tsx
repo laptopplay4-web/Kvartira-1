@@ -63,9 +63,7 @@ export default function AssignmentGroupDetailPage() {
 
   const addMembersMutation = useMutation({
     mutationFn: async (studentIds: string[]) => {
-      await Promise.all(
-        studentIds.map((studentId) => api.assignmentGroups.addMember(id!, studentId, user.id)),
-      );
+      await api.assignmentGroups.addMembers(id!, studentIds, user.id);
     },
     onMutate: async (studentIds) => {
       const keys = [...groupKeys];

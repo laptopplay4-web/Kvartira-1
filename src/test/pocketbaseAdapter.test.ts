@@ -182,6 +182,7 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     // Superuser Admin UI must not hit hide (otherwise enrich fails / fields vanish).
     expect(hook).toContain('isUsersAuth');
     expect(hook).toContain('joinAdminToAllGroupChats');
+    expect(hook).toContain('joinUserToSchoolWideChats');
     expect(hook).toContain('onRecordAfterUpdateSuccess');
   });
 
@@ -234,6 +235,27 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     });
     expect(lesson.materials).toHaveLength(1);
     expect(lesson.cancelReason).toBeUndefined();
+  });
+
+  it('mapLessonRecord maps yclients external fields', () => {
+    const lesson = mapLessonRecord({
+      id: 'lesson-ext',
+      collectionId: 'lessons',
+      collectionName: 'lessons',
+      created: '2026-08-01T10:00:00.000Z',
+      updated: '2026-08-02T10:00:00.000Z',
+      student: 'student-1',
+      teacher: 'teacher-1',
+      direction: 'dir-vocal',
+      date: '2026-09-15 00:00:00.000Z',
+      startTime: '14:00',
+      durationMinutes: 60,
+      status: 'scheduled',
+      externalSource: 'yclients',
+      externalId: 'yc-555',
+    });
+    expect(lesson.externalSource).toBe('yclients');
+    expect(lesson.externalId).toBe('yc-555');
   });
 
   it('mapDirectionRecord and mapAvailabilityRecord map PB fields', () => {
@@ -678,7 +700,9 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('syncReadReceipts');
     expect(lib).toContain('assertConversationPinUpdate');
     expect(lib).toContain('joinAdminsToGroupConversation');
+    expect(lib).toContain('joinAllUsersToSchoolWideConversation');
     expect(lib).toContain('joinAdminToAllGroupChats');
+    expect(hook).toContain('joinAllUsersToSchoolWideConversation');
   });
 
   it('chat list loads unread candidates instead of full message history', () => {
@@ -687,6 +711,9 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(chatApi).toContain('loadUnreadCandidateMessages');
     expect(chatApi).toContain('loadMessagesForConversationEnrichment');
     expect(chatApi).not.toMatch(/async function loadMessagesForConversations\(/);
+    expect(chatApi).toContain('addMembers(');
+    expect(chatApi).not.toContain('ensureSchoolWideMembershipPb');
+    expect(chatApi).not.toContain('ensureAdminGroupMembershipPb');
   });
 
   it('buildUnreadCandidateFilter scopes by lastReadAt and excludes own/system', async () => {
@@ -1299,6 +1326,32 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(groupsApi).toContain('resolveUsersAvatars');
     expect(lessonsApi).toContain('resolveUsersAvatars');
     expect(publicApi).toContain('resolveUsersAvatars');
+  });
+
+  it('hot adapters batch file URL and user loads (no per-row resolve in lists)', () => {
+    const assignmentsApi = readFileSync(
+      resolve(ROOT, 'src/services/api/pocketbase/assignments.ts'),
+      'utf8',
+    );
+    const supportApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/support.ts'), 'utf8');
+    const eventsApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/events.ts'), 'utf8');
+    const groupsApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/groups.ts'), 'utf8');
+    const filesApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/files.ts'), 'utf8');
+
+    expect(filesApi).toContain('resolveAssignments');
+    expect(filesApi).toContain('resolveSupportTickets');
+    expect(assignmentsApi).toContain('resolveAssignments');
+    expect(assignmentsApi).not.toContain('list.map(resolveAssignment)');
+    expect(supportApi).toContain('resolveSupportTickets');
+    expect(supportApi).not.toContain('list.map(resolveSupportTicket)');
+    expect(supportApi).toContain('pbEqOr');
+    expect(supportApi).toContain('resolveUsersAvatars');
+    expect(eventsApi).toContain('resolveStoredFileUrls');
+    expect(eventsApi).toContain('presentPbEvents');
+    expect(eventsApi).toContain('resolveEventImages');
+    expect(eventsApi).not.toContain('records.map((r) => presentPbEvent');
+    expect(groupsApi).toContain('PB_USER_ID_CHUNK');
+    expect(groupsApi).toContain('pbEqOr');
   });
 
   it('chat realtime subscribes to PocketBase collections when mode is pocketbase', () => {

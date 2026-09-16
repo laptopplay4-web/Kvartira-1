@@ -20,7 +20,13 @@ import { useClearChatSeen } from '@/hooks/useClearChatSeen';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { canManageChats } from '@/services/chat/access';
 import { canPinMessage, toggleReactionList } from '@/services/chat/messages';
-import { getConversationDisplayTitle, isGroupLike, orderPinnedMessagesNewestFirst, sortConversationsWithPins } from '@/services/chat/helpers';
+import {
+  getConversationDisplayTitle,
+  isGroupLike,
+  isOptimisticConversationId,
+  orderPinnedMessagesNewestFirst,
+  sortConversationsWithPins,
+} from '@/services/chat/helpers';
 import type { ChatFilter } from '@/services/chat/helpers';
 import { useConversationMembers } from '@/hooks/useConversationMembers';
 import { ForwardMessageModal } from '@/components/chat/ForwardMessageModal';
@@ -79,6 +85,12 @@ export default function ChatPage() {
 
   const { draft, setDraft, clearDraft } = useChatDraft(activeId);
 
+  useEffect(() => {
+    if (activeId && isOptimisticConversationId(activeId)) {
+      navigate('/chat', { replace: true });
+    }
+  }, [activeId, navigate]);
+
   useChatRealtime(user.id, activeId);
 
   const {
@@ -118,13 +130,28 @@ export default function ChatPage() {
 
   const deleteConversationMutation = useMutation({
     mutationFn: (conversationId: string) => api.chat.deleteConversation(conversationId, user.id),
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations', user.id] });
+      const previous = queryClient.getQueryData<Conversation[]>(['conversations', user.id]);
+      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
+        (old ?? []).filter((c) => c.id !== conversationId),
+      );
+      return { previous, conversationId };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(['conversations', user.id], ctx.previous);
+      }
+    },
     onSuccess: (_void, conversationId) => {
       setPendingDeleteId(null);
-      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
       if (activeId === conversationId) {
         navigate('/chat');
       }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      void queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
     },
   });
 
@@ -816,6 +843,7 @@ export default function ChatPage() {
         currentUser={user}
         users={users ?? []}
         onCreated={(conversationId) => {
+          if (isOptimisticConversationId(conversationId)) return;
           setCreateOpen(false);
           navigate(`/chat/${conversationId}`);
         }}

@@ -244,36 +244,106 @@ export async function resolveMessages(messages: Message[]): Promise<Message[]> {
   return Promise.all(messages.map(resolveMessage));
 }
 
-export async function resolveAssignment(assignment: Assignment): Promise<Assignment> {
-  const contentBlocks = assignment.contentBlocks?.length
-    ? await Promise.all(
-        assignment.contentBlocks.map(async (block) => {
-          if (!block.url) return block;
-          const url = await resolveStoredFileUrl(block.url);
-          return url && url !== block.url ? { ...block, url } : block;
-        }),
-      )
-    : assignment.contentBlocks;
+function applyResolvedBlockUrls<T extends { url?: string }>(
+  blocks: T[],
+  resolvedUrls: Array<string | undefined>,
+): T[] {
+  return blocks.map((block, index) => {
+    const url = resolvedUrls[index];
+    return url && url !== block.url ? { ...block, url } : block;
+  });
+}
 
-  return {
+export async function resolveAssignment(assignment: Assignment): Promise<Assignment> {
+  const [resolved] = await resolveAssignments([assignment]);
+  return resolved;
+}
+
+/** Batch-resolve content block `pbfile:` refs across many assignments. */
+export async function resolveAssignments(assignments: Assignment[]): Promise<Assignment[]> {
+  if (assignments.length === 0) return assignments;
+
+  const flatUrls: Array<string | undefined> = [];
+  const blockRefs: Array<{ assignmentIndex: number; blockIndex: number }> = [];
+
+  assignments.forEach((assignment, assignmentIndex) => {
+    assignment.contentBlocks?.forEach((block, blockIndex) => {
+      flatUrls.push(block.url);
+      blockRefs.push({ assignmentIndex, blockIndex });
+    });
+  });
+
+  if (flatUrls.length === 0) return assignments;
+
+  const resolvedUrls = await resolveStoredFileUrls(flatUrls);
+  if (flatUrls.every((url, index) => resolvedUrls[index] === url)) {
+    return assignments;
+  }
+
+  const result = assignments.map((assignment) => ({
     ...assignment,
-    contentBlocks: contentBlocks ?? assignment.contentBlocks,
-  };
+    contentBlocks: assignment.contentBlocks ? [...assignment.contentBlocks] : assignment.contentBlocks,
+  }));
+
+  blockRefs.forEach(({ assignmentIndex, blockIndex }, flatIndex) => {
+    const blocks = result[assignmentIndex].contentBlocks;
+    if (!blocks) return;
+    const url = resolvedUrls[flatIndex];
+    const block = blocks[blockIndex];
+    if (url && url !== block.url) {
+      blocks[blockIndex] = { ...block, url };
+    }
+  });
+
+  return result;
 }
 
 export async function resolveSupportAttachments(
   attachments: SupportTicketAttachment[],
 ): Promise<SupportTicketAttachment[]> {
-  return Promise.all(
-    attachments.map(async (attachment) => {
-      const url = await resolveStoredFileUrl(attachment.url);
-      return url && url !== attachment.url ? { ...attachment, url } : attachment;
-    }),
-  );
+  if (attachments.length === 0) return attachments;
+  const resolvedUrls = await resolveStoredFileUrls(attachments.map((attachment) => attachment.url));
+  return applyResolvedBlockUrls(attachments, resolvedUrls);
 }
 
 export async function resolveSupportTicket(ticket: SupportTicket): Promise<SupportTicket> {
-  if (!ticket.attachments.length) return ticket;
-  const attachments = await resolveSupportAttachments(ticket.attachments);
-  return { ...ticket, attachments };
+  const [resolved] = await resolveSupportTickets([ticket]);
+  return resolved;
+}
+
+/** Batch-resolve ticket attachment `pbfile:` refs. */
+export async function resolveSupportTickets(tickets: SupportTicket[]): Promise<SupportTicket[]> {
+  if (tickets.length === 0) return tickets;
+
+  const flatUrls: Array<string | undefined> = [];
+  const attachmentRefs: Array<{ ticketIndex: number; attachmentIndex: number }> = [];
+
+  tickets.forEach((ticket, ticketIndex) => {
+    ticket.attachments.forEach((attachment, attachmentIndex) => {
+      flatUrls.push(attachment.url);
+      attachmentRefs.push({ ticketIndex, attachmentIndex });
+    });
+  });
+
+  if (flatUrls.length === 0) return tickets;
+
+  const resolvedUrls = await resolveStoredFileUrls(flatUrls);
+  if (flatUrls.every((url, index) => resolvedUrls[index] === url)) {
+    return tickets;
+  }
+
+  const result = tickets.map((ticket) => ({
+    ...ticket,
+    attachments: [...ticket.attachments],
+  }));
+
+  attachmentRefs.forEach(({ ticketIndex, attachmentIndex }, flatIndex) => {
+    const url = resolvedUrls[flatIndex];
+    const attachment = result[ticketIndex].attachments[attachmentIndex];
+    if (url && url !== attachment.url) {
+      result[ticketIndex].attachments[attachmentIndex] = { ...attachment, url };
+    }
+  });
+
+  return result;
 }

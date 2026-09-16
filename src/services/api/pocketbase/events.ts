@@ -15,7 +15,7 @@ import {
 import {
   deleteStoredFiles,
   isStoredFileRef,
-  resolveStoredFileUrl,
+  resolveStoredFileUrls,
   resolveUsersAvatars,
   uploadStoredFile,
 } from '@/services/api/pocketbase/files';
@@ -50,21 +50,27 @@ async function assertEventsAdminAccess(requesterId: string): Promise<User> {
 }
 
 async function resolveEventImage(event: SchoolEvent): Promise<SchoolEvent> {
-  if (!event.imageUrl) return event;
-  const resolved = await resolveStoredFileUrl(event.imageUrl);
-  if (resolved === event.imageUrl) return event;
-  return { ...event, imageUrl: resolved };
+  const [resolved] = await resolveEventImages([event]);
+  return resolved;
 }
 
-async function presentPbEvent(
+async function resolveEventImages(events: SchoolEvent[]): Promise<SchoolEvent[]> {
+  if (events.length === 0) return events;
+  const resolvedUrls = await resolveStoredFileUrls(events.map((event) => event.imageUrl));
+  return events.map((event, index) => {
+    const imageUrl = resolvedUrls[index];
+    if (!imageUrl || imageUrl === event.imageUrl) return event;
+    return { ...event, imageUrl };
+  });
+}
+
+function applyPbEventPresentation(
   event: SchoolEvent,
   viewerId: string,
-  viewer?: User | null,
+  viewer: User | null | undefined,
   options?: { forceRegistered?: boolean },
-): Promise<SchoolEvent> {
-  const resolvedViewer =
-    viewer !== undefined ? viewer : await getRequesterUser(viewerId).catch(() => null);
-  const hideRoster = !canManageEvents(resolvedViewer);
+): SchoolEvent {
+  const hideRoster = !canManageEvents(viewer);
 
   let source = event;
   if (options?.forceRegistered) {
@@ -79,8 +85,33 @@ async function presentPbEvent(
     };
   }
 
-  const presented = presentSchoolEvent(source, viewerId, { hideRoster });
+  return presentSchoolEvent(source, viewerId, { hideRoster });
+}
+
+async function presentPbEvent(
+  event: SchoolEvent,
+  viewerId: string,
+  viewer?: User | null,
+  options?: { forceRegistered?: boolean },
+): Promise<SchoolEvent> {
+  const resolvedViewer =
+    viewer !== undefined ? viewer : await getRequesterUser(viewerId).catch(() => null);
+  const presented = applyPbEventPresentation(event, viewerId, resolvedViewer, options);
   return resolveEventImage(presented);
+}
+
+async function presentPbEvents(
+  events: SchoolEvent[],
+  userId: string,
+  viewer: User | null | undefined,
+  options?: { ownRegistered?: Set<string> },
+): Promise<SchoolEvent[]> {
+  const presented = events.map((event) =>
+    applyPbEventPresentation(event, userId, viewer, {
+      forceRegistered: options?.ownRegistered?.has(event.id),
+    }),
+  );
+  return resolveEventImages(presented);
 }
 
 /** Own registration rows — roster sync may lag behind create. */
@@ -237,13 +268,7 @@ export const pocketbaseEventsApi: EventsApi = {
       const ownRegistered = canManageEvents(viewer)
         ? new Set<string>()
         : await loadOwnRegisteredEventIds(userId);
-      return Promise.all(
-        events.map((event) =>
-          presentPbEvent(event, userId, viewer, {
-            forceRegistered: ownRegistered.has(event.id),
-          }),
-        ),
-      );
+      return presentPbEvents(events, userId, viewer, { ownRegistered: ownRegistered });
     });
   },
 
@@ -463,7 +488,9 @@ export const pocketbaseEventsApi: EventsApi = {
       await assertEventsAdminAccess(requesterId);
       const pb = getPocketBase();
       const records = await pb.collection('events').getFullList({ sort: 'date,startTime' });
-      return Promise.all(records.map((r) => presentPbEvent(mapEventRecord(r), requesterId)));
+      const viewer = await getRequesterUser(requesterId);
+      const events = records.map(mapEventRecord);
+      return presentPbEvents(events, requesterId, viewer);
     });
   },
 

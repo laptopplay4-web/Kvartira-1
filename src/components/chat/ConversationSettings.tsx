@@ -95,15 +95,47 @@ export function ConversationSettings({
   const avatarChanged = (avatarUrl || '') !== (conversation.avatarUrl ?? '');
   const canSaveProfile = titleChanged || avatarChanged;
 
+  const profileCacheKeys = useMemo(
+    () =>
+      [
+        ['conversations', currentUser.id] as const,
+        ['conversation', conversation.id, currentUser.id] as const,
+        ['conversation', conversation.id] as const,
+      ] as const,
+    [conversation.id, currentUser.id],
+  );
+
   const updateMutation = useMutation({
     mutationFn: () =>
       api.chat.updateConversation(conversation.id, currentUser.id, {
         ...(titleChanged ? { title: title.trim() } : {}),
         ...(avatarChanged ? { avatarUrl } : {}),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+    onMutate: async () => {
+      const keys = [...profileCacheKeys];
+      const snapshots = await snapshotQueries(queryClient, keys);
+      const patch: Partial<Pick<Conversation, 'title' | 'avatarUrl'>> = {
+        ...(titleChanged ? { title: title.trim() } : {}),
+        ...(avatarChanged ? { avatarUrl } : {}),
+      };
+      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
+        (old ?? []).map((c) => (c.id === conversation.id ? { ...c, ...patch } : c)),
+      );
+      queryClient.setQueryData<Conversation>(
+        ['conversation', conversation.id, currentUser.id],
+        (old) => (old ? { ...old, ...patch } : old),
+      );
+      queryClient.setQueryData<Conversation>(['conversation', conversation.id], (old) =>
+        old ? { ...old, ...patch } : old,
+      );
+      return { snapshots };
+    },
+    onError: (_err, _vars, ctx) => {
+      restoreQuerySnapshots(queryClient, [...profileCacheKeys], ctx?.snapshots);
+      pushToast({ title: 'Не удалось сохранить', tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [...profileCacheKeys]);
     },
   });
 
@@ -235,11 +267,7 @@ export function ConversationSettings({
 
   const addMembersMutation = useMutation({
     mutationFn: async (studentIds: string[]) => {
-      await Promise.all(
-        studentIds.map((targetUserId) =>
-          api.chat.addMember(conversation.id, currentUser.id, targetUserId),
-        ),
-      );
+      await api.chat.addMembers(conversation.id, currentUser.id, studentIds);
     },
     onMutate: async (studentIds) => {
       const keys = [...memberCacheKeys];
@@ -338,10 +366,30 @@ export function ConversationSettings({
 
   const deleteMutation = useMutation({
     mutationFn: () => api.chat.deleteConversation(conversation.id, currentUser.id),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['conversations', currentUser.id] });
+      const prevConversations = queryClient.getQueryData<Conversation[]>([
+        'conversations',
+        currentUser.id,
+      ]);
+      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
+        (old ?? []).filter((c) => c.id !== conversation.id),
+      );
+      return { prevConversations };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prevConversations) {
+        queryClient.setQueryData(['conversations', currentUser.id], ctx.prevConversations);
+      }
+      pushToast({ title: 'Не удалось удалить чат', tone: 'danger' });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
       onDeleted?.();
       onClose();
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+      void queryClient.invalidateQueries({ queryKey: ['chat-unread', currentUser.id] });
     },
   });
 

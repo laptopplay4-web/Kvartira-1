@@ -1,3 +1,4 @@
+import type { CreateConversationInput } from '@/services/api/types';
 import type {
   Conversation,
   ConversationLastMessage,
@@ -8,9 +9,74 @@ import type {
 import { formatUserName } from '@/utils';
 import { compareIsoDates } from '@/utils/dates';
 import { getAttachmentsPreviewLabel, isSyntheticMediaCaption } from './attachments';
-import { LAST_MESSAGE_PREVIEW_LENGTH, MESSAGE_SEARCH_MIN_LENGTH } from './constants';
+import { LAST_MESSAGE_PREVIEW_LENGTH, MESSAGE_SEARCH_MIN_LENGTH, SCHOOL_WIDE_CHAT_DEFAULT_TITLE } from './constants';
 import { getMessageDisplayText } from './messages';
 import { isSchoolWideConversation } from './schoolWide';
+
+export const OPTIMISTIC_CONVERSATION_ID_PREFIX = 'client-conv-';
+
+export function isOptimisticConversationId(id: string): boolean {
+  return id.startsWith(OPTIMISTIC_CONVERSATION_ID_PREFIX);
+}
+
+export function createOptimisticConversationId(): string {
+  return `${OPTIMISTIC_CONVERSATION_ID_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function buildOptimisticConversation(
+  userId: string,
+  tempId: string,
+  input: CreateConversationInput,
+  displayTitle?: string,
+): Conversation {
+  const now = new Date().toISOString();
+  const title =
+    displayTitle?.trim() ||
+    (input.type === 'personal'
+      ? 'Новый чат'
+      : input.allUsers
+        ? input.title?.trim() || SCHOOL_WIDE_CHAT_DEFAULT_TITLE
+        : input.title?.trim() || 'Новая группа');
+  const participantIds = input.allUsers
+    ? [...new Set([userId, ...(input.participantIds ?? [])])]
+    : [...new Set([userId, ...input.participantIds])];
+
+  return {
+    id: tempId,
+    type: input.type,
+    title,
+    participantIds,
+    createdAt: now,
+    updatedAt: now,
+    lastMessageAt: now,
+    unreadCount: 0,
+    pinnedMessageIds: [],
+    ...(input.avatarUrl?.trim() ? { avatarUrl: input.avatarUrl.trim() } : {}),
+    ...(input.allUsers
+      ? { metadata: { ...(input.metadata ?? {}), schoolWide: true } }
+      : input.metadata
+        ? { metadata: input.metadata }
+        : {}),
+  };
+}
+
+export function prependOptimisticConversation(
+  conversations: Conversation[],
+  optimistic: Conversation,
+  currentUserId: string,
+): Conversation[] {
+  return sortConversationsWithPins([optimistic, ...conversations], [], currentUserId);
+}
+
+export function replaceOptimisticConversationInList(
+  conversations: Conversation[],
+  tempId: string,
+  real: Conversation,
+  currentUserId: string,
+): Conversation[] {
+  const withoutTemp = conversations.filter((c) => c.id !== tempId && c.id !== real.id);
+  return sortConversationsWithPins([real, ...withoutTemp], [], currentUserId);
+}
 
 export type ChatFilter = 'all' | 'personal' | 'group' | 'school';
 

@@ -126,12 +126,29 @@ export async function resolveAssignmentGroupIdForWrite(
   }
 }
 
+/** Stay under PocketBase filter length limits on large rosters. */
+const PB_USER_ID_CHUNK = 50;
+
 async function loadMembers(memberIds: string[]): Promise<User[]> {
   if (memberIds.length === 0) return [];
   const pb = getPocketBase();
-  const filter = pbEqOr('id', memberIds);
-  const records = await pb.collection('users').getFullList({ filter });
-  const byId = new Map(records.map((r) => [r.id, mapUserRecord(r)]));
+  const unique = [...new Set(memberIds.filter(Boolean))];
+  const byId = new Map<string, User>();
+
+  for (let i = 0; i < unique.length; i += PB_USER_ID_CHUNK) {
+    const chunk = unique.slice(i, i + PB_USER_ID_CHUNK);
+    const filter = pbEqOr('id', chunk);
+    if (!filter) continue;
+    try {
+      const records = await pb.collection('users').getFullList({ filter });
+      for (const record of records) {
+        byId.set(record.id, mapUserRecord(record));
+      }
+    } catch {
+      /* skip inaccessible chunk */
+    }
+  }
+
   const members = memberIds.map((id) => byId.get(id)).filter((u): u is User => !!u);
   return resolveUsersAvatars(members);
 }
@@ -216,7 +233,7 @@ export const pocketbaseAssignmentGroupsApi: AssignmentGroupsApi = {
     });
   },
 
-  async addMember(groupId, studentId, requesterId) {
+  async addMembers(groupId, studentIds, requesterId) {
     const [user, group] = await Promise.all([
       getRequesterUser(requesterId),
       loadGroupOrThrow(groupId),
@@ -225,14 +242,18 @@ export const pocketbaseAssignmentGroupsApi: AssignmentGroupsApi = {
       throw new ApiError('Нет прав на управление группой', 'FORBIDDEN', 403);
     }
 
-    const student = await getRequesterUser(studentId);
-    if (student.role !== 'student') {
-      throw new ApiError('В группу можно добавить только ученика', 'VALIDATION_ERROR', 400);
+    const uniqueIds = [...new Set(studentIds)];
+    for (const studentId of uniqueIds) {
+      const student = await getRequesterUser(studentId);
+      if (student.role !== 'student') {
+        throw new ApiError('В группу можно добавить только ученика', 'VALIDATION_ERROR', 400);
+      }
     }
 
-    const memberIds = group.memberIds.includes(studentId)
-      ? group.memberIds
-      : [...group.memberIds, studentId];
+    const memberIds = [...group.memberIds];
+    for (const studentId of uniqueIds) {
+      if (!memberIds.includes(studentId)) memberIds.push(studentId);
+    }
 
     return withPbError(async () => {
       const pb = getPocketBase();
@@ -241,6 +262,10 @@ export const pocketbaseAssignmentGroupsApi: AssignmentGroupsApi = {
       });
       return mapAssignmentGroupRecord(record);
     });
+  },
+
+  async addMember(groupId, studentId, requesterId) {
+    return pocketbaseAssignmentGroupsApi.addMembers(groupId, [studentId], requesterId);
   },
 
   async removeMember(groupId, studentId, requesterId) {

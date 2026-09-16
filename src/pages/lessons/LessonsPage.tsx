@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, List, CalendarDays, History } from 'lucide-react';
+import { List, CalendarDays, History } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
 import { actsAsTeacher, can } from '@/permissions';
@@ -11,7 +11,6 @@ import { LessonCard } from '@/components/ui/LessonCard';
 import { LessonCardSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { BookLessonLink } from '@/components/ui/BookLessonLink';
 import { LessonCalendar } from '@/components/calendar/LessonCalendar';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { cn } from '@/utils';
@@ -91,12 +90,6 @@ export default function LessonsPage() {
               <Button variant="secondary" size="sm">График работы</Button>
             </Link>
           )}
-          {can(user, 'lessons:book') && (
-            <BookLessonLink size="sm">
-              <Plus className="h-4 w-4" aria-hidden />
-              Запись
-            </BookLessonLink>
-          )}
         </div>
       </header>
 
@@ -158,12 +151,7 @@ export default function LessonsPage() {
             <EmptyState
               icon={CalendarDays}
               title="Пока нет предстоящих занятий"
-              description="Запишитесь на удобное время"
-              action={
-                can(user, 'lessons:book') ? (
-                  <BookLessonLink>Найти занятие</BookLessonLink>
-                ) : undefined
-              }
+              description="Занятия появятся из расписания школы"
             />
           ) : null}
 

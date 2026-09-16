@@ -130,66 +130,6 @@ async function loadUserMembers(userId: string): Promise<ConversationMember[]> {
   return records.map(mapConversationMemberRecord);
 }
 
-/** Join current user into school-wide chats they are not yet in (idempotent). */
-async function ensureSchoolWideMembershipPb(userId: string, conversations: Conversation[]): Promise<void> {
-  const pb = getPocketBase();
-  const members = await loadUserMembers(userId);
-  for (const conv of conversations) {
-    if (!isSchoolWideConversation(conv)) continue;
-    if (members.some((m) => m.conversationId === conv.id && m.userId === userId)) continue;
-    try {
-      await pb.collection('conversation_members').create({
-        conversation: conv.id,
-        user: userId,
-        role: 'member',
-        muted: false,
-      });
-      if (!conv.participantIds.includes(userId)) {
-        const nextIds = [...conv.participantIds, userId];
-        await pb.collection('conversations').update(conv.id, { participantIds: nextIds });
-        conv.participantIds = nextIds;
-      }
-    } catch {
-      /* race / already member — ignore */
-    }
-  }
-}
-
-/** Join admin into every non-personal chat (idempotent). */
-async function ensureAdminGroupMembershipPb(
-  userId: string,
-  conversations: Conversation[],
-): Promise<void> {
-  const pb = getPocketBase();
-  const members = await loadUserMembers(userId);
-  for (const conv of conversations) {
-    if (conv.type === 'personal') continue;
-    if (members.some((m) => m.conversationId === conv.id && m.userId === userId)) continue;
-    try {
-      await pb.collection('conversation_members').create({
-        conversation: conv.id,
-        user: userId,
-        role: 'member',
-        muted: false,
-      });
-      if (!conv.participantIds.includes(userId)) {
-        const nextIds = [...conv.participantIds, userId];
-        await pb.collection('conversations').update(conv.id, { participantIds: nextIds });
-        conv.participantIds = nextIds;
-      }
-      members.push({
-        conversationId: conv.id,
-        userId,
-        role: 'member',
-        joinedAt: new Date().toISOString(),
-        muted: false,
-      });
-    } catch {
-      /* race / already member — ignore */
-    }
-  }
-}
-
 /**
  * PocketBase filter for messages that may count as unread for `userId`.
  * Does not load full history — only candidates after each membership lastReadAt.
@@ -332,9 +272,7 @@ async function assertConversationAccess(
   const conversation = await loadConversationOrThrow(conversationId);
   if (user.role === 'admin') {
     // Moderation / report deep-link: admin may open any chat by id (list stays membership-based).
-    if (conversation.type !== 'personal') {
-      await ensureAdminGroupMembershipPb(userId, [conversation]);
-    }
+    // Group membership for admins is ensured server-side (pb_hooks users.pb.js + kvartiraChat.js).
     const members = await loadMembers(conversationId);
     return { user, conversation, members };
   }
@@ -517,10 +455,8 @@ export const pocketbaseChatApi: ChatApi = {
         sort: '-lastMessageAt,-id',
       });
       const conversations = records.map(mapConversationRecord);
-      await ensureSchoolWideMembershipPb(userId, conversations);
-      if (user.role === 'admin') {
-        await ensureAdminGroupMembershipPb(userId, conversations);
-      }
+      // Membership ensure (school-wide, admin↔groups) runs in PocketBase hooks on user/conversation
+      // create — not on list load. Legacy gaps are backfilled when users register or chats are created.
       const userMembers = await loadUserMembers(userId);
       const accessible = conversations.filter((c) => canAccessConversation(user, c, userMembers));
       const messages = await loadMessagesForConversationEnrichment(
@@ -914,11 +850,6 @@ export const pocketbaseChatApi: ChatApi = {
             ? input.title?.trim() || SCHOOL_WIDE_CHAT_DEFAULT_TITLE
             : input.title!.trim();
 
-      const avatarRef =
-        input.type !== 'personal' && input.avatarUrl?.trim()
-          ? await persistConversationAvatar(userId, input.avatarUrl)
-          : undefined;
-
       const convRecord = await createConversationWithAvatar(
         {
           type: input.type,
@@ -930,7 +861,6 @@ export const pocketbaseChatApi: ChatApi = {
           },
           pinnedMessageIds: [],
         },
-        avatarRef,
       );
 
       // Owner first (access), then the rest in parallel — omit muted (PB bool blank issues)
@@ -954,12 +884,24 @@ export const pocketbaseChatApi: ChatApi = {
         throw new ApiError('Не удалось добавить участников', 'INTERNAL', 500);
       }
 
-      if (avatarRef) {
-        const fileId = parseStoredFileRef(avatarRef);
-        if (fileId) await linkStoredFilesToContext([fileId], convRecord.id);
-      }
+      let conv = await resolveConversationAvatar(mapConversationRecord(convRecord));
 
-      const conv = await resolveConversationAvatar(mapConversationRecord(convRecord));
+      if (input.type !== 'personal' && input.avatarUrl?.trim()) {
+        const avatarRef = await persistConversationAvatar(
+          userId,
+          input.avatarUrl,
+          undefined,
+          convRecord.id,
+        );
+        if (avatarRef) {
+          const updatedRecord = await updateConversationWithAvatar(convRecord.id, {
+            avatarUrl: avatarRef,
+          });
+          const fileId = parseStoredFileRef(avatarRef);
+          if (fileId) await linkStoredFilesToContext([fileId], convRecord.id);
+          conv = await resolveConversationAvatar(mapConversationRecord(updatedRecord));
+        }
+      }
       const members = await loadMembers(conv.id);
       chatRealtimeService.emit({ type: 'conversation.updated', conversationId: conv.id, conversation: conv });
       return enrichConversation(conv, userId, [], members);
@@ -1021,7 +963,7 @@ export const pocketbaseChatApi: ChatApi = {
     });
   },
 
-  async addMember(conversationId, userId, targetUserId) {
+  async addMembers(conversationId, userId, targetUserIds) {
     return withPbError(async () => {
       const { user, conversation, members } = await assertConversationAccess(conversationId, userId);
       if (!canAddMember(user, conversationId, members, conversation)) {
@@ -1034,30 +976,59 @@ export const pocketbaseChatApi: ChatApi = {
         throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
-      if (getConversationMember(conversationId, targetUserId, members)) {
-        throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
+      const uniqueIds = [...new Set(targetUserIds)];
+      const toAdd: string[] = [];
+      for (const targetUserId of uniqueIds) {
+        if (getConversationMember(conversationId, targetUserId, members)) continue;
+        await getRequesterUser(targetUserId);
+        toAdd.push(targetUserId);
       }
 
-      const target = await getRequesterUser(targetUserId);
+      if (uniqueIds.length > 0 && toAdd.length === 0) {
+        throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
+      }
+      if (toAdd.length === 0) return [];
+
       const pb = getPocketBase();
-      const record = await pb.collection('conversation_members').create({
-        conversation: conversationId,
-        user: targetUserId,
-        role: 'member',
-        muted: false,
-      });
+      const memberRecords = await Promise.all(
+        toAdd.map((targetUserId) =>
+          pb.collection('conversation_members').create({
+            conversation: conversationId,
+            user: targetUserId,
+            role: 'member',
+            muted: false,
+          }),
+        ),
+      );
+
+      const targets = await Promise.all(toAdd.map((id) => getRequesterUser(id)));
+      const targetNames = targets.map((t) => formatUserName(t));
+      const namesText =
+        targetNames.length === 1
+          ? targetNames[0]
+          : targetNames.length === 2
+            ? `${targetNames[0]} и ${targetNames[1]}`
+            : `${targetNames.slice(0, -1).join(', ')} и ${targetNames[targetNames.length - 1]}`;
+
       await Promise.all([
-        updateParticipantIds(conversationId, [...new Set([...conversation.participantIds, targetUserId])]),
-        createSystemMessage(conversationId, userId, `${formatUserName(user)} добавил ${formatUserName(target)}`, {
+        updateParticipantIds(conversationId, [...new Set([...conversation.participantIds, ...toAdd])]),
+        createSystemMessage(conversationId, userId, `${formatUserName(user)} добавил ${namesText}`, {
           event: 'member_added',
           actorId: userId,
-          targetUserId,
+          ...(toAdd.length === 1 ? { targetUserId: toAdd[0] } : {}),
         }),
       ]);
 
-      chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
-      return mapConversationMemberRecord(record);
+      for (const targetUserId of toAdd) {
+        chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
+      }
+      return memberRecords.map(mapConversationMemberRecord);
     });
+  },
+
+  async addMember(conversationId, userId, targetUserId) {
+    const [member] = await pocketbaseChatApi.addMembers(conversationId, userId, [targetUserId]);
+    return member;
   },
 
   async removeMember(conversationId, userId, targetUserId) {

@@ -290,6 +290,39 @@ function ensureMemberInConversation(app, conversationId, userId) {
 }
 
 /**
+ * After a school-wide chat is created — every user becomes a member.
+ *
+ * @param {core.App} app
+ * @param {core.Record} conversationRecord
+ */
+function joinAllUsersToSchoolWideConversation(app, conversationRecord) {
+  if (!conversationRecord || !isSchoolWideMetadata(conversationRecord.get('metadata'))) return;
+
+  const convId = String(conversationRecord.id);
+
+  try {
+    /** @type {core.Record[]} */
+    let users = [];
+    try {
+      users = app.findRecordsByFilter('users', '', '-id', 5000, 0) || [];
+    } catch (_) {
+      users = [];
+    }
+    if (!Array.isArray(users)) users = [];
+
+    for (const user of users) {
+      try {
+        ensureMemberInConversation(app, convId, String(user.id));
+      } catch (err) {
+        console.error('joinAllUsersToSchoolWideConversation user', err);
+      }
+    }
+  } catch (err) {
+    console.error('joinAllUsersToSchoolWideConversation', err);
+  }
+}
+
+/**
  * After a group chat is created — every admin becomes a member.
  *
  * @param {core.App} app
@@ -410,6 +443,7 @@ module.exports = {
   syncConversationLastMessage,
   syncReadReceipts,
   joinUserToSchoolWideChats,
+  joinAllUsersToSchoolWideConversation,
   joinAdminsToGroupConversation,
   joinAdminToAllGroupChats,
   assertConversationPinUpdate,

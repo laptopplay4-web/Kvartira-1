@@ -670,7 +670,7 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       return db.conversationMembers.filter((m) => m.conversationId === conversationId);
     },
 
-    async addMember(conversationId, userId, targetUserId) {
+    async addMembers(conversationId, userId, targetUserIds) {
       await delay(80);
       const user = getUserById(userId);
       assertConversationAccess(conversationId, userId);
@@ -686,32 +686,51 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
-      getUserById(targetUserId);
-      if (getConversationMember(conversationId, targetUserId, db.conversationMembers)) {
+      const uniqueIds = [...new Set(targetUserIds)];
+      const toAdd = uniqueIds.filter((targetUserId) => {
+        getUserById(targetUserId);
+        return !getConversationMember(conversationId, targetUserId, db.conversationMembers);
+      });
+
+      if (uniqueIds.length > 0 && toAdd.length === 0) {
         throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
       }
+      if (toAdd.length === 0) return [];
 
       const now = new Date().toISOString();
-      const member: ConversationMember = {
+      const members: ConversationMember[] = toAdd.map((targetUserId) => ({
         conversationId,
         userId: targetUserId,
         role: 'member',
         joinedAt: now,
         muted: false,
-      };
-      db.conversationMembers.push(member);
-      conv.participantIds = [...new Set([...conv.participantIds, targetUserId])];
+      }));
+      db.conversationMembers.push(...members);
+      conv.participantIds = [...new Set([...conv.participantIds, ...toAdd])];
 
-      const target = getUserById(targetUserId);
       const actor = getUserById(userId);
-      const sysMsg = createSystemMessage(conv.id, `${formatUserName(actor)} добавил ${formatUserName(target)}`, {
+      const targetNames = toAdd.map((id) => formatUserName(getUserById(id)));
+      const namesText =
+        targetNames.length === 1
+          ? targetNames[0]
+          : targetNames.length === 2
+            ? `${targetNames[0]} и ${targetNames[1]}`
+            : `${targetNames.slice(0, -1).join(', ')} и ${targetNames[targetNames.length - 1]}`;
+      const sysMsg = createSystemMessage(conv.id, `${formatUserName(actor)} добавил ${namesText}`, {
         event: 'member_added',
         actorId: userId,
-        targetUserId,
+        ...(toAdd.length === 1 ? { targetUserId: toAdd[0] } : {}),
       });
       db.messages.push(sysMsg);
 
-      chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
+      for (const targetUserId of toAdd) {
+        chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
+      }
+      return members;
+    },
+
+    async addMember(conversationId, userId, targetUserId) {
+      const [member] = await api.addMembers(conversationId, userId, [targetUserId]);
       return member;
     },
 

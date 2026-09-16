@@ -14,6 +14,7 @@ import {
   collectStoredFileIds,
   linkStoredFilesToContext,
   resolveAssignment,
+  resolveAssignments,
   uploadStoredFile,
 } from '@/services/api/pocketbase/files';
 import { resolveAssignmentGroupIdForWrite } from '@/services/api/pocketbase/groups';
@@ -42,7 +43,7 @@ export const pocketbaseAssignmentsApi: AssignmentsApi = {
         list = list.filter((a) => a.teacherId === filters.teacherId);
       }
 
-      const resolved = await Promise.all(list.map(resolveAssignment));
+      const resolved = await resolveAssignments(list);
       return sortAssignmentsByDate(resolved);
     });
   },

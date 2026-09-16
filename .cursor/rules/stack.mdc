@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.175 Full app responsiveness (optimistic + prefetch + RUM) · 2026-09-16
+Версия: 1.176 YClients ground + online opt rewrite · 2026-09-16
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -276,7 +276,7 @@ kvartira/
 | `/` | Landing | GuestRoute |
 | `/login`, `/register`, `/forgot-password`, `/reset-password` | Auth | GuestRoute |
 | `/home` | Dashboard (admin = teacher UI) | Protected |
-| `/lessons`, `/lessons/book`, `/lessons/availability`, `/lessons/:id` | Занятия (+ график работы teacher/admin) | Protected |
+| `/lessons`, `/lessons/book` (redirect → `/lessons`), `/lessons/availability`, `/lessons/:id` | Занятия / календарь (+ график teacher/admin); запись через YClients | Protected |
 | `/chat`, `/chat/:id` | Чат | Protected |
 | `/events`, `/events/:id` | Мероприятия | Protected |
 | `/profile`, `/profile/settings/account`, `/profile/settings/system`, `/profile/settings/security` | Профиль / настройки (вкладки) | Protected |
@@ -317,7 +317,7 @@ Lesson ← getLessons({ from, to, requesterId }) ← LessonCalendar (day/week/mo
                     LessonDetailPage (/lessons/:id)
 ```
 
-- Календарь показывает **занятия**, не свободные слоты (слоты — только в `/lessons/book`).
+- Календарь показывает **занятия**, не свободные слоты (in-app booking убран — YClients; слоты/`bookLesson` остаются в API/mock для тестов).
 - Teacher day view: рабочие часы + перерывы из `TeacherAvailability`.
 - Query keys: `['lessons', 'calendar', …]`; invalidation через `['lessons']` после book/reschedule/cancel.
 - Admin `/admin/schedule`: фильтры teacher/direction/date/status + календарь.
@@ -438,7 +438,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back + outline style (6 tests) |
 | `routes.test.ts` | основные маршруты (+ `/assignments/create`) |
 | `routes.test.tsx` | admin shell: redirect, AppLayout, nav links, student block, shared users cache, EmptyState, role toggle (13 tests) |
-| `offline.test.tsx` | BookLessonLink offline; AvailabilityPage save disabled offline (4 tests) |
+| `offline.test.tsx` | AvailabilityPage save disabled offline (2 tests) |
 | `assignments.test.ts` | access, manage, groups CRUD/delete, create/update/delete IDOR, member helpers, content validation, home helpers (36 tests) |
 | `progress.test.ts` | access, helpers, summary, achievements, auto-unlock, teacher goals/skills CRUD, attendance (32 tests) |
 | `support.test.ts` | access, FAQ filter/CRUD, validation, tickets search/filters, attachments, IDOR, admin inbox, report copy/deep-link, notifications, permissions |
@@ -466,7 +466,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 | `responsiveness.test.ts` | optimistic helper, nav prefetch, web-vitals behind analytics consent (6 tests) |
 
-**Итого:** 733 passed (49 files); booking cancel past-slot flake вне scope.
+**Итого:** 744 passed (50 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -1428,10 +1428,10 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 |------|----------|
 | MVP + этап 2 (mock) | ✅ |
 | Текущая фаза | **6** — Deploy; параллельно Figma Q&A (§126) |
-| Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy; на сервере подключить `deploy/static-cache.conf` |
+| Следующий шаг | Deploy: миграция `1792500000_*` + `yclients.pb.js` + фронт; live YClients credentials; или Figma §126 |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **733** (49 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §175 responsiveness |
+| Тесты | **744** (50 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §176 YClients ground |
 | Graphify | CLI недоступен в cloud env; last known 2879 nodes, 3193 edges, 440 communities — обновить локально `graphify update .` |
 
 ### Фазы (кратко)
@@ -1454,7 +1454,53 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2879 nodes, 3193 edges, 440 communities (post-§174; §175 — graphify CLI missing in cloud, re-run locally).
+**Graphify stats:** 2879 nodes, 3193 edges, 440 communities (post-§174; §175–§176 — graphify CLI missing in cloud, re-run locally).
+
+---
+
+## 176. YClients ground + online opt rewrite (2026-09-16)
+
+**Scope:** убрать in-app booking; почва под YClients; batch members + server ensure; N+1 reads; create-chat optimistic; forms + vite chunks. Без offline-first.
+
+**Graphify:** `YClientsSyncPort` → `NullYClientsSync`; `addMembers` → ConversationSettings / AssignmentGroupDetail; `presentPbEvents` / `resolveAssignments`; `useCreateConversation` optimistic `client-conv-*`.
+
+### Phase 0 — no in-app book (✅)
+
+- CTA «Записаться» убраны (Home / Lessons / DayView); `/lessons/book` → Navigate `/lessons`.
+- `BookLessonLink` удалён; FAQ seed про YClients.
+- `LessonsApi.bookLesson` + тесты booking сохранены (deprecated в types).
+
+### Phase 1 — YClients foundation (✅)
+
+- Миграция `1792500000_*`: `externalSource`/`externalId` на lessons + users; `idx_lessons_external`.
+- `src/services/integrations/yclients/` — port + Null stub.
+- PB webhook stub `POST /api/kvartira/yclients/webhook` + `docs/YCLIENTS.md` + env.
+
+### Phase 2 — chat batch + server ensure (✅)
+
+- `addMembers` (chat + assignment groups); UI один вызов.
+- `getConversations` без serial ensure; school-wide join на create conversation hook.
+
+### Phase 3 — N+1 (✅)
+
+- Batch file/user resolve: assignments, support, events list, groups members.
+
+### Phase 4 — create chat (✅)
+
+- Optimistic list row `client-conv-*` (не route); navigate только на real id; PB avatar after create.
+
+### Phase 5 — polish (✅)
+
+- Optimistic rename/delete chat, role toggle, assignment/group delete.
+- Vite `manualChunks` react/query; CDN checklist в `PRODUCTION_READINESS.md`.
+
+### Tests
+
+`yclientsSync` +3; schema/adapter/chat/assignments; suite **744** (50 files). typecheck ✅.
+
+### Deploy
+
+Миграция `1792500000_*` + `pb_hooks` (`yclients.pb.js`, `kvartiraYclients.js`, chat ensure) + фронт; **перезапуск PocketBase**. Live YClients — после credentials.
 
 ---
 

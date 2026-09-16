@@ -3,8 +3,12 @@ import { mockChatApi, resetMockDatabase } from '@/services/api/mock';
 import { ApiError } from '@/services/api/types';
 import {
   bumpConversationInList,
+  buildOptimisticConversation,
   filterConversations,
+  isOptimisticConversationId,
   orderPinnedMessagesNewestFirst,
+  prependOptimisticConversation,
+  replaceOptimisticConversationInList,
   resolvePinnedIndexForViewport,
   sortConversationsWithPins,
 } from '@/services/chat/helpers';
@@ -880,6 +884,70 @@ describe('message reactions and forward', () => {
     expect(bumped.find((c) => c.id === 'cold')?.unreadCount).toBe(1);
   });
 
+  it('isOptimisticConversationId detects client temp ids only', () => {
+    expect(isOptimisticConversationId('client-conv-123-abc')).toBe(true);
+    expect(isOptimisticConversationId('conv-1')).toBe(false);
+    expect(isOptimisticConversationId('client-msg-1')).toBe(false);
+  });
+
+  it('prependOptimisticConversation adds temp row without replacing existing', () => {
+    const existing: Conversation = {
+      id: 'conv-old',
+      type: 'group',
+      title: 'Old',
+      participantIds: ['u1', 'u2'],
+      createdAt: '2026-01-01T10:00:00.000Z',
+      updatedAt: '2026-01-01T10:00:00.000Z',
+      lastMessageAt: '2026-01-01T10:00:00.000Z',
+      unreadCount: 0,
+    };
+    const tempId = 'client-conv-temp';
+    const optimistic = buildOptimisticConversation(
+      'u1',
+      tempId,
+      { type: 'group', title: 'New group', participantIds: ['u2'] },
+      'New group',
+    );
+    const next = prependOptimisticConversation([existing], optimistic, 'u1');
+    expect(next.map((c) => c.id)).toEqual([tempId, 'conv-old']);
+    expect(next[0]?.title).toBe('New group');
+  });
+
+  it('replaceOptimisticConversationInList swaps temp for real conversation', () => {
+    const tempId = 'client-conv-temp';
+    const list: Conversation[] = [
+      buildOptimisticConversation(
+        'u1',
+        tempId,
+        { type: 'group', title: 'Pending', participantIds: ['u2'] },
+        'Pending',
+      ),
+      {
+        id: 'conv-other',
+        type: 'personal',
+        title: 'Other',
+        participantIds: ['u1', 'u3'],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T09:00:00.000Z',
+        lastMessageAt: '2026-01-01T09:00:00.000Z',
+        unreadCount: 0,
+      },
+    ];
+    const real: Conversation = {
+      id: 'conv-real',
+      type: 'group',
+      title: 'Ready',
+      participantIds: ['u1', 'u2'],
+      createdAt: '2026-01-01T16:00:00.000Z',
+      updatedAt: '2026-01-01T16:00:00.000Z',
+      lastMessageAt: '2026-01-01T16:00:00.000Z',
+      unreadCount: 0,
+    };
+    const next = replaceOptimisticConversationInList(list, tempId, real, 'u1');
+    expect(next.map((c) => c.id)).toEqual(['conv-real', 'conv-other']);
+    expect(next.find((c) => c.id === tempId)).toBeUndefined();
+  });
+
   it('bumpConversationInList ignores stale older timestamps', () => {
     const list: Conversation[] = [
       {
@@ -1007,6 +1075,36 @@ describe('group management', () => {
     await mockChatApi.addMember(conv.id, 'user-teacher-1', 'user-student-2');
     const members = await mockChatApi.getMembers(conv.id, 'user-teacher-1');
     expect(members.some((m) => m.userId === 'user-student-2')).toBe(true);
+  });
+
+  it('teacher can add multiple members in one batch', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Тест batch',
+      participantIds: ['user-student'],
+    });
+    const added = await mockChatApi.addMembers(conv.id, 'user-teacher-1', [
+      'user-student-2',
+      'user-teacher-2',
+    ]);
+    expect(added).toHaveLength(2);
+    const members = await mockChatApi.getMembers(conv.id, 'user-teacher-1');
+    expect(members.some((m) => m.userId === 'user-student-2')).toBe(true);
+    expect(members.some((m) => m.userId === 'user-teacher-2')).toBe(true);
+    const { messages } = await mockChatApi.getMessages(conv.id, 'user-teacher-1', { limit: 5 });
+    const systemMsg = messages.find((m) => m.messageType === 'system' && m.metadata?.system?.event === 'member_added');
+    expect(systemMsg?.text).toContain('и');
+  });
+
+  it('addMembers rejects when all targets are already members', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Тест dup',
+      participantIds: ['user-student', 'user-student-2'],
+    });
+    await expect(
+      mockChatApi.addMembers(conv.id, 'user-teacher-1', ['user-student-2']),
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
   });
 
   it('student cannot add member', async () => {

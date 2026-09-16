@@ -1,5 +1,7 @@
 export type UserRole = 'student' | 'teacher' | 'admin';
 
+export type ExternalSource = 'yclients';
+
 export interface User {
   id: string;
   phone: string;
@@ -11,6 +13,9 @@ export interface User {
   bio?: string;
   /** Направления обучения (ученик) или преподавания (teacher). */
   directionIds?: string[];
+  /** Внешний id в системе записи (YClients client/staff). */
+  externalSource?: ExternalSource;
+  externalId?: string;
 }
 
 export type LessonStatus =
@@ -82,6 +87,9 @@ export interface Lesson {
   materials?: LessonMaterial[];
   teacherNotes?: string;
   cancelReason?: string;
+  /** Источник внешней синхронизации (YClients). */
+  externalSource?: ExternalSource;
+  externalId?: string;
   createdAt: string;
   updatedAt: string;
 }

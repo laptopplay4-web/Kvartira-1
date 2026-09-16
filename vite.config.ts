@@ -115,6 +115,25 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: { '@': path.resolve(__dirname, './src') },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/react-router/')
+            ) {
+              return 'react-vendor';
+            }
+            if (id.includes('/@tanstack/react-query/')) {
+              return 'query-vendor';
+            }
+          },
+        },
+      },
+    },
     test: {
       globals: true,
       environment: 'jsdom',

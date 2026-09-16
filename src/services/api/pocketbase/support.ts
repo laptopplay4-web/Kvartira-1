@@ -17,11 +17,13 @@ import {
   mapSupportTicketRecord,
   mapUserRecord,
 } from '@/services/api/pocketbase/mappers';
-import { escapePbFilter } from '@/services/api/pocketbase/helpers';
+import { escapePbFilter, pbEqOr } from '@/services/api/pocketbase/helpers';
 import {
   collectStoredFileIds,
   linkStoredFilesToContext,
   resolveSupportTicket,
+  resolveSupportTickets,
+  resolveUsersAvatars,
   uploadStoredFile,
 } from '@/services/api/pocketbase/files';
 import {
@@ -167,11 +169,11 @@ async function loadReportSources(
 
   if (conversation?.type === 'personal' && conversation.participantIds.length) {
     try {
-      const filter = conversation.participantIds
-        .map((id) => `id = "${escapePbFilter(id)}"`)
-        .join(' || ');
-      const records = await pb.collection('users').getFullList({ filter });
-      users = records.map((r) => mapUserRecord(r));
+      const filter = pbEqOr('id', conversation.participantIds);
+      if (filter) {
+        const records = await pb.collection('users').getFullList({ filter });
+        users = await resolveUsersAvatars(records.map((r) => mapUserRecord(r)));
+      }
     } catch {
       users = [];
     }
@@ -240,7 +242,7 @@ export const pocketbaseSupportApi: SupportApi = {
         .filter((ticket) => canViewTicket(user, ticket));
       list = filterTickets(list, { status: filters.status, category: filters.category });
       list = searchTickets(list, filters.query ?? '');
-      const resolved = await Promise.all(list.map(resolveSupportTicket));
+      const resolved = await resolveSupportTickets(list);
       const enriched = await Promise.all(
         resolved.map((ticket) => enrichTicketReport(ticket, filters.requesterId)),
       );

@@ -149,12 +149,12 @@ export const pocketbaseLegalApi: LegalApi = {
       const user = await getRequesterUser(requesterId);
       assertAcceptAccess(requesterId, user);
 
-      const results: UserConsent[] = [];
-      for (const documentId of documentIds) {
-        const document = await loadDocumentOrThrow(documentId);
-        if (!document.requiresConsent) continue;
-        results.push(await createConsentRecord(document, requesterId, options));
-      }
+      const documents = await Promise.all(documentIds.map((documentId) => loadDocumentOrThrow(documentId)));
+      const results = await Promise.all(
+        documents
+          .filter((document) => document.requiresConsent)
+          .map((document) => createConsentRecord(document, requesterId, options)),
+      );
       return results;
     });
   },

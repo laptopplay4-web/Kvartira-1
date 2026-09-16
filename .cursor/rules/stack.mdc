@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.174 Chat list load speed (unread candidates + batch files) · 2026-09-13
+Версия: 1.175 Full app responsiveness (optimistic + prefetch + RUM) · 2026-09-16
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -464,8 +464,9 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `authSessionStorage.test.ts` | sanitize persisted session/user, invalid role rejection (4 tests) |
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
+| `responsiveness.test.ts` | optimistic helper, nav prefetch, web-vitals behind analytics consent (6 tests) |
 
-**Итого:** 716 passed (48 files); booking cancel past-slot flake вне scope.
+**Итого:** 733 passed (49 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -617,6 +618,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Admin help inbox + report message UX | ✅ 2026-09-13, см. §172 |
 | StudentPicker Все/Направления + count | ✅ 2026-09-13, см. §173 |
 | Chat list load speed (unread + batch files) | ✅ 2026-09-13, см. §174 |
+| Full app responsiveness (10 measures) | ✅ 2026-09-16, см. §175 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1426,11 +1428,11 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 |------|----------|
 | MVP + этап 2 (mock) | ✅ |
 | Текущая фаза | **6** — Deploy; параллельно Figma Q&A (§126) |
-| Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
+| Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy; на сервере подключить `deploy/static-cache.conf` |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **727** (48 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §174 chat load |
-| Graphify | 2879 nodes, 3193 edges, 440 communities |
+| Тесты | **733** (49 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §175 responsiveness |
+| Graphify | CLI недоступен в cloud env; last known 2879 nodes, 3193 edges, 440 communities — обновить локально `graphify update .` |
 
 ### Фазы (кратко)
 
@@ -1452,7 +1454,33 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2879 nodes, 3193 edges, 440 communities (post-§174).
+**Graphify stats:** 2879 nodes, 3193 edges, 440 communities (post-§174; §175 — graphify CLI missing in cloud, re-run locally).
+
+---
+
+## 175. Full app responsiveness (2026-09-16)
+
+**Scope:** все 10 отраслевых мер отклика там, где был пробел; логика/RBAC без изменений.
+
+**Graphify:** `optimisticMutation` → ConversationSettings / AssignmentGroupDetail / EventDetail / SecurityPage / ChatPage; `prefetchRouteData` → BottomNav / SidebarNav / MobileHeader; `startWebVitals` → analytics consent; slim `addMember`/`bookLesson`/`forwardMessage`.
+
+### Done (✅)
+
+1. Optimistic UI: chat/ДЗ members, event register/unregister, security revoke, reactions/pin messages; helper `src/utils/optimisticMutation.ts`.
+2. Fewer round-trips: slim PB add/remove member; parallel createConversation validate; slim book/reschedule (one availability+lessons pass); parallel markAllAsRead / acceptDocuments / revokeAllOtherSessions / forwardMessage / multi-add.
+3. Prefetch shell routes on pointer/focus (`src/services/nav/prefetch.ts`).
+4. Cache: setQueryData after assignment save (+ events already §168).
+5. Skeleton / realtime / non-blocking auth-push — без регрессий (уже были).
+6. Deploy: `deploy/static-cache.conf` + docs note.
+7. RUM: `web-vitals` only after analytics cookie consent.
+
+### Tests
+
+`responsiveness.test.ts` +6; suite **733** (49 files). typecheck ✅.
+
+### Deploy
+
+Фронт + подключить nginx `static-cache.conf`; перезапуск PB не обязателен (без новых hooks/миграций).
 
 ---
 

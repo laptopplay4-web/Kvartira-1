@@ -77,6 +77,7 @@ import {
   MESSAGE_MAX_LENGTH,
   MESSAGE_PAGE_SIZE,
   MESSAGE_SEARCH_MIN_LENGTH,
+  PINNED_MESSAGES_LIMIT,
   SCHOOL_WIDE_CHAT_DEFAULT_TITLE,
 } from '@/services/chat/constants';
 import { detectAttachmentType, validateAttachment, validateMessageContent } from '@/services/chat/validation';
@@ -93,7 +94,6 @@ import type {
   User,
 } from '@/types';
 
-const PINNED_MESSAGES_LIMIT = 5;
 const openConversations = new Map<string, string>();
 
 function uid(prefix: string): string {
@@ -895,10 +895,11 @@ export const pocketbaseChatApi: ChatApi = {
       // Auto-added admins: skip getOne (same RBAC risk); membership created below / by hook.
       if (!input.allUsers) {
         const skipValidate = new Set(autoAdminIds);
-        for (const participantId of uniqueParticipants) {
-          if (skipValidate.has(participantId)) continue;
-          await getRequesterUser(participantId);
-        }
+        await Promise.all(
+          uniqueParticipants
+            .filter((participantId) => !skipValidate.has(participantId))
+            .map((participantId) => getRequesterUser(participantId)),
+        );
       }
 
       const otherId = uniqueParticipants.find((id) => id !== userId);
@@ -1033,11 +1034,11 @@ export const pocketbaseChatApi: ChatApi = {
         throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
-      await getRequesterUser(targetUserId);
       if (getConversationMember(conversationId, targetUserId, members)) {
         throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
       }
 
+      const target = await getRequesterUser(targetUserId);
       const pb = getPocketBase();
       const record = await pb.collection('conversation_members').create({
         conversation: conversationId,
@@ -1045,14 +1046,14 @@ export const pocketbaseChatApi: ChatApi = {
         role: 'member',
         muted: false,
       });
-      await updateParticipantIds(conversationId, [...new Set([...conversation.participantIds, targetUserId])]);
-
-      const target = await getRequesterUser(targetUserId);
-      await createSystemMessage(conversationId, userId, `${formatUserName(user)} добавил ${formatUserName(target)}`, {
-        event: 'member_added',
-        actorId: userId,
-        targetUserId,
-      });
+      await Promise.all([
+        updateParticipantIds(conversationId, [...new Set([...conversation.participantIds, targetUserId])]),
+        createSystemMessage(conversationId, userId, `${formatUserName(user)} добавил ${formatUserName(target)}`, {
+          event: 'member_added',
+          actorId: userId,
+          targetUserId,
+        }),
+      ]);
 
       chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
       return mapConversationMemberRecord(record);
@@ -1069,20 +1070,24 @@ export const pocketbaseChatApi: ChatApi = {
         throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
-      const pb = getPocketBase();
-      const targetRecord = await findMemberRecord(conversationId, targetUserId);
-      if (targetRecord) await pb.collection('conversation_members').delete(targetRecord.id);
-      await updateParticipantIds(
-        conversationId,
-        conversation.participantIds.filter((id) => id !== targetUserId),
-      );
-
-      const target = await getRequesterUser(targetUserId);
-      await createSystemMessage(conversationId, userId, `${formatUserName(user)} удалил ${formatUserName(target)}`, {
-        event: 'member_removed',
-        actorId: userId,
-        targetUserId,
-      });
+      const [target, targetRecord] = await Promise.all([
+        getRequesterUser(targetUserId),
+        findMemberRecord(conversationId, targetUserId),
+      ]);
+      if (targetRecord) {
+        await getPocketBase().collection('conversation_members').delete(targetRecord.id);
+      }
+      await Promise.all([
+        updateParticipantIds(
+          conversationId,
+          conversation.participantIds.filter((id) => id !== targetUserId),
+        ),
+        createSystemMessage(conversationId, userId, `${formatUserName(user)} удалил ${formatUserName(target)}`, {
+          event: 'member_removed',
+          actorId: userId,
+          targetUserId,
+        }),
+      ]);
 
       chatRealtimeService.emit({ type: 'member.left', conversationId, userId: targetUserId });
     });
@@ -1263,13 +1268,13 @@ export const pocketbaseChatApi: ChatApi = {
       await assertConversationAccess(sourceConversationId, userId);
       const source = await pocketbaseChatApi.getMessage(sourceConversationId, messageId, userId);
       if (source.deletedAt) throw new ApiError('Сообщение удалено', 'NOT_FOUND', 404);
-      const created: Message[] = [];
-      for (const targetId of targetConversationIds) {
-        const forwarded = await pocketbaseChatApi.sendMessage(targetId, userId, source.text, {
-          attachments: source.attachments,
-        });
-        created.push(forwarded);
-      }
+      const created = await Promise.all(
+        targetConversationIds.map((targetId) =>
+          pocketbaseChatApi.sendMessage(targetId, userId, source.text, {
+            attachments: source.attachments,
+          }),
+        ),
+      );
       return created;
     });
   },

@@ -195,11 +195,11 @@ export const pocketbaseSecurityApi: SecurityApi = {
       });
       const sessions = await mapSessionsForViewer(records, currentToken);
 
-      for (const session of sessions) {
-        if (!session.isCurrent) {
-          await pb.collection('security_sessions').delete(session.id);
-        }
-      }
+      await Promise.all(
+        sessions.filter((session) => !session.isCurrent).map((session) =>
+          pb.collection('security_sessions').delete(session.id),
+        ),
+      );
     });
   },
 

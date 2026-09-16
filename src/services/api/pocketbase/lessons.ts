@@ -370,284 +370,154 @@ export const pocketbaseLessonsApi: LessonsApi = {
 
 
   async bookLesson(input, studentId) {
-
     return withPbError(async () => {
-
-      const availability = await getPocketBaseAvailability(input.teacherId);
-
+      const [availability, existingLessons] = await Promise.all([
+        getPocketBaseAvailability(input.teacherId),
+        loadTeacherLessons(input.teacherId),
+      ]);
       if (!availability) {
-
         throw new ApiError('Преподаватель недоступен', 'NOT_FOUND', 404);
-
       }
-
-
 
       const duration = input.durationMinutes ?? availability.defaultLessonDurationMinutes;
-
-      const slots = await pocketbaseLessonsApi.getAvailableSlots({
-
-        teacherId: input.teacherId,
-
+      const slots = calculateAvailableSlots({
+        availability,
+        existingLessons,
         date: input.date,
-
-        durationMinutes: duration,
-
+        dayOfWeek: getDayOfWeekFromDate(input.date),
+        lessonDurationMinutes: duration,
       });
-
-
 
       if (!slots.some((slot) => slot.startTime === input.startTime)) {
-
         throw new ApiError(
-
           'Этот слот уже занят. Выберите другое время.',
-
           'SLOT_UNAVAILABLE',
-
           409,
-
         );
-
       }
-
-
-
-      const existingLessons = await loadTeacherLessons(input.teacherId);
 
       if (
-
         slotsConflict(
-
           existingLessons,
-
           input.teacherId,
-
           input.date,
-
           input.startTime,
-
           duration,
-
         )
-
       ) {
-
         throw new ApiError(
-
           'Этот слот уже занят. Выберите другое время.',
-
           'SLOT_CONFLICT',
-
           409,
-
         );
-
       }
 
-
-
       const pb = getPocketBase();
-
       const record = await pb.collection('lessons').create({
-
         student: studentId,
-
         teacher: input.teacherId,
-
         direction: input.directionId,
-
         date: input.date,
-
         startTime: input.startTime,
-
         durationMinutes: duration,
-
         status: 'scheduled',
-
         location: 'Студия',
-
         materials: [],
-
         teacherNotes: '',
-
         cancelReason: '',
-
       });
-
-
 
       const lesson = mapLessonRecord(record);
 
-
-
       await createHistoryEntry(lesson.id, 'created', studentId, {
-
         newDate: lesson.date,
-
         newStartTime: lesson.startTime,
-
       });
-
-
 
       return lesson;
-
     });
-
   },
 
-
-
   async rescheduleLesson(id, input, userId) {
-
     return withPbError(async () => {
-
       const pb = getPocketBase();
-
-      const existing = await pb.collection('lessons').getOne(id);
-
+      const [existing, user] = await Promise.all([
+        pb.collection('lessons').getOne(id),
+        getRequesterUser(userId),
+      ]);
       const lesson = mapLessonRecord(existing);
 
-      const user = await getRequesterUser(userId);
-
-
-
       if (!canRescheduleLesson(user, lesson)) {
-
         throw new ApiError('Нет прав на перенос занятия', 'FORBIDDEN', 403);
-
       }
-
-
 
       if (lesson.status === 'cancelled' || lesson.status === 'completed') {
-
         throw new ApiError('Нельзя перенести это занятие', 'INVALID_STATUS', 400);
-
       }
 
-
-
-      const availability = await getPocketBaseAvailability(lesson.teacherId);
-
+      const [availability, existingLessons] = await Promise.all([
+        getPocketBaseAvailability(lesson.teacherId),
+        loadTeacherLessons(lesson.teacherId),
+      ]);
       if (!availability) {
-
         throw new ApiError('Преподаватель недоступен', 'NOT_FOUND', 404);
-
       }
 
-
-
-      const slots = await pocketbaseLessonsApi.getAvailableSlots({
-
-        teacherId: lesson.teacherId,
-
+      const slots = calculateAvailableSlots({
+        availability,
+        existingLessons,
         date: input.date,
-
-        durationMinutes: lesson.durationMinutes,
-
+        dayOfWeek: getDayOfWeekFromDate(input.date),
+        lessonDurationMinutes: lesson.durationMinutes,
         excludeLessonId: id,
-
       });
-
-
 
       if (!slots.some((slot) => slot.startTime === input.startTime)) {
-
         throw new ApiError(
-
           'Это время больше недоступно. Выберите другое.',
-
           'SLOT_UNAVAILABLE',
-
           409,
-
         );
-
       }
-
-
-
-      const existingLessons = await loadTeacherLessons(lesson.teacherId);
 
       if (
-
         slotsConflict(
-
           existingLessons,
-
           lesson.teacherId,
-
           input.date,
-
           input.startTime,
-
           lesson.durationMinutes,
-
           id,
-
         )
-
       ) {
-
         throw new ApiError(
-
           'Это время больше недоступно. Выберите другое.',
-
           'SLOT_CONFLICT',
-
           409,
-
         );
-
       }
 
-
-
       const prevDate = lesson.date;
-
       const prevTime = lesson.startTime;
 
-
-
       const record = await pb.collection('lessons').update(id, {
-
         date: input.date,
-
         startTime: input.startTime,
-
         status: 'rescheduled',
-
       });
-
-
 
       const updated = mapLessonRecord(record);
 
-
-
       await createHistoryEntry(id, 'rescheduled', userId, {
-
         previousDate: prevDate,
-
         previousStartTime: prevTime,
-
         newDate: input.date,
-
         newStartTime: input.startTime,
-
       });
 
-
-
       return updated;
-
     });
-
   },
-
-
 
   async cancelLesson(id, userId, reason) {
 

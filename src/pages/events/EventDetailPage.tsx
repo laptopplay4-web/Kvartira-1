@@ -24,12 +24,18 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useToast } from '@/components/ui/Toast';
 import { CompetitionApplicationModal } from '@/components/events/CompetitionApplicationModal';
 import { EventFormModal } from '@/components/events/EventFormModal';
 import { EventParticipantsSheet } from '@/components/events/EventParticipantsSheet';
 import { EventParticipationDeltaBadges } from '@/components/events/EventParticipationDeltaBadges';
 import { formatFullDate } from '@/utils/dates';
-import type { CompetitionApplication, EventType } from '@/types';
+import {
+  invalidateQueryKeys,
+  restoreQuerySnapshots,
+  snapshotQueries,
+} from '@/utils/optimisticMutation';
+import type { CompetitionApplication, EventType, SchoolEvent } from '@/types';
 
 const EVENT_CTA: Record<EventType, string> = {
   concert: 'Участвовать',
@@ -43,6 +49,7 @@ export default function EventDetailPage() {
   const user = useCurrentUser()!;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { pushToast } = useToast();
   const isOnline = useOnlineStatus();
   const canManage = canManageEvents(user);
   const canRegister = canRegisterForEvents(user);
@@ -92,31 +99,127 @@ export default function EventDetailPage() {
   const registerMutation = useMutation({
     mutationFn: (application?: CompetitionApplication) =>
       api.events.register(id!, user.id, application),
-    onSuccess: (updated) => {
+    onMutate: async () => {
+      const keys = [
+        ['event', id] as const,
+        ['events', user.id] as const,
+      ];
+      const snapshots = await snapshotQueries(queryClient, keys);
+      queryClient.setQueryData<SchoolEvent>(['event', id], (old) => {
+        if (!old || isUserRegisteredForEvent(old, user.id)) return old;
+        const registeredUserIds = old.registeredUserIds.includes(user.id)
+          ? old.registeredUserIds
+          : [...old.registeredUserIds, user.id];
+        return {
+          ...old,
+          registeredUserIds,
+          registeredCount: getEventRegisteredCount(old) + 1,
+          isRegistered: true,
+        };
+      });
+      queryClient.setQueryData<SchoolEvent[]>(['events', user.id], (old) =>
+        (old ?? []).map((e) => {
+          if (e.id !== id || isUserRegisteredForEvent(e, user.id)) return e;
+          const registeredUserIds = e.registeredUserIds.includes(user.id)
+            ? e.registeredUserIds
+            : [...e.registeredUserIds, user.id];
+          return {
+            ...e,
+            registeredUserIds,
+            registeredCount: getEventRegisteredCount(e) + 1,
+            isRegistered: true,
+          };
+        }),
+      );
       setApplicationOpen(false);
       setApplicationError('');
-      queryClient.setQueryData(['event', id], updated);
-      void queryClient.invalidateQueries({ queryKey: ['event', id] });
-      void queryClient.invalidateQueries({ queryKey: ['event-registration', id, user.id] });
-      void queryClient.invalidateQueries({ queryKey: ['events', user.id] });
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      void queryClient.invalidateQueries({ queryKey: ['event-participants', id] });
+      return { snapshots };
     },
-    onError: (err) => {
-      setApplicationError(err instanceof ApiError ? err.message : 'Не удалось подать заявку');
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['event', id], updated);
+    },
+    onError: (err, _app, ctx) => {
+      restoreQuerySnapshots(
+        queryClient,
+        [
+          ['event', id],
+          ['events', user.id],
+        ],
+        ctx?.snapshots,
+      );
+      const message = err instanceof ApiError ? err.message : 'Не удалось подать заявку';
+      setApplicationError(message);
+      pushToast({ title: message, tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [
+        ['event', id],
+        ['event-registration', id, user.id],
+        ['events', user.id],
+        ['notifications'],
+        ['event-participants', id],
+      ]);
     },
   });
 
   const unregisterMutation = useMutation({
     mutationFn: () => api.events.unregister(id!, user.id),
-    onSuccess: (updated) => {
+    onMutate: async () => {
+      const keys = [
+        ['event', id] as const,
+        ['events', user.id] as const,
+      ];
+      const snapshots = await snapshotQueries(queryClient, keys);
+      queryClient.setQueryData<SchoolEvent>(['event', id], (old) => {
+        if (!old || !isUserRegisteredForEvent(old, user.id)) return old;
+        const registeredUserIds = old.registeredUserIds.filter((uid) => uid !== user.id);
+        return {
+          ...old,
+          registeredUserIds,
+          registeredCount: Math.max(0, getEventRegisteredCount(old) - 1),
+          isRegistered: false,
+        };
+      });
+      queryClient.setQueryData<SchoolEvent[]>(['events', user.id], (old) =>
+        (old ?? []).map((e) => {
+          if (e.id !== id || !isUserRegisteredForEvent(e, user.id)) return e;
+          const registeredUserIds = e.registeredUserIds.filter((uid) => uid !== user.id);
+          return {
+            ...e,
+            registeredUserIds,
+            registeredCount: Math.max(0, getEventRegisteredCount(e) - 1),
+            isRegistered: false,
+          };
+        }),
+      );
       setCancelOpen(false);
+      return { snapshots };
+    },
+    onSuccess: (updated) => {
       queryClient.setQueryData(['event', id], updated);
-      void queryClient.invalidateQueries({ queryKey: ['event', id] });
-      void queryClient.invalidateQueries({ queryKey: ['event-registration', id, user.id] });
-      void queryClient.invalidateQueries({ queryKey: ['events', user.id] });
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      void queryClient.invalidateQueries({ queryKey: ['event-participants', id] });
+    },
+    onError: (err, _v, ctx) => {
+      restoreQuerySnapshots(
+        queryClient,
+        [
+          ['event', id],
+          ['events', user.id],
+        ],
+        ctx?.snapshots,
+      );
+      pushToast({
+        title: err instanceof ApiError ? err.message : 'Не удалось отменить запись',
+        tone: 'danger',
+      });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [
+        ['event', id],
+        ['event-registration', id, user.id],
+        ['events', user.id],
+        ['notifications'],
+        ['event-participants', id],
+      ]);
     },
   });
 

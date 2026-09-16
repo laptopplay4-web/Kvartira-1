@@ -117,13 +117,28 @@ export default function ChatPage() {
 
   const deleteConversationMutation = useMutation({
     mutationFn: (conversationId: string) => api.chat.deleteConversation(conversationId, user.id),
-    onSuccess: (_void, conversationId) => {
-      setPendingDeleteId(null);
-      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations', user.id] });
+      const previous = queryClient.getQueryData<Conversation[]>(['conversations', user.id]);
+      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
+        (old ?? []).filter((c) => c.id !== conversationId),
+      );
       if (activeId === conversationId) {
         navigate('/chat');
       }
+      return { previous };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(['conversations', user.id], ctx.previous);
+      }
+    },
+    onSuccess: () => {
+      setPendingDeleteId(null);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      void queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
     },
   });
 

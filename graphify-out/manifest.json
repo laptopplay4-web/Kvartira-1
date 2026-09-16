@@ -395,8 +395,8 @@
     "semantic_hash": ""
   },
   "src/components/chat/ChatHeader.tsx": {
-    "mtime": 1789562077.2937727,
-    "ast_hash": "d08bd1535bd68c4e695aeb3f69d3c6f7",
+    "mtime": 1789563795.224634,
+    "ast_hash": "118ad62e916f535bf31cf51e95783c9d",
     "semantic_hash": ""
   },
   "src/components/chat/ConversationItem.tsx": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "src/pages/chat/ChatPage.tsx": {
-    "mtime": 1789562106.659544,
-    "ast_hash": "f07e04d2e177a28823adb54aec600532",
+    "mtime": 1789563832.0352848,
+    "ast_hash": "3d34d3e2a24b936c30973eff5493b2f5",
     "semantic_hash": ""
   },
   "src/services/chat/access.ts": {
@@ -485,8 +485,8 @@
     "semantic_hash": ""
   },
   "src/components/chat/ConversationSettings.tsx": {
-    "mtime": 1789563149.3216245,
-    "ast_hash": "d7aedb3d2000a3b77d4ab8af97fa3288",
+    "mtime": 1789563832.0352848,
+    "ast_hash": "2110d4f7dc405e479813cb96c834a70c",
     "semantic_hash": ""
   },
   "src/components/chat/ImageViewer.tsx": {
@@ -1215,8 +1215,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/errors.ts": {
-    "mtime": 1789562077.3678746,
-    "ast_hash": "abc460a136c330884022a26ed45c9249",
+    "mtime": 1789563765.4406483,
+    "ast_hash": "0b7247400af3165b1c53951dbddc0859",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/index.ts": {
@@ -1225,8 +1225,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/mappers.ts": {
-    "mtime": 1789562097.6231694,
-    "ast_hash": "01f03306e9de8b5ff204934732454b92",
+    "mtime": 1789563791.5811467,
+    "ast_hash": "a6fee2f50726866af19596836fdefd1e",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/users.ts": {
@@ -1235,8 +1235,8 @@
     "semantic_hash": ""
   },
   "src/test/pocketbaseAdapter.test.ts": {
-    "mtime": 1789562097.6278152,
-    "ast_hash": "2c2dc418bb5a20dba6651c23abc0df9a",
+    "mtime": 1789563876.920919,
+    "ast_hash": "31f81f86efbd0ebd4c77bc7b7fef1ec6",
     "semantic_hash": ""
   },
   "pocketbase/pb_migrations/1788499200_kvartira_lessons_adapter.js": {
@@ -1290,8 +1290,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/chat.ts": {
-    "mtime": 1789562980.0390148,
-    "ast_hash": "7fa028ca98f67a3433274d79ce223dda",
+    "mtime": 1789563844.366702,
+    "ast_hash": "0f0de7a289f98f140dc634f7ab974bcf",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/assignments.pb.js": {

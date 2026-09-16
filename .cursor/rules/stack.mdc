@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.175 Chat group members batch + optimistic UI · 2026-09-16
+Версия: 1.176 Chat delete purge + member count heal · 2026-09-16
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -465,7 +465,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 728 passed (48 files); booking cancel past-slot flake вне scope.
+**Итого:** 731 passed (48 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -618,6 +618,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | StudentPicker Все/Направления + count | ✅ 2026-09-13, см. §173 |
 | Chat list load speed (unread + batch files) | ✅ 2026-09-13, см. §174 |
 | Chat group members batch + optimistic UI | ✅ 2026-09-16, см. §175 |
+| Chat delete purge + member count heal | ✅ 2026-09-16, см. §176 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1430,8 +1431,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **728** (48 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §175 members batch |
-| Graphify | 2880 nodes, 3194 edges, 440 communities |
+| Тесты | **731** (48 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §176 chat delete |
+| Graphify | 2884 nodes, 3201 edges, 441 communities |
 
 ### Фазы (кратко)
 
@@ -1453,7 +1454,37 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2880 nodes, 3194 edges, 440 communities (post-§175).
+**Graphify stats:** 2884 nodes, 3201 edges, 441 communities (post-§176).
+
+---
+
+## 176. Chat delete purge + member count heal (2026-09-16)
+
+**Scope:** удаление чата падало с текстом про «мероприятие» (cascade); список обновлялся медленно; счётчик участников брал раздутый `participantIds` (напр. 40 вместо 6).
+
+**Graphify:** `deleteConversation()` → `purgeConversationDependents()`; `ChatHeader` → `useConversationMembers`; `reconcileParticipantIds` → `asIdList` JSONRaw.
+
+### Delete (✅)
+
+- PB `deleteConversation`: перед delete — parallel purge `messages` + `conversation_members` (+ avatar files); не зависит от cascade на live DB.
+- Ошибка cascade в `errors.ts` — нейтральный текст (без «мероприятие»).
+- Optimistic remove из списка чатов (`ChatPage` / `ConversationSettings`).
+
+### Member count (✅)
+
+- Header: счётчик из `conversation_members` (не из `participantIds`); school-wide → «Все пользователи школы».
+- `getConversation`: `reconcileParticipantIds` — heal JSON из membership.
+- `asIdList`: decode JSONRaw-like + dedupe.
+
+### Tests
+
+adapter +3 (cascade copy, JSONRaw ids, purge wiring); suite **731**. typecheck ✅.
+
+### Deploy
+
+Только фронт; перезапуск PB не обязателен.
+
+**Graphify stats:** 2884 nodes, 3201 edges, 441 communities.
 
 ---
 

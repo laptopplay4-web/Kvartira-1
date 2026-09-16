@@ -323,10 +323,27 @@ export function ConversationSettings({
 
   const deleteMutation = useMutation({
     mutationFn: () => api.chat.deleteConversation(conversation.id, currentUser.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
-      onDeleted?.();
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['conversations', currentUser.id] });
+      const previous = queryClient.getQueryData<Conversation[]>([
+        'conversations',
+        currentUser.id,
+      ]);
+      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
+        (old ?? []).filter((c) => c.id !== conversation.id),
+      );
       onClose();
+      onDeleted?.();
+      return { previous };
+    },
+    onError: (_err, _void, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(['conversations', currentUser.id], ctx.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+      void queryClient.invalidateQueries({ queryKey: ['chat-unread', currentUser.id] });
     },
   });
 

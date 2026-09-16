@@ -1,11 +1,11 @@
 # Graph Report - Kvartira 1  (2026-09-16)
 
 ## Corpus Check
-- 459 files · ~214,347 words
+- 459 files · ~215,001 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2880 nodes · 3194 edges · 440 communities (294 shown, 146 thin omitted)
+- 2884 nodes · 3201 edges · 441 communities (295 shown, 146 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 123 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
@@ -181,7 +181,7 @@
 - AvatarPhotoViewer.tsx
 - PocketBase schema — «Квартира»
 - pocketbaseSchema.test.ts
-- kvartiraAuth.js
+- kvartiraInvite.js
 - pocketbaseAuth.test.ts
 - providers.tsx
 - AvailabilityMonthCalendar.tsx
@@ -198,7 +198,7 @@
 - auth.ts
 - users.ts
 - pocketbaseAdapter.test.ts
-- pocketbase/helpers.ts
+- pocketbase/groups.ts
 - events.ts
 - kvartiraEvents.js
 - kvartiraChat.js
@@ -306,7 +306,8 @@
 - cookies/helpers.ts
 - zod
 - ReportMessageModal.tsx
-- kvartiraInvite.js
+- kvartiraAuth.js
+- pocketbase/helpers.ts
 - adminInbox.ts
 - kvartiraLegalBootstrap.js
 - clsx
@@ -338,7 +339,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (440 total, 146 thin omitted)
+## Communities (441 total, 146 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -509,8 +510,8 @@ Cohesion: 0.11
 Nodes (6): ChatRealtimeCallback, ChatRealtimeEvent, ChatRealtimeEventType, ChatRealtimeService, Listener, MockChatRealtimeService
 
 ### Community 84 - "ChatHeader.tsx"
-Cohesion: 0.40
-Nodes (3): ChatHeaderProps, ConversationSettings(), ConversationSettingsProps
+Cohesion: 0.38
+Nodes (5): ChatHeader(), ChatHeaderProps, formatMemberCountLabel(), ConversationSettings(), ConversationSettingsProps
 
 ### Community 85 - "MessageComposer.tsx"
 Cohesion: 0.15
@@ -684,9 +685,9 @@ Nodes (16): Assignments adapter (ROADMAP 2.5 ✅), Auth (ROADMAP 1.3 ✅), Chat 
 Cohesion: 0.18
 Nodes (10): AVATAR_TEXT_MAX_MIGRATION, AVATAR_TEXT_MIGRATION, MIGRATION, REQUIRED_COLLECTIONS, ROOT, SCHEMA_DOC, USER_CASCADE_FIX_MIGRATION, USER_CASCADE_MIGRATION (+2 more)
 
-### Community 226 - "kvartiraAuth.js"
-Cohesion: 0.28
-Nodes (11): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+3 more)
+### Community 226 - "kvartiraInvite.js"
+Cohesion: 0.36
+Nodes (11): asObject(), assertRegistrationInviteOnUserCreate(), decodeJsonField(), findSchoolSettingsRecord(), isDevEnvironment(), isValidInviteToken(), readInviteFromRequest(), readJsonObjectField() (+3 more)
 
 ### Community 227 - "pocketbaseAuth.test.ts"
 Cohesion: 0.18
@@ -724,9 +725,9 @@ Nodes (5): extractPbFieldError(), mapPocketBaseError(), PB_FIELD_MESSAGE_MAP, PB
 Cohesion: 0.05
 Nodes (29): coerceJsonObjectFromContacts(), mapSchoolSettingsRecord(), mapUserRecord(), MapUserRecordOptions, parseDirectionIds(), parseSchoolContacts(), PbAssignmentGroupRecord, PbAssignmentRecord (+21 more)
 
-### Community 249 - "pocketbase/helpers.ts"
-Cohesion: 0.17
-Nodes (10): ensureGeneralAssignmentGroup(), pocketbaseAssignmentGroupsApi, resolveAssignmentGroupIdForWrite(), escapePbFilter(), getPbRecordCreatedAt(), getPbRecordUpdatedAt(), normalizePbDateTime(), pbEqOr() (+2 more)
+### Community 249 - "pocketbase/groups.ts"
+Cohesion: 0.29
+Nodes (5): ensureGeneralAssignmentGroup(), pocketbaseAssignmentGroupsApi, resolveAssignmentGroupIdForWrite(), relId(), mapAssignmentGroupRecord()
 
 ### Community 251 - "events.ts"
 Cohesion: 0.19
@@ -749,8 +750,8 @@ Cohesion: 0.41
 Nodes (11): assertAssignmentCreate(), assertAssignmentGroupCreate(), assertAssignmentGroupDelete(), assertAssignmentGroupUpdate(), assertAssignmentUpdate(), assertMembersAreStudents(), isUsersAuth(), notifyAssignmentCreated() (+3 more)
 
 ### Community 260 - "pocketbase/chat.ts"
-Cohesion: 0.14
-Nodes (13): assertConversationAccess(), createConversationWithAvatar(), ensureAdminGroupMembershipPb(), ensureSchoolWideMembershipPb(), isPbUrlFieldError(), loadConversationOrThrow(), loadMembers(), loadUserMembers() (+5 more)
+Cohesion: 0.13
+Nodes (15): assertConversationAccess(), createConversationWithAvatar(), ensureAdminGroupMembershipPb(), ensureSchoolWideMembershipPb(), isPbUrlFieldError(), loadConversationOrThrow(), loadMembers(), loadUserMembers() (+7 more)
 
 ### Community 261 - "Готовность к выкладке на сервер"
 Cohesion: 0.25
@@ -833,8 +834,8 @@ Cohesion: 0.25
 Nodes (3): findSchoolSettingsRecord(), loadOrCreateSchoolSettingsRecord(), pocketbaseSchoolSettingsApi
 
 ### Community 318 - "asIdList"
-Cohesion: 0.40
-Nodes (5): asIdList(), mapConversationRecord(), mapEventRecord(), mapLastMessage(), readRecordField()
+Cohesion: 0.33
+Nodes (6): asIdList(), decodeJsonRawLike(), mapConversationRecord(), mapEventRecord(), mapLastMessage(), readRecordField()
 
 ### Community 323 - "kvartiraUsers.js"
 Cohesion: 0.27
@@ -948,9 +949,13 @@ Nodes (5): COOKIE_CONSENT_BODY, COOKIE_CONSENT_LABELS, COOKIE_CONSENT_STORAGE_KE
 Cohesion: 0.24
 Nodes (10): acceptCookieConsent(), buildPreferences(), decideCookieConsent(), getCookieConsentPreferences(), hasAcceptedCookieConsent(), hasCookieConsentDecision(), parseStored(), preferencesFromDecision() (+2 more)
 
-### Community 429 - "kvartiraInvite.js"
-Cohesion: 0.06
-Nodes (30): PURPOSES, asObject(), assertRegistrationInviteOnUserCreate(), decodeJsonField(), findSchoolSettingsRecord(), isDevEnvironment(), isValidInviteToken(), readInviteFromRequest() (+22 more)
+### Community 429 - "kvartiraAuth.js"
+Cohesion: 0.05
+Nodes (30): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+22 more)
+
+### Community 434 - "pocketbase/helpers.ts"
+Cohesion: 0.39
+Nodes (5): escapePbFilter(), getPbRecordCreatedAt(), getPbRecordUpdatedAt(), normalizePbDateTime(), pbEqOr()
 
 ### Community 437 - "kvartiraLegalBootstrap.js"
 Cohesion: 0.67
@@ -966,9 +971,9 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
   _High betweenness centrality (0.002) - this node is a cross-community bridge._
-- **Why does `SupportApi` connect `SupportApi` to `types.ts`?**
-  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
+- **Why does `UsersApi` connect `UsersApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
   _947 weakly-connected nodes found - possible documentation gaps or missing edges._

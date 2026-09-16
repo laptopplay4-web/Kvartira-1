@@ -333,6 +333,20 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(apiError.code).toBe('SERVER_ERROR');
   });
 
+  it('mapPocketBaseError maps relation delete conflict without event-specific copy', () => {
+    const pbError = new ClientResponseError({
+      status: 400,
+      response: {
+        message:
+          'Failed to delete record. Make sure that the record is not part of a required relation reference.',
+      },
+    } as never);
+    const apiError = mapPocketBaseError(pbError);
+    expect(apiError.code).toBe('CONFLICT');
+    expect(apiError.message).toContain('связанные записи');
+    expect(apiError.message).not.toContain('мероприятие');
+  });
+
   it('mapPocketBaseError maps unique slot conflict to SLOT_CONFLICT', () => {
     const pbError = new ClientResponseError({
       status: 409,
@@ -575,6 +589,25 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(conv.createdAt).toBe('2026-08-01T10:00:00.000Z');
   });
 
+  it('mapConversationRecord decodes JSONRaw-like participantIds and dedupes', () => {
+    const json = JSON.stringify(['user-a', 'user-b', 'user-a']);
+    const rawLike: Record<string, number> = {};
+    for (let i = 0; i < json.length; i += 1) {
+      rawLike[String(i)] = json.charCodeAt(i);
+    }
+    const conv = mapConversationRecord({
+      id: 'conv-raw',
+      collectionId: 'conversations',
+      collectionName: 'conversations',
+      created: '2026-08-01 10:00:00.000Z',
+      updated: '2026-08-01 10:00:00.000Z',
+      type: 'group',
+      title: 'Группа',
+      participantIds: rawLike as never,
+    });
+    expect(conv.participantIds).toEqual(['user-a', 'user-b']);
+  });
+
   it('mapConversationMemberRecord and mapMessageRecord map relations and dates', () => {
     const member = mapConversationMemberRecord({
       id: 'cm-1',
@@ -687,6 +720,14 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(chatApi).toContain('loadUnreadCandidateMessages');
     expect(chatApi).toContain('loadMessagesForConversationEnrichment');
     expect(chatApi).not.toMatch(/async function loadMessagesForConversations\(/);
+  });
+
+  it('chat deleteConversation purges messages and members before delete', () => {
+    const chatApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/chat.ts'), 'utf8');
+    expect(chatApi).toContain('purgeConversationDependents');
+    expect(chatApi).toContain('reconcileParticipantIds');
+    expect(chatApi).toMatch(/deleteRows\('messages'\)/);
+    expect(chatApi).toMatch(/deleteRows\('conversation_members'\)/);
   });
 
   it('buildUnreadCandidateFilter scopes by lastReadAt and excludes own/system', async () => {

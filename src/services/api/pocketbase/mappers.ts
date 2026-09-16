@@ -299,10 +299,30 @@ export function mapLessonHistoryRecord(record: PbLessonHistoryRecord | RecordMod
   return entry;
 }
 
+function decodeJsonRawLike(value: unknown): unknown {
+  if (value == null || typeof value === 'string' || Array.isArray(value)) return value;
+  if (typeof value !== 'object') return value;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj);
+  if (keys.length === 0 || !keys.every((k) => /^\d+$/.test(k))) return value;
+  const ordered = keys
+    .map((k) => Number(k))
+    .sort((a, b) => a - b)
+    .map((i) => obj[String(i)]);
+  if (!ordered.every((b) => typeof b === 'number' && b >= 0 && b <= 255)) return value;
+  try {
+    const text = String.fromCharCode(...(ordered as number[]));
+    return JSON.parse(text) as unknown;
+  } catch {
+    return value;
+  }
+}
+
 function asIdList(value: unknown): string[] {
-  if (value == null) return [];
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
+  const decoded = decodeJsonRawLike(value);
+  if (decoded == null) return [];
+  if (typeof decoded === 'string') {
+    const trimmed = decoded.trim();
     if (!trimmed) return [];
     try {
       return asIdList(JSON.parse(trimmed) as unknown);
@@ -310,10 +330,11 @@ function asIdList(value: unknown): string[] {
       return trimmed ? [trimmed] : [];
     }
   }
-  if (!Array.isArray(value)) return [];
-  return value
+  if (!Array.isArray(decoded)) return [];
+  const ids = decoded
     .map((item) => {
       if (typeof item === 'string' && item.length > 0) return item;
+      if (typeof item === 'number' && Number.isFinite(item)) return '';
       if (item && typeof item === 'object' && 'id' in item) {
         const id = (item as { id: unknown }).id;
         return typeof id === 'string' && id.length > 0 ? id : '';
@@ -321,6 +342,7 @@ function asIdList(value: unknown): string[] {
       return '';
     })
     .filter(Boolean);
+  return [...new Set(ids)];
 }
 
 function readRecordField(record: RecordModel, field: string): unknown {

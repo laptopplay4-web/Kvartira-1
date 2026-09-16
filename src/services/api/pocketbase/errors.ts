@@ -24,7 +24,7 @@ const PB_MESSAGE_MAP: Record<string, { message: string; code: string }> = {
   },
   'Failed to delete record. Make sure that the record is not part of a required relation reference.': {
     message:
-      'Не удалось удалить мероприятие: есть связанные записи. Примените миграцию cascade и перезапустите PocketBase.',
+      'Не удалось удалить: есть связанные записи. Обновите приложение (cascade purge) или примените миграции PocketBase и перезапустите сервер.',
     code: 'CONFLICT',
   },
 };

@@ -385,6 +385,7 @@ function enrichConversation(
 
   return {
     ...conv,
+    participantIds: [...new Set(conv.participantIds)],
     unreadCount,
     viewerPinnedAt,
     viewerMuted: member ? isMemberMuted(member) : false,
@@ -506,6 +507,56 @@ async function updateParticipantIds(conversationId: string, participantIds: stri
   await pb.collection('conversations').update(conversationId, { participantIds });
 }
 
+/** Source of truth for roster = conversation_members; heal bloated/stale participantIds JSON. */
+async function reconcileParticipantIds(
+  conversation: Conversation,
+  members: ConversationMember[],
+): Promise<Conversation> {
+  if (isSchoolWideConversation(conversation)) return conversation;
+  const fromMembers = [...new Set(members.map((m) => m.userId))];
+  const current = [...new Set(conversation.participantIds)];
+  const same =
+    fromMembers.length === current.length && fromMembers.every((id) => current.includes(id));
+  if (same) {
+    return fromMembers.length === conversation.participantIds.length
+      ? conversation
+      : { ...conversation, participantIds: fromMembers };
+  }
+  try {
+    await updateParticipantIds(conversation.id, fromMembers);
+  } catch {
+    /* best-effort heal — still return corrected view */
+  }
+  return { ...conversation, participantIds: fromMembers };
+}
+
+/** Cascade may be missing on live DB — purge dependents before conversation delete. */
+async function purgeConversationDependents(conversationId: string): Promise<void> {
+  const pb = getPocketBase();
+  const filter = `conversation = "${escapePbFilter(conversationId)}"`;
+
+  const deleteRows = async (collection: string) => {
+    try {
+      const rows = await pb.collection(collection).getFullList({ filter });
+      await Promise.all(
+        rows.map(async (row) => {
+          try {
+            await pb.collection(collection).delete(row.id);
+          } catch {
+            /* already gone / cascade */
+          }
+        }),
+      );
+    } catch {
+      /* list may fail; conversation delete still attempted */
+    }
+  };
+
+  // Messages first (no FK to members), then memberships.
+  await deleteRows('messages');
+  await deleteRows('conversation_members');
+}
+
 export const pocketbaseChatApi: ChatApi = {
   async getConversations(userId) {
     return withPbError(async () => {
@@ -538,8 +589,9 @@ export const pocketbaseChatApi: ChatApi = {
   async getConversation(conversationId, userId) {
     return withPbError(async () => {
       const { conversation, members } = await assertConversationAccess(conversationId, userId);
-      const messages = await loadMessagesForConversationEnrichment([conversation], userId, members);
-      return resolveConversationAvatar(enrichConversation(conversation, userId, messages, members));
+      const healed = await reconcileParticipantIds(conversation, members);
+      const messages = await loadMessagesForConversationEnrichment([healed], userId, members);
+      return resolveConversationAvatar(enrichConversation(healed, userId, messages, members));
     });
   },
 
@@ -1320,11 +1372,15 @@ export const pocketbaseChatApi: ChatApi = {
 
   async deleteConversation(conversationId, userId) {
     return withPbError(async () => {
-      const { user, members } = await assertConversationAccess(conversationId, userId);
+      const { user, conversation, members } = await assertConversationAccess(conversationId, userId);
       if (!canDeleteConversation(user, conversationId, members)) {
         throw new ApiError('Нет прав на удаление чата', 'FORBIDDEN', 403);
       }
       const pb = getPocketBase();
+      await purgeConversationDependents(conversationId);
+      if (conversation.avatarUrl) {
+        await deleteStoredFiles(conversation.avatarUrl).catch(() => undefined);
+      }
       await pb.collection('conversations').delete(conversationId);
     });
   },

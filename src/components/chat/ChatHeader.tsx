@@ -4,12 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, MoreHorizontal, Users, Calendar } from 'lucide-react';
 import type { Conversation, User } from '@/types';
 import { getConversationDisplayTitle, isGroupLike } from '@/services/chat/helpers';
+import { isSchoolWideConversation } from '@/services/chat/schoolWide';
 import { Avatar } from '@/components/ui/Avatar';
 import { backNavIconButtonClassName } from '@/components/ui/BackLink';
 import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/utils';
 import { isDisplayableAvatarSrc } from '@/services/profile/constants';
 import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
+import { useConversationMembers } from '@/hooks/useConversationMembers';
 import { ConversationSettings } from './ConversationSettings';
 import { api } from '@/services/api';
 import { formatLessonDateTime } from '@/utils/dates';
@@ -23,6 +25,15 @@ interface ChatHeaderProps {
   onBack?: () => void;
 }
 
+function formatMemberCountLabel(count: number): string {
+  const mod100 = count % 100;
+  const mod10 = count % 10;
+  if (mod100 >= 11 && mod100 <= 14) return `${count} участников`;
+  if (mod10 === 1) return `${count} участник`;
+  if (mod10 >= 2 && mod10 <= 4) return `${count} участника`;
+  return `${count} участников`;
+}
+
 export function ChatHeader({
   conversation,
   currentUserId,
@@ -34,6 +45,11 @@ export function ChatHeader({
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const lessonId = conversation?.metadata?.lessonId;
+
+  const { data: members } = useConversationMembers(
+    conversation && isGroupLike(conversation) ? conversation.id : undefined,
+    currentUserId,
+  );
 
   const { data: lesson } = useQuery({
     queryKey: ['lesson', lessonId, currentUserId],
@@ -52,9 +68,11 @@ export function ChatHeader({
 
   const title = getConversationDisplayTitle(conversation, currentUserId, users);
   const isGroup = isGroupLike(conversation);
+  const schoolWide = isSchoolWideConversation(conversation);
   const otherId = conversation.participantIds.find((id) => id !== currentUserId);
   const other = users.find((u) => u.id === otherId);
-  const memberCount = conversation.participantIds.length;
+  const memberCount = members?.length ?? new Set(conversation.participantIds).size;
+  const memberLabel = schoolWide ? 'Все пользователи школы' : formatMemberCountLabel(memberCount);
 
   return (
     <>
@@ -91,10 +109,7 @@ export function ChatHeader({
               )}
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-h3">{title}</h1>
-                <p className="text-caption text-text-muted">
-                  {memberCount}{' '}
-                  {memberCount === 1 ? 'участник' : memberCount < 5 ? 'участника' : 'участников'}
-                </p>
+                <p className="text-caption text-text-muted">{memberLabel}</p>
               </div>
             </button>
           ) : other ? (

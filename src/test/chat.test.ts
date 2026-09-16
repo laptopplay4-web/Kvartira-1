@@ -1009,6 +1009,26 @@ describe('group management', () => {
     expect(members.some((m) => m.userId === 'user-student-2')).toBe(true);
   });
 
+  it('teacher can add multiple members in one batch', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Батч',
+      participantIds: ['user-student'],
+    });
+    const added = await mockChatApi.addMembers(conv.id, 'user-teacher-1', [
+      'user-student', // already in — skipped
+      'user-student-2',
+    ]);
+    expect(added).toHaveLength(1);
+    expect(added[0]?.userId).toBe('user-student-2');
+    const members = await mockChatApi.getMembers(conv.id, 'user-teacher-1');
+    expect(members.some((m) => m.userId === 'user-student-2')).toBe(true);
+    const refreshed = await mockChatApi.getConversation(conv.id, 'user-teacher-1');
+    expect(refreshed.participantIds).toEqual(
+      expect.arrayContaining(['user-student', 'user-student-2']),
+    );
+  });
+
   it('student cannot add member', async () => {
     await expect(mockChatApi.addMember('conv-2', 'user-student', 'user-admin')).rejects.toThrow(ApiError);
   });

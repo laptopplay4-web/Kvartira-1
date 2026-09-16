@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.174 Chat list load speed (unread candidates + batch files) · 2026-09-13
+Версия: 1.175 Chat group members batch + optimistic UI · 2026-09-16
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -237,7 +237,7 @@ kvartira/
 | `src/hooks/useEditMessage.ts` | Optimistic edit + rollback |
 | `src/hooks/useDeleteMessage.ts` | Soft-delete optimistic |
 | `src/hooks/useMarkPassiveNotificationsOnLeave.ts` | Leave `/notifications` → mark passive as read (urgent keep) |
-| `src/test/chat.test.ts` | 80+ tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR |
+| `src/test/chat.test.ts` | 90 tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch |
 
 ---
 
@@ -432,7 +432,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `availability.test.ts` | validation, period form, planningPeriod slots, permissions, exceptions, mock save (29 tests) |
 | `calendar.test.ts` | date ranges, IDOR filters, booking/reschedule/cancel → calendar data |
 | `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput, register count/notify/participants/unread, image write-back (38 tests) |
-| `chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort by lastMessage, attachments, realtime, pagination, IDOR, notifications, cache isolation |
+| `chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort by lastMessage, attachments, realtime, pagination, IDOR, notifications, cache isolation, addMembers batch |
 | `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; admin as teacher; progress block (skipped when UI hidden, §85) |
 | `nav.test.tsx` | MobileHeader assignments + bell + «О школе»; SidebarNav без notifications + «О школе»; aria-current; admin active; BottomNav brand (15 tests) |
 | `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back + outline style (6 tests) |
@@ -465,7 +465,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 716 passed (48 files); booking cancel past-slot flake вне scope.
+**Итого:** 728 passed (48 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -617,6 +617,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Admin help inbox + report message UX | ✅ 2026-09-13, см. §172 |
 | StudentPicker Все/Направления + count | ✅ 2026-09-13, см. §173 |
 | Chat list load speed (unread + batch files) | ✅ 2026-09-13, см. §174 |
+| Chat group members batch + optimistic UI | ✅ 2026-09-16, см. §175 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1429,8 +1430,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **727** (48 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §174 chat load |
-| Graphify | 2879 nodes, 3193 edges, 440 communities |
+| Тесты | **728** (48 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §175 members batch |
+| Graphify | 2880 nodes, 3194 edges, 440 communities |
 
 ### Фазы (кратко)
 
@@ -1452,7 +1453,37 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2879 nodes, 3193 edges, 440 communities (post-§174).
+**Graphify stats:** 2880 nodes, 3194 edges, 440 communities (post-§175).
+
+---
+
+## 175. Chat group members — batch + optimistic UI (2026-09-16)
+
+**Scope:** ускорить добавление/удаление участников группового чата (раньше: N×2–3 с секвенциально + спиннер на удалении).
+
+**Graphify:** `ConversationSettings()` → `ChatApi.addMembers|removeMember` → mock/PB `conversation_members` + `updateParticipantIds`.
+
+### API (✅)
+
+- `ChatApi.addMembers(conversationId, userId, targetUserIds[])` — один access-check, parallel create members, один `participantIds` update, parallel system messages.
+- `addMember` — thin wrapper над `addMembers([id])`.
+- PB `removeMember` — parallel `findMemberRecord` + `getRequesterUser`, parallel delete + `updateParticipantIds`.
+
+### UI (✅)
+
+- `ConversationSettings`: optimistic TanStack Query для add/remove (список обновляется сразу, rollback on error).
+- Add: один batch-запрос вместо `for…await addMember`; модалка закрывается в `onMutate`.
+- Remove: без глобального loading-спиннера — участник исчезает мгновенно.
+
+### Tests
+
+`chat` group management +1 (batch + skip already-in); typecheck ✅; suite **728** (48 files).
+
+### Deploy
+
+Только фронт (контракт + adapter); миграции PB не нужны.
+
+**Graphify stats:** 2880 nodes, 3194 edges, 440 communities.
 
 ---
 

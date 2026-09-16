@@ -671,7 +671,18 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
     },
 
     async addMember(conversationId, userId, targetUserId) {
+      const [member] = await api.addMembers(conversationId, userId, [targetUserId]);
+      if (!member) {
+        throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
+      }
+      return member;
+    },
+
+    async addMembers(conversationId, userId, targetUserIds) {
       await delay(80);
+      const uniqueIds = [...new Set(targetUserIds.filter(Boolean))];
+      if (uniqueIds.length === 0) return [];
+
       const user = getUserById(userId);
       assertConversationAccess(conversationId, userId);
       const conv = getConversationOrThrow(conversationId);
@@ -686,33 +697,47 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
-      getUserById(targetUserId);
-      if (getConversationMember(conversationId, targetUserId, db.conversationMembers)) {
-        throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
+      const toAdd = uniqueIds.filter(
+        (id) => !getConversationMember(conversationId, id, db.conversationMembers),
+      );
+      if (toAdd.length === 0) {
+        if (uniqueIds.length === 1) {
+          throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
+        }
+        return [];
       }
 
       const now = new Date().toISOString();
-      const member: ConversationMember = {
-        conversationId,
-        userId: targetUserId,
-        role: 'member',
-        joinedAt: now,
-        muted: false,
-      };
-      db.conversationMembers.push(member);
-      conv.participantIds = [...new Set([...conv.participantIds, targetUserId])];
-
-      const target = getUserById(targetUserId);
       const actor = getUserById(userId);
-      const sysMsg = createSystemMessage(conv.id, `${formatUserName(actor)} добавил ${formatUserName(target)}`, {
-        event: 'member_added',
-        actorId: userId,
-        targetUserId,
-      });
-      db.messages.push(sysMsg);
+      const added: ConversationMember[] = [];
 
-      chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
-      return member;
+      for (const targetUserId of toAdd) {
+        const target = getUserById(targetUserId);
+        const member: ConversationMember = {
+          conversationId,
+          userId: targetUserId,
+          role: 'member',
+          joinedAt: now,
+          muted: false,
+        };
+        db.conversationMembers.push(member);
+        added.push(member);
+
+        const sysMsg = createSystemMessage(
+          conv.id,
+          `${formatUserName(actor)} добавил ${formatUserName(target)}`,
+          {
+            event: 'member_added',
+            actorId: userId,
+            targetUserId,
+          },
+        );
+        db.messages.push(sysMsg);
+        chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
+      }
+
+      conv.participantIds = [...new Set([...conv.participantIds, ...toAdd])];
+      return added;
     },
 
     async removeMember(conversationId, userId, targetUserId) {

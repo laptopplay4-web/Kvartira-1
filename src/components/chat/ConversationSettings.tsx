@@ -217,23 +217,98 @@ export function ConversationSettings({
   const isListPinned = !!(currentMember?.pinnedAt || conversation.viewerPinnedAt);
 
   const addMembersMutation = useMutation({
-    mutationFn: async (studentIds: string[]) => {
-      for (const targetUserId of studentIds) {
-        await api.chat.addMember(conversation.id, currentUser.id, targetUserId);
+    mutationFn: (studentIds: string[]) =>
+      api.chat.addMembers(conversation.id, currentUser.id, studentIds),
+    onMutate: async (studentIds) => {
+      const membersKey = ['members', conversation.id, currentUser.id] as const;
+      const conversationKey = ['conversation', conversation.id] as const;
+      await queryClient.cancelQueries({ queryKey: membersKey });
+      await queryClient.cancelQueries({ queryKey: conversationKey });
+
+      const prevMembers = queryClient.getQueryData<ConversationMember[]>(membersKey);
+      const prevConversation = queryClient.getQueryData<Conversation>(conversationKey);
+      const now = new Date().toISOString();
+      const existing = new Set((prevMembers ?? []).map((m) => m.userId));
+      const optimistic: ConversationMember[] = studentIds
+        .filter((id) => !existing.has(id))
+        .map((userId) => ({
+          conversationId: conversation.id,
+          userId,
+          role: 'member' as const,
+          joinedAt: now,
+          muted: false,
+        }));
+
+      if (optimistic.length > 0) {
+        queryClient.setQueryData<ConversationMember[]>(membersKey, [
+          ...(prevMembers ?? []),
+          ...optimistic,
+        ]);
+        queryClient.setQueryData<Conversation>(conversationKey, (prev) => {
+          const base = prev ?? conversation;
+          return {
+            ...base,
+            participantIds: [...new Set([...base.participantIds, ...studentIds])],
+          };
+        });
+      }
+
+      setAddMembersOpen(false);
+      return { prevMembers, prevConversation };
+    },
+    onError: (_err, _ids, ctx) => {
+      if (ctx?.prevMembers) {
+        queryClient.setQueryData(['members', conversation.id, currentUser.id], ctx.prevMembers);
+      }
+      if (ctx?.prevConversation) {
+        queryClient.setQueryData(['conversation', conversation.id], ctx.prevConversation);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
+      void queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+      void queryClient.invalidateQueries({ queryKey: ['messages', conversation.id, currentUser.id] });
     },
   });
 
   const removeMemberMutation = useMutation({
     mutationFn: (targetUserId: string) =>
       api.chat.removeMember(conversation.id, currentUser.id, targetUserId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
+    onMutate: async (targetUserId) => {
+      const membersKey = ['members', conversation.id, currentUser.id] as const;
+      const conversationKey = ['conversation', conversation.id] as const;
+      await queryClient.cancelQueries({ queryKey: membersKey });
+      await queryClient.cancelQueries({ queryKey: conversationKey });
+
+      const prevMembers = queryClient.getQueryData<ConversationMember[]>(membersKey);
+      const prevConversation = queryClient.getQueryData<Conversation>(conversationKey);
+
+      queryClient.setQueryData<ConversationMember[]>(membersKey, (prev) =>
+        (prev ?? []).filter((m) => m.userId !== targetUserId),
+      );
+      queryClient.setQueryData<Conversation>(conversationKey, (prev) => {
+        const base = prev ?? conversation;
+        return {
+          ...base,
+          participantIds: base.participantIds.filter((id) => id !== targetUserId),
+        };
+      });
+
+      return { prevMembers, prevConversation };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prevMembers) {
+        queryClient.setQueryData(['members', conversation.id, currentUser.id], ctx.prevMembers);
+      }
+      if (ctx?.prevConversation) {
+        queryClient.setQueryData(['conversation', conversation.id], ctx.prevConversation);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
+      void queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
+      void queryClient.invalidateQueries({ queryKey: ['messages', conversation.id, currentUser.id] });
     },
   });
 
@@ -365,7 +440,11 @@ export function ConversationSettings({
                           variant="ghost"
                           size="sm"
                           onClick={() => removeMemberMutation.mutate(member.userId)}
-                          loading={removeMemberMutation.isPending}
+                          disabled={
+                            !isOnline ||
+                            (removeMemberMutation.isPending &&
+                              removeMemberMutation.variables === member.userId)
+                          }
                         >
                           Удалить
                         </Button>
@@ -452,7 +531,7 @@ export function ConversationSettings({
       loading={addMembersMutation.isPending}
       disabled={!isOnline}
       onAdd={async (studentIds) => {
-        await addMembersMutation.mutateAsync(studentIds);
+        addMembersMutation.mutate(studentIds);
       }}
     />
     </>

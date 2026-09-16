@@ -1,11 +1,11 @@
-# Graph Report - Kvartira 1  (2026-09-13)
+# Graph Report - Kvartira 1  (2026-09-16)
 
 ## Corpus Check
-- 459 files · ~213,852 words
+- 459 files · ~214,347 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2879 nodes · 3193 edges · 440 communities (294 shown, 146 thin omitted)
+- 2880 nodes · 3194 edges · 440 communities (294 shown, 146 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 123 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
@@ -314,7 +314,7 @@
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
 2. `КВАРТИРА — DEVELOPMENT RULES FOR CURSOR` - 31 edges
-3. `ChatApi` - 28 edges
+3. `ChatApi` - 29 edges
 4. `КВАРТИРА — DESIGN SYSTEM` - 26 edges
 5. `compilerOptions` - 20 edges
 6. `scripts` - 16 edges

@@ -1021,7 +1021,18 @@ export const pocketbaseChatApi: ChatApi = {
   },
 
   async addMember(conversationId, userId, targetUserId) {
+    const [member] = await pocketbaseChatApi.addMembers(conversationId, userId, [targetUserId]);
+    if (!member) {
+      throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
+    }
+    return member;
+  },
+
+  async addMembers(conversationId, userId, targetUserIds) {
     return withPbError(async () => {
+      const uniqueIds = [...new Set(targetUserIds.filter(Boolean))];
+      if (uniqueIds.length === 0) return [];
+
       const { user, conversation, members } = await assertConversationAccess(conversationId, userId);
       if (!canAddMember(user, conversationId, members, conversation)) {
         throw new ApiError('Нет прав на управление участниками', 'FORBIDDEN', 403);
@@ -1033,29 +1044,50 @@ export const pocketbaseChatApi: ChatApi = {
         throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
 
-      await getRequesterUser(targetUserId);
-      if (getConversationMember(conversationId, targetUserId, members)) {
-        throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
+      const toAdd = uniqueIds.filter((id) => !getConversationMember(conversationId, id, members));
+      if (toAdd.length === 0) {
+        if (uniqueIds.length === 1) {
+          throw new ApiError('Участник уже в чате', 'VALIDATION', 400);
+        }
+        return [];
       }
 
+      const targets = await Promise.all(toAdd.map((id) => getRequesterUser(id)));
       const pb = getPocketBase();
-      const record = await pb.collection('conversation_members').create({
-        conversation: conversationId,
-        user: targetUserId,
-        role: 'member',
-        muted: false,
-      });
-      await updateParticipantIds(conversationId, [...new Set([...conversation.participantIds, targetUserId])]);
+      const records = await Promise.all(
+        toAdd.map((targetUserId) =>
+          pb.collection('conversation_members').create({
+            conversation: conversationId,
+            user: targetUserId,
+            role: 'member',
+            muted: false,
+          }),
+        ),
+      );
 
-      const target = await getRequesterUser(targetUserId);
-      await createSystemMessage(conversationId, userId, `${formatUserName(user)} добавил ${formatUserName(target)}`, {
-        event: 'member_added',
-        actorId: userId,
-        targetUserId,
-      });
+      await updateParticipantIds(conversationId, [
+        ...new Set([...conversation.participantIds, ...toAdd]),
+      ]);
 
-      chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
-      return mapConversationMemberRecord(record);
+      await Promise.all(
+        targets.map((target, index) => {
+          const targetUserId = toAdd[index]!;
+          return createSystemMessage(
+            conversationId,
+            userId,
+            `${formatUserName(user)} добавил ${formatUserName(target)}`,
+            {
+              event: 'member_added',
+              actorId: userId,
+              targetUserId,
+            },
+          ).then(() => {
+            chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
+          });
+        }),
+      );
+
+      return records.map(mapConversationMemberRecord);
     });
   },
 
@@ -1070,19 +1102,31 @@ export const pocketbaseChatApi: ChatApi = {
       }
 
       const pb = getPocketBase();
-      const targetRecord = await findMemberRecord(conversationId, targetUserId);
-      if (targetRecord) await pb.collection('conversation_members').delete(targetRecord.id);
-      await updateParticipantIds(
-        conversationId,
-        conversation.participantIds.filter((id) => id !== targetUserId),
-      );
+      const [targetRecord, target] = await Promise.all([
+        findMemberRecord(conversationId, targetUserId),
+        getRequesterUser(targetUserId),
+      ]);
 
-      const target = await getRequesterUser(targetUserId);
-      await createSystemMessage(conversationId, userId, `${formatUserName(user)} удалил ${formatUserName(target)}`, {
-        event: 'member_removed',
-        actorId: userId,
-        targetUserId,
-      });
+      await Promise.all([
+        targetRecord
+          ? pb.collection('conversation_members').delete(targetRecord.id)
+          : Promise.resolve(),
+        updateParticipantIds(
+          conversationId,
+          conversation.participantIds.filter((id) => id !== targetUserId),
+        ),
+      ]);
+
+      await createSystemMessage(
+        conversationId,
+        userId,
+        `${formatUserName(user)} удалил ${formatUserName(target)}`,
+        {
+          event: 'member_removed',
+          actorId: userId,
+          targetUserId,
+        },
+      );
 
       chatRealtimeService.emit({ type: 'member.left', conversationId, userId: targetUserId });
     });

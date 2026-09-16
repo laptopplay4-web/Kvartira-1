@@ -223,6 +223,12 @@ export interface ChatApi {
   searchMessages(userId: string, query: string): Promise<MessageSearchResult[]>;
   getMembers(conversationId: string, userId: string): Promise<ConversationMember[]>;
   addMember(conversationId: string, userId: string, targetUserId: string): Promise<ConversationMember>;
+  /** Batch add — one access check + one participantIds write (avoids N sequential round-trips). */
+  addMembers(
+    conversationId: string,
+    userId: string,
+    targetUserIds: string[],
+  ): Promise<ConversationMember[]>;
   removeMember(conversationId: string, userId: string, targetUserId: string): Promise<void>;
   leaveConversation(conversationId: string, userId: string): Promise<void>;
   updateConversation(

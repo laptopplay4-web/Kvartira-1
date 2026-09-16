@@ -619,6 +619,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | StudentPicker Все/Направления + count | ✅ 2026-09-13, см. §173 |
 | Chat list load speed (unread + batch files) | ✅ 2026-09-13, см. §174 |
 | Full app responsiveness (10 measures) | ✅ 2026-09-16, см. §175 |
+| YClients ground + online opt rewrite | ✅ 2026-09-16, см. §176 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---

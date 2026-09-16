@@ -21,7 +21,7 @@ alwaysApply: true
 | Сборка | Vite | 6.x |
 | UI | React | 19.x |
 | Роутинг | React Router | 7.x |
-| Серверный стейт | TanStack Query 5 + persist (localStorage) | 5.x |
+| Серверный стейт | TanStack Query 5 + dehydrate/hydrate persist | 5.x |
 | Клиентский стейт | Zustand | 5.x (auth) |
 | Стили | Tailwind CSS 4 + CSS variables | 4.x |
 | UI variants | class-variance-authority + tailwind-merge | — |
@@ -1478,8 +1478,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 
 ### Persist (✅)
 
-- `@tanstack/react-query-persist-client` + sync localStorage persister (`kvartira-query-cache`).
-- Dehydrate только shell-ключи (conversations, lessons, events, assignments, …); **не** messages/security/slots.
+- Собственный bridge на `dehydrate`/`hydrate` из `@tanstack/react-query` (без `@tanstack/react-query-persist-client`).
+- localStorage `kvartira-query-cache`; dehydrate только shell-ключи; **не** messages/security/slots.
 - `staleTime` 60s · `gcTime` 24h; после restore UI сразу из кэша, сеть — background revalidate.
 - Login/logout/role-change → `clearAppQueryCache()` (memory + storage).
 

@@ -1,9 +1,9 @@
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { queryClient } from './queryClient';
-import { queryPersistOptions } from './queryPersist';
+import { QueryCachePersistBridge } from './queryPersist';
 import { useAuthStore } from '@/stores/authStore';
 import { ToastProvider } from '@/components/ui/Toast';
 import { UserPreviewProvider } from '@/components/users/UserPreviewProvider';
@@ -32,14 +32,16 @@ function AuthHydrationGate({ children }: { children: ReactNode }) {
 
 export function AppProviders() {
   return (
-    <PersistQueryClientProvider client={queryClient} persistOptions={queryPersistOptions}>
-      <ToastProvider>
-        <AuthHydrationGate>
-          <UserPreviewProvider>
-            <RouterProvider router={router} />
-          </UserPreviewProvider>
-        </AuthHydrationGate>
-      </ToastProvider>
-    </PersistQueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <QueryCachePersistBridge>
+        <ToastProvider>
+          <AuthHydrationGate>
+            <UserPreviewProvider>
+              <RouterProvider router={router} />
+            </UserPreviewProvider>
+          </AuthHydrationGate>
+        </ToastProvider>
+      </QueryCachePersistBridge>
+    </QueryClientProvider>
   );
 }

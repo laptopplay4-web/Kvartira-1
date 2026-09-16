@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { MESSAGE_PAGE_SIZE } from '@/services/chat/constants';
+import { isOptimisticConversationId } from '@/services/chat/helpers';
 import { compareIsoDates } from '@/utils/dates';
 import type { Message } from '@/types';
 
@@ -14,7 +15,7 @@ export function useChatMessages(conversationId: string | undefined, userId: stri
       }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => (page.hasMore ? page.nextCursor : undefined),
-    enabled: !!conversationId && !!userId,
+    enabled: !!conversationId && !!userId && !isOptimisticConversationId(conversationId),
   });
 }
 

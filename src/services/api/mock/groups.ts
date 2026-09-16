@@ -55,7 +55,7 @@ export function createMockAssignmentGroupsApi(
     return user;
   }
 
-  return {
+  const api: AssignmentGroupsApi = {
     async getGroups(requesterId) {
       await delay();
       const user = await getUserById(requesterId);
@@ -116,23 +116,38 @@ export function createMockAssignmentGroupsApi(
       return group;
     },
 
-    async addMember(groupId, studentId, requesterId) {
+    async addMembers(groupId, studentIds, requesterId) {
       await delay(150);
       const group = getGroupById(groupId);
       await assertEditAccess(group, requesterId);
 
-      const student = await getUserById(studentId);
-      if (student.role !== 'student') {
-        throw new ApiError('В группу можно добавить только ученика', 'VALIDATION_ERROR', 400);
+      const normalizedIds: string[] = [];
+      for (const studentId of [...new Set(studentIds)]) {
+        const student = await getUserById(studentId);
+        if (student.role !== 'student') {
+          throw new ApiError('В группу можно добавить только ученика', 'VALIDATION_ERROR', 400);
+        }
+        normalizedIds.push(toMockUserId(db.users, student));
       }
 
-      const normalizedId = toMockUserId(db.users, student);
-      if (!group.memberIds.includes(normalizedId)) {
-        group.memberIds.push(normalizedId);
+      const nextMemberIds = [...group.memberIds];
+      let changed = false;
+      for (const id of normalizedIds) {
+        if (!nextMemberIds.includes(id)) {
+          nextMemberIds.push(id);
+          changed = true;
+        }
+      }
+      if (changed) {
+        group.memberIds = nextMemberIds;
         group.updatedAt = new Date().toISOString();
       }
 
       return group;
+    },
+
+    async addMember(groupId, studentId, requesterId) {
+      return api.addMembers(groupId, [studentId], requesterId);
     },
 
     async removeMember(groupId, studentId, requesterId) {
@@ -159,4 +174,6 @@ export function createMockAssignmentGroupsApi(
       db.assignmentGroups = db.assignmentGroups.filter((g) => g.id !== id);
     },
   };
+
+  return api;
 }

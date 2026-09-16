@@ -9,7 +9,7 @@ interface AddGroupMembersModalProps {
   onClose: () => void;
   students: User[];
   directions: Direction[];
-  onAdd: (studentIds: string[]) => Promise<void>;
+  onAdd: (studentIds: string[]) => void | Promise<void>;
   loading?: boolean;
   disabled?: boolean;
 }

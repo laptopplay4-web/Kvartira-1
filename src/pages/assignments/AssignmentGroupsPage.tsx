@@ -50,8 +50,28 @@ export default function AssignmentGroupsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (groupId: string) => api.assignmentGroups.deleteGroup(groupId, user.id),
+    onMutate: async (groupId) => {
+      await queryClient.cancelQueries({ queryKey: ['assignment-groups'] });
+      const previousGroups = queryClient.getQueriesData<AssignmentGroup[]>({
+        queryKey: ['assignment-groups'],
+      });
+      queryClient.setQueriesData<AssignmentGroup[]>(
+        { queryKey: ['assignment-groups'] },
+        (old) => (old ?? []).filter((g) => g.id !== groupId),
+      );
+      return { previousGroups };
+    },
+    onError: (_err, _groupId, ctx) => {
+      if (ctx?.previousGroups) {
+        for (const [key, data] of ctx.previousGroups) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+    },
     onSuccess: () => {
       setGroupToDelete(null);
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['assignment-groups'] });
       void queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },

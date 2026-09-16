@@ -1,7 +1,10 @@
 import { Link, NavLink } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Bell, BookOpen } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { SchoolAboutButton } from '@/components/school/SchoolAboutButton';
+import { useCurrentUser } from '@/stores/authStore';
+import { prefetchRouteData } from '@/services/nav/prefetch';
 import { cn } from '@/utils';
 
 const headerNavLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -27,6 +30,10 @@ export function MobileHeader({
   showNotifications = true,
   notifBadge = 0,
 }: MobileHeaderProps) {
+  const user = useCurrentUser();
+  const queryClient = useQueryClient();
+  const prefetch = (to: string) => prefetchRouteData(queryClient, to, user);
+
   return (
     <header
       className={cn(
@@ -35,7 +42,13 @@ export function MobileHeader({
       )}
     >
       <div className="flex items-center gap-1 md:hidden">
-        <Link to="/home" className="focus-ring rounded-lg" aria-label="На главную">
+        <Link
+          to="/home"
+          className="focus-ring rounded-lg"
+          aria-label="На главную"
+          onPointerEnter={() => prefetch('/home')}
+          onFocus={() => prefetch('/home')}
+        >
           <Logo size="sm" />
         </Link>
         <SchoolAboutButton />
@@ -45,6 +58,8 @@ export function MobileHeader({
           <NavLink
             to="/assignments"
             className={headerNavLinkClass}
+            onPointerEnter={() => prefetch('/assignments')}
+            onFocus={() => prefetch('/assignments')}
             aria-label={
               assignmentsBadge > 0
                 ? `Домашние задания, ${assignmentsBadge} непрочитанных`
@@ -64,6 +79,8 @@ export function MobileHeader({
             to="/notifications"
             end
             className={headerNavLinkClass}
+            onPointerEnter={() => prefetch('/notifications')}
+            onFocus={() => prefetch('/notifications')}
             aria-label={notifBadge > 0 ? `Уведомления, ${notifBadge} непрочитанных` : 'Уведомления'}
           >
             <Bell className="h-5 w-5" strokeWidth={1.75} aria-hidden />

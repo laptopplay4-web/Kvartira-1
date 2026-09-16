@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
+import { isOptimisticConversationId } from '@/services/chat/helpers';
 
 export function useChatConversations(userId: string) {
   return useQuery({
@@ -13,7 +14,7 @@ export function useChatConversation(conversationId: string | undefined, userId: 
   return useQuery({
     queryKey: ['conversation', conversationId, userId],
     queryFn: () => api.chat.getConversation(conversationId!, userId),
-    enabled: !!conversationId && !!userId,
+    enabled: !!conversationId && !!userId && !isOptimisticConversationId(conversationId),
     retry: false,
   });
 }

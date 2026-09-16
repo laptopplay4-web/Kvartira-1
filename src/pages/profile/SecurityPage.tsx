@@ -16,12 +16,19 @@ import { validateChangePasswordInput } from '@/services/security/validation';
 import { LOGIN_HISTORY_UI_LIMIT } from '@/services/security/constants';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
+import type { SecuritySession } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useToast } from '@/components/ui/Toast';
+import {
+  invalidateQueryKeys,
+  restoreQuerySnapshots,
+  snapshotQueries,
+} from '@/utils/optimisticMutation';
 
 function StatCard({ label, value, loading }: { label: string; value: string | number; loading?: boolean }) {
   if (loading) return <Skeleton className="h-20 rounded-xl" />;
@@ -42,6 +49,7 @@ export default function SecurityPage() {
   const user = useCurrentUser()!;
   const token = useAuthStore((s) => s.session?.token);
   const queryClient = useQueryClient();
+  const { pushToast } = useToast();
   const isOnline = useOnlineStatus();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -108,12 +116,48 @@ export default function SecurityPage() {
 
   const revokeSessionMutation = useMutation({
     mutationFn: (sessionId: string) => api.security.revokeSession(sessionId, user.id, token),
-    onSuccess: invalidateSecurity,
+    onMutate: async (sessionId) => {
+      const key = ['security', 'sessions', user.id, token] as const;
+      const snapshots = await snapshotQueries(queryClient, [key]);
+      queryClient.setQueryData<SecuritySession[]>(key, (old) =>
+        (old ?? []).filter((s) => s.id !== sessionId),
+      );
+      return { snapshots };
+    },
+    onError: (_e, _id, ctx) => {
+      restoreQuerySnapshots(
+        queryClient,
+        [['security', 'sessions', user.id, token]],
+        ctx?.snapshots,
+      );
+      pushToast({ title: 'Не удалось завершить сессию', tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [['security']]);
+    },
   });
 
   const revokeOthersMutation = useMutation({
     mutationFn: () => api.security.revokeAllOtherSessions(user.id, token!),
-    onSuccess: invalidateSecurity,
+    onMutate: async () => {
+      const key = ['security', 'sessions', user.id, token] as const;
+      const snapshots = await snapshotQueries(queryClient, [key]);
+      queryClient.setQueryData<SecuritySession[]>(key, (old) =>
+        (old ?? []).filter((s) => s.isCurrent),
+      );
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => {
+      restoreQuerySnapshots(
+        queryClient,
+        [['security', 'sessions', user.id, token]],
+        ctx?.snapshots,
+      );
+      pushToast({ title: 'Не удалось завершить другие сессии', tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [['security']]);
+    },
   });
 
   const handleChangePassword = () => {

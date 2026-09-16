@@ -3,11 +3,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { useToast } from '@/components/ui/Toast';
 import { ChatAvatarEditor } from '@/components/chat/ChatAvatarEditor';
 import { AddGroupMembersModal } from '@/components/assignments/AddGroupMembersModal';
 import { api } from '@/services/api';
 import type { Conversation, ConversationMember, User } from '@/types';
 import { formatUserName } from '@/utils';
+import {
+  invalidateQueryKeys,
+  restoreQuerySnapshots,
+  snapshotQueries,
+} from '@/utils/optimisticMutation';
 import { getRoleLabel } from '@/permissions';
 import { filterUsersBySearchQuery } from '@/services/users/helpers';
 import {
@@ -45,6 +51,7 @@ export function ConversationSettings({
   onDeleted,
 }: ConversationSettingsProps) {
   const queryClient = useQueryClient();
+  const { pushToast } = useToast();
   const isOnline = useOnlineStatus();
   const { data: members } = useConversationMembers(conversation.id, currentUser.id);
   const [title, setTitle] = useState(conversation.title);
@@ -88,15 +95,47 @@ export function ConversationSettings({
   const avatarChanged = (avatarUrl || '') !== (conversation.avatarUrl ?? '');
   const canSaveProfile = titleChanged || avatarChanged;
 
+  const profileCacheKeys = useMemo(
+    () =>
+      [
+        ['conversations', currentUser.id] as const,
+        ['conversation', conversation.id, currentUser.id] as const,
+        ['conversation', conversation.id] as const,
+      ] as const,
+    [conversation.id, currentUser.id],
+  );
+
   const updateMutation = useMutation({
     mutationFn: () =>
       api.chat.updateConversation(conversation.id, currentUser.id, {
         ...(titleChanged ? { title: title.trim() } : {}),
         ...(avatarChanged ? { avatarUrl } : {}),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+    onMutate: async () => {
+      const keys = [...profileCacheKeys];
+      const snapshots = await snapshotQueries(queryClient, keys);
+      const patch: Partial<Pick<Conversation, 'title' | 'avatarUrl'>> = {
+        ...(titleChanged ? { title: title.trim() } : {}),
+        ...(avatarChanged ? { avatarUrl } : {}),
+      };
+      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
+        (old ?? []).map((c) => (c.id === conversation.id ? { ...c, ...patch } : c)),
+      );
+      queryClient.setQueryData<Conversation>(
+        ['conversation', conversation.id, currentUser.id],
+        (old) => (old ? { ...old, ...patch } : old),
+      );
+      queryClient.setQueryData<Conversation>(['conversation', conversation.id], (old) =>
+        old ? { ...old, ...patch } : old,
+      );
+      return { snapshots };
+    },
+    onError: (_err, _vars, ctx) => {
+      restoreQuerySnapshots(queryClient, [...profileCacheKeys], ctx?.snapshots);
+      pushToast({ title: 'Не удалось сохранить', tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [...profileCacheKeys]);
     },
   });
 
@@ -216,24 +255,103 @@ export function ConversationSettings({
 
   const isListPinned = !!(currentMember?.pinnedAt || conversation.viewerPinnedAt);
 
+  const memberCacheKeys = useMemo(
+    () =>
+      [
+        ['members', conversation.id, currentUser.id] as const,
+        ['conversation', conversation.id] as const,
+        ['conversations', currentUser.id] as const,
+      ] as const,
+    [conversation.id, currentUser.id],
+  );
+
   const addMembersMutation = useMutation({
     mutationFn: async (studentIds: string[]) => {
-      for (const targetUserId of studentIds) {
-        await api.chat.addMember(conversation.id, currentUser.id, targetUserId);
-      }
+      await api.chat.addMembers(conversation.id, currentUser.id, studentIds);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+    onMutate: async (studentIds) => {
+      const keys = [...memberCacheKeys];
+      const snapshots = await snapshotQueries(queryClient, keys);
+      const now = new Date().toISOString();
+      const optimisticMembers: ConversationMember[] = studentIds.map((userId) => ({
+        conversationId: conversation.id,
+        userId,
+        role: 'member',
+        joinedAt: now,
+        muted: false,
+      }));
+      queryClient.setQueryData<ConversationMember[]>(
+        ['members', conversation.id, currentUser.id],
+        (old) => {
+          const existing = new Set((old ?? []).map((m) => m.userId));
+          return [...(old ?? []), ...optimisticMembers.filter((m) => !existing.has(m.userId))];
+        },
+      );
+      const nextParticipantIds = [
+        ...new Set([...conversation.participantIds, ...studentIds]),
+      ];
+      queryClient.setQueryData<Conversation>(['conversation', conversation.id], (old) =>
+        old ? { ...old, participantIds: nextParticipantIds } : old,
+      );
+      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
+        (old ?? []).map((c) =>
+          c.id === conversation.id ? { ...c, participantIds: nextParticipantIds } : c,
+        ),
+      );
+      return { snapshots };
+    },
+    onError: (_err, _ids, ctx) => {
+      restoreQuerySnapshots(queryClient, [...memberCacheKeys], ctx?.snapshots);
+      pushToast({ title: 'Не удалось добавить участников', tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [...memberCacheKeys]);
     },
   });
 
   const removeMemberMutation = useMutation({
     mutationFn: (targetUserId: string) =>
       api.chat.removeMember(conversation.id, currentUser.id, targetUserId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
+    onMutate: async (targetUserId) => {
+      const keys = [
+        ['members', conversation.id, currentUser.id] as const,
+        ['conversation', conversation.id] as const,
+        ['conversations', currentUser.id] as const,
+      ];
+      const snapshots = await snapshotQueries(queryClient, keys);
+      queryClient.setQueryData<ConversationMember[]>(
+        ['members', conversation.id, currentUser.id],
+        (old) => (old ?? []).filter((m) => m.userId !== targetUserId),
+      );
+      const nextParticipantIds = conversation.participantIds.filter((id) => id !== targetUserId);
+      queryClient.setQueryData<Conversation>(['conversation', conversation.id], (old) =>
+        old ? { ...old, participantIds: nextParticipantIds } : old,
+      );
+      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
+        (old ?? []).map((c) =>
+          c.id === conversation.id ? { ...c, participantIds: nextParticipantIds } : c,
+        ),
+      );
+      return { snapshots };
+    },
+    onError: (_err, _id, ctx) => {
+      restoreQuerySnapshots(
+        queryClient,
+        [
+          ['members', conversation.id, currentUser.id],
+          ['conversation', conversation.id],
+          ['conversations', currentUser.id],
+        ],
+        ctx?.snapshots,
+      );
+      pushToast({ title: 'Не удалось удалить участника', tone: 'danger' });
+    },
+    onSettled: () => {
+      invalidateQueryKeys(queryClient, [
+        ['members', conversation.id, currentUser.id],
+        ['conversation', conversation.id],
+        ['conversations', currentUser.id],
+      ]);
     },
   });
 
@@ -248,10 +366,30 @@ export function ConversationSettings({
 
   const deleteMutation = useMutation({
     mutationFn: () => api.chat.deleteConversation(conversation.id, currentUser.id),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['conversations', currentUser.id] });
+      const prevConversations = queryClient.getQueryData<Conversation[]>([
+        'conversations',
+        currentUser.id,
+      ]);
+      queryClient.setQueryData<Conversation[]>(['conversations', currentUser.id], (old) =>
+        (old ?? []).filter((c) => c.id !== conversation.id),
+      );
+      return { prevConversations };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prevConversations) {
+        queryClient.setQueryData(['conversations', currentUser.id], ctx.prevConversations);
+      }
+      pushToast({ title: 'Не удалось удалить чат', tone: 'danger' });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
       onDeleted?.();
       onClose();
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+      void queryClient.invalidateQueries({ queryKey: ['chat-unread', currentUser.id] });
     },
   });
 
@@ -365,7 +503,10 @@ export function ConversationSettings({
                           variant="ghost"
                           size="sm"
                           onClick={() => removeMemberMutation.mutate(member.userId)}
-                          loading={removeMemberMutation.isPending}
+                          loading={
+                            removeMemberMutation.isPending &&
+                            removeMemberMutation.variables === member.userId
+                          }
                         >
                           Удалить
                         </Button>
@@ -449,10 +590,9 @@ export function ConversationSettings({
       onClose={() => setAddMembersOpen(false)}
       students={availableStudents}
       directions={directions}
-      loading={addMembersMutation.isPending}
-      disabled={!isOnline}
-      onAdd={async (studentIds) => {
-        await addMembersMutation.mutateAsync(studentIds);
+      disabled={!isOnline || addMembersMutation.isPending}
+      onAdd={(studentIds) => {
+        addMembersMutation.mutate(studentIds);
       }}
     />
     </>

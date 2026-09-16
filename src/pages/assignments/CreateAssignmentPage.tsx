@@ -17,7 +17,7 @@ import {
 } from '@/services/assignments/groups/helpers';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
-import type { AssignmentContentType } from '@/types';
+import type { Assignment, AssignmentContentType } from '@/types';
 import { readFileAsDataUrl } from '@/utils/files';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -148,6 +148,20 @@ export function AssignmentFormPage({ mode }: AssignmentFormPageProps) {
       return api.assignments.createAssignment(payload, user.id);
     },
     onSuccess: (assignment) => {
+      queryClient.setQueryData(['assignment', assignment.id], assignment);
+      queryClient.setQueriesData<Assignment[]>(
+        { queryKey: ['assignments'] },
+        (prev) => {
+          if (!prev) return prev;
+          const idx = prev.findIndex((a) => a.id === assignment.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = assignment;
+            return next;
+          }
+          return [assignment, ...prev];
+        },
+      );
       void queryClient.invalidateQueries({ queryKey: ['assignments'] });
       void queryClient.invalidateQueries({ queryKey: ['assignment', assignment.id] });
       navigate(`/assignments/${assignment.id}`);

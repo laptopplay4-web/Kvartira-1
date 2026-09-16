@@ -52,8 +52,9 @@ onRecordAfterCreateSuccess((e) => {
   try {
     const chat = require(`${__hooks}/lib/kvartiraChat.js`);
     chat.joinAdminsToGroupConversation($app, e.record);
+    chat.joinAllUsersToSchoolWideConversation($app, e.record);
   } catch (_) {
-    /* never block create on admin join */
+    /* never block create on membership sync */
   }
   e.next();
 }, 'conversations');

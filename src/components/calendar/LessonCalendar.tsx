@@ -25,7 +25,6 @@ interface LessonCalendarProps {
   filters?: CalendarFilters;
   defaultView?: CalendarViewMode;
   initialAnchor?: Date;
-  showBookAction?: boolean;
   schoolWide?: boolean;
   className?: string;
 }
@@ -57,7 +56,6 @@ export function LessonCalendar({
   filters,
   defaultView = 'day',
   initialAnchor,
-  showBookAction = true,
   schoolWide = false,
   className,
 }: LessonCalendarProps) {
@@ -151,7 +149,6 @@ export function LessonCalendar({
               teachers={teachers}
               students={students}
               viewer={calendarViewer}
-              showBookAction={showBookAction}
             />
           )}
           {view === 'week' && lessons && (

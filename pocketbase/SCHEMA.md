@@ -12,7 +12,7 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 | `users` *(auth)* | `User` | phone, role, firstName, lastName, avatarUrl (text, `pbfile:` ref), avatarOriginalUrl (text), bio, directionIds (json, student learning / teacher teaching) |
 | `directions` | `Direction` | name, description, icon — admin CRUD (`admin:directions`) |
 | `teacher_availability` | `TeacherAvailability` | teacher, schedule (json), exceptions, planningPeriod (json) |
-| `lessons` | `Lesson` | student, teacher, direction, date, startTime, status |
+| `lessons` | `Lesson` | student, teacher, direction, date, startTime, status, externalSource, externalId |
 | `lesson_history` | `LessonHistoryEntry` | lesson, action, user |
 | `conversations` | `Conversation` | type, title, participantIds, metadata, avatarUrl (text, `pbfile:` ref) |
 | `conversation_members` | `ConversationMember` | conversation, user, role, muted |
@@ -53,6 +53,7 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 |--------|------------|
 | `idx_users_phone` UNIQUE | один аккаунт на телефон |
 | `idx_lessons_teacher_slot` UNIQUE | anti double-booking (§31) |
+| `idx_lessons_external` UNIQUE | YClients upsert `(externalSource, externalId)` |
 | `idx_availability_teacher` UNIQUE | одно расписание на препода |
 | `idx_conv_member` UNIQUE | один membership на пару |
 | `idx_event_registration` UNIQUE | одна регистрация на событие |

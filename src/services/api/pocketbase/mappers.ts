@@ -76,6 +76,8 @@ export interface PbUserRecord extends RecordModel {
   avatarOriginalUrl?: string;
   bio?: string;
   directionIds?: string[];
+  externalSource?: string;
+  externalId?: string;
 }
 
 export interface MapUserRecordOptions {
@@ -139,6 +141,10 @@ export function mapUserRecord(
   if (r.bio) user.bio = r.bio;
   const directionIds = parseDirectionIds(r.directionIds);
   if (directionIds?.length) user.directionIds = directionIds;
+  const externalSource = emptyToUndefined(r.externalSource);
+  if (externalSource === 'yclients') user.externalSource = 'yclients';
+  const externalId = emptyToUndefined(r.externalId);
+  if (externalId) user.externalId = externalId;
 
   return user;
 }
@@ -192,6 +198,8 @@ export interface PbLessonRecord extends RecordModel {
   materials?: LessonMaterial[];
   teacherNotes?: string;
   cancelReason?: string;
+  externalSource?: string;
+  externalId?: string;
 }
 
 export function mapLessonRecord(record: PbLessonRecord | RecordModel): Lesson {
@@ -221,6 +229,12 @@ export function mapLessonRecord(record: PbLessonRecord | RecordModel): Lesson {
 
   const cancelReason = emptyToUndefined(r.cancelReason);
   if (cancelReason) lesson.cancelReason = cancelReason;
+
+  const externalSource = emptyToUndefined(r.externalSource);
+  if (externalSource === 'yclients') lesson.externalSource = 'yclients';
+
+  const externalId = emptyToUndefined(r.externalId);
+  if (externalId) lesson.externalId = externalId;
 
   return lesson;
 }

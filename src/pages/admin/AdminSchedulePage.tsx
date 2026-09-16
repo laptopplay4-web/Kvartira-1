@@ -116,7 +116,6 @@ export default function AdminSchedulePage() {
         filters={calendarFilters}
         defaultView={dateFilter ? 'day' : 'week'}
         initialAnchor={dateFilter ? parseISO(dateFilter) : undefined}
-        showBookAction={false}
         schoolWide
         className="mb-8"
         key={dateFilter || 'default'}

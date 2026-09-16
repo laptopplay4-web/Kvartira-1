@@ -1,17 +1,15 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Sparkles, Plus, CalendarDays } from 'lucide-react';
+import { Sparkles, CalendarDays } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
 import { actsAsTeacher, can, getRoleLabel } from '@/permissions';
-import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { LessonCard } from '@/components/ui/LessonCard';
 import { LessonCardSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { BookLessonLink } from '@/components/ui/BookLessonLink';
 import { HomeEventCard } from '@/components/events/HomeEventCard';
 import { HomeAssignmentsBlock } from '@/components/assignments/HomeAssignmentsBlock';
 import { getNextUpcomingEvent } from '@/services/events/helpers';
@@ -117,7 +115,6 @@ export default function HomePage() {
 
   const showTeacherInCard = !teacherView;
   const showStudentInCard = teacherView;
-  const showBookCta = can(user, 'lessons:book');
   const showAssignmentsBlock = can(user, 'assignments:view-own');
 
   const retryLessons = () => void refetchLessons();
@@ -126,20 +123,6 @@ export default function HomePage() {
   return (
     <div className="page-container">
       <HomeGreetingHeader user={user} />
-
-      {showBookCta && (
-        <Card className="mb-6 border-brand/20 bg-gradient-to-br from-brand-muted to-transparent">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-h3">Записаться на занятие</h2>
-              <p className="mt-1 text-body-sm text-text-secondary">Выберите направление и удобное время</p>
-            </div>
-            <BookLessonLink size="icon" aria-label="Записаться">
-              <Plus className="h-5 w-5" />
-            </BookLessonLink>
-          </div>
-        </Card>
-      )}
 
       <section className="mb-6">
         <h2 className="mb-3 text-label uppercase tracking-wide">Ближайшее занятие</h2>
@@ -159,13 +142,8 @@ export default function HomePage() {
           <EmptyState
             icon={CalendarDays}
             title="Пока нет предстоящих занятий"
-            description="Запишитесь на удобное время"
+            description="Занятия появятся из расписания школы"
             className="py-8"
-            action={
-              showBookCta ? (
-                <BookLessonLink size="sm">Найти занятие</BookLessonLink>
-              ) : undefined
-            }
           />
         )}
       </section>
@@ -231,13 +209,8 @@ export default function HomePage() {
           <EmptyState
             icon={CalendarDays}
             title="Пока нет предстоящих занятий"
-            description="Запишитесь на удобное время"
+            description="Занятия появятся из расписания школы"
             className="py-8"
-            action={
-              showBookCta ? (
-                <BookLessonLink size="sm">Найти занятие</BookLessonLink>
-              ) : undefined
-            }
           />
         ) : null}
       </section>

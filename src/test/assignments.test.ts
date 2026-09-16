@@ -506,6 +506,17 @@ describe('mock assignment groups API', () => {
     expect(updated.memberIds).toContain(student.id);
   });
 
+  it('teacher adds multiple members in one batch', async () => {
+    const group = await mockAssignmentGroupsApi.createGroup({ name: 'Batch' }, teacher.id);
+    const updated = await mockAssignmentGroupsApi.addMembers(
+      group.id,
+      [student.id, otherStudent.id],
+      teacher.id,
+    );
+    expect(updated.memberIds).toContain(student.id);
+    expect(updated.memberIds).toContain(otherStudent.id);
+  });
+
   it('student cannot create group', async () => {
     await expect(
       mockAssignmentGroupsApi.createGroup({ name: 'Хакеры' }, student.id),

@@ -1,4 +1,5 @@
 import type { CookieConsentPreferences } from '@/services/cookies/types';
+import { startWebVitals } from '@/services/perf/webVitals';
 
 /**
  * Analytics / marketing loaders.
@@ -57,6 +58,7 @@ export function applyCookieConsentScripts(
   if (preferences.analytics && !analyticsLoaded) {
     loadYandexMetrika();
     loadGoogleAnalytics();
+    void startWebVitals();
     analyticsLoaded = true;
   }
 

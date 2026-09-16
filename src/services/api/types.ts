@@ -135,6 +135,7 @@ export interface LessonsApi {
     durationMinutes?: number;
     excludeLessonId?: string;
   }): Promise<TimeSlot[]>;
+  /** @deprecated In-app booking UI removed — prefer YClients inbound sync. Kept for mock/tests until outbound live. */
   bookLesson(input: BookLessonInput, studentId: string): Promise<Lesson>;
   rescheduleLesson(id: string, input: RescheduleLessonInput, userId: string): Promise<Lesson>;
   cancelLesson(id: string, userId: string, reason?: string): Promise<Lesson>;
@@ -223,6 +224,11 @@ export interface ChatApi {
   searchMessages(userId: string, query: string): Promise<MessageSearchResult[]>;
   getMembers(conversationId: string, userId: string): Promise<ConversationMember[]>;
   addMember(conversationId: string, userId: string, targetUserId: string): Promise<ConversationMember>;
+  addMembers(
+    conversationId: string,
+    userId: string,
+    targetUserIds: string[],
+  ): Promise<ConversationMember[]>;
   removeMember(conversationId: string, userId: string, targetUserId: string): Promise<void>;
   leaveConversation(conversationId: string, userId: string): Promise<void>;
   updateConversation(
@@ -474,6 +480,11 @@ export interface AssignmentGroupsApi {
   createGroup(input: CreateAssignmentGroupInput, requesterId: string): Promise<AssignmentGroup>;
   updateGroup(id: string, input: UpdateAssignmentGroupInput, requesterId: string): Promise<AssignmentGroup>;
   addMember(groupId: string, studentId: string, requesterId: string): Promise<AssignmentGroup>;
+  addMembers(
+    groupId: string,
+    studentIds: string[],
+    requesterId: string,
+  ): Promise<AssignmentGroup>;
   removeMember(groupId: string, studentId: string, requesterId: string): Promise<AssignmentGroup>;
   deleteGroup(id: string, requesterId: string): Promise<void>;
 }

@@ -31,6 +31,8 @@ export const MESSAGE_SEARCH_DEBOUNCE_MS = 300;
 
 export const SCHOOL_WIDE_CHAT_DEFAULT_TITLE = 'Общий чат';
 
+export const PINNED_MESSAGES_LIMIT = 5;
+
 export const MAX_CHAT_AVATAR_FILE_SIZE = 5 * 1024 * 1024;
 export const CHAT_AVATAR_OUTPUT_SIZE = 256;
 export const CHAT_AVATAR_JPEG_QUALITY = 0.85;

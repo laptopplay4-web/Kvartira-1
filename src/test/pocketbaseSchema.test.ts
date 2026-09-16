@@ -247,6 +247,29 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(source).toContain('terms_of_service');
   });
 
+  it('yclients external ids migration adds source/id fields and unique index', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1792500000_kvartira_yclients_external_ids.js'),
+      'utf8',
+    );
+    expect(source).toContain('externalSource');
+    expect(source).toContain('externalId');
+    expect(source).toContain('idx_lessons_external');
+    expect(source).toContain("'yclients'");
+    expect(source).toContain('users');
+    expect(source).toContain('lessons');
+  });
+
+  it('yclients webhook stub hook wires secret verification', () => {
+    const hook = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/yclients.pb.js'), 'utf8');
+    const lib = readFileSync(resolve(ROOT, 'pocketbase/pb_hooks/lib/kvartiraYclients.js'), 'utf8');
+    expect(hook).toContain("/api/kvartira/yclients/webhook");
+    expect(hook).toContain('kvartiraYclients');
+    expect(lib).toContain('verifyWebhookSecret');
+    expect(lib).toContain('handleWebhookPayload');
+    expect(lib).toContain('YCLIENTS_WEBHOOK_SECRET');
+  });
+
   it('avatar purpose select fix migration sets full purpose values list', () => {
     const source = readFileSync(
       resolve(ROOT, 'pocketbase/pb_migrations/1789795200_kvartira_avatar_purpose_select.js'),

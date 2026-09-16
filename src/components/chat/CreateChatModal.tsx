@@ -11,7 +11,7 @@ import {
   canCreateSchoolWideChat,
 } from '@/services/chat/access';
 import { SCHOOL_WIDE_CHAT_DEFAULT_TITLE } from '@/services/chat/constants';
-import { useCreateConversation } from '@/hooks/useCreateConversation';
+import { useCreateConversation, type CreateConversationVars } from '@/hooks/useCreateConversation';
 import { api } from '@/services/api';
 import type { User } from '@/types';
 
@@ -72,53 +72,52 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
     onCreated(conversationId);
   };
 
-  const submitPersonal = async () => {
-    const studentId = selectedUserIds[0];
-    if (!studentId || createMutation.isPending) return;
+  const submitCreate = async (input: CreateConversationVars) => {
+    if (createMutation.isPending) return;
     setSubmitError('');
     try {
-      const conv = await createMutation.mutateAsync({
-        type: 'personal',
-        participantIds: [studentId],
-      });
+      const conv = await createMutation.mutateAsync(input);
       finishCreated(conv.id);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать чат');
+      setSubmitError(
+        error instanceof Error ? error.message : 'Не удалось создать чат',
+      );
     }
+  };
+
+  const submitPersonal = async () => {
+    const studentId = selectedUserIds[0];
+    if (!studentId) return;
+    const student = students.find((u) => u.id === studentId);
+    await submitCreate({
+      type: 'personal',
+      participantIds: [studentId],
+      displayTitle: student ? `${student.firstName} ${student.lastName}`.trim() : undefined,
+    });
   };
 
   const submitGroup = async () => {
-    if (!title.trim() || selectedUserIds.length === 0 || createMutation.isPending) return;
-    setSubmitError('');
-    try {
-      const conv = await createMutation.mutateAsync({
-        type: 'group',
-        title: title.trim(),
-        participantIds: selectedUserIds,
-        ...(avatarUrl ? { avatarUrl } : {}),
-      });
-      finishCreated(conv.id);
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать группу');
-    }
+    if (!title.trim() || selectedUserIds.length === 0) return;
+    await submitCreate({
+      type: 'group',
+      title: title.trim(),
+      participantIds: selectedUserIds,
+      displayTitle: title.trim(),
+      ...(avatarUrl ? { avatarUrl } : {}),
+    });
   };
 
   const submitSchoolWide = async () => {
-    if (!title.trim() || createMutation.isPending) return;
-    setSubmitError('');
-    try {
-      const conv = await createMutation.mutateAsync({
-        type: 'group',
-        title: title.trim(),
-        // Pass visible directory so PB does not re-fetch + getOne every user (RBAC/hangs)
-        participantIds: users.map((u) => u.id),
-        allUsers: true,
-        ...(avatarUrl ? { avatarUrl } : {}),
-      });
-      finishCreated(conv.id);
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать общий чат');
-    }
+    if (!title.trim()) return;
+    await submitCreate({
+      type: 'group',
+      title: title.trim(),
+      // Pass visible directory so PB does not re-fetch + getOne every user (RBAC/hangs)
+      participantIds: users.map((u) => u.id),
+      allUsers: true,
+      displayTitle: title.trim(),
+      ...(avatarUrl ? { avatarUrl } : {}),
+    });
   };
 
   const modalTitle =
@@ -162,7 +161,14 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
     ) : undefined;
 
   return (
-    <Modal open={open} onClose={onClose} title={modalTitle} size="lg" footer={stepFooter}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={modalTitle}
+      size="lg"
+      footer={stepFooter}
+      dismissible={!createMutation.isPending}
+    >
       {step === 'choose' && (
         <div className="flex flex-col gap-2">
           {canPersonal && (

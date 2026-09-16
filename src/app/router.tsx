@@ -11,7 +11,6 @@ const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPasswordPage'));
 const HomePage = lazy(() => import('@/pages/home/HomePage'));
 const LessonsPage = lazy(() => import('@/pages/lessons/LessonsPage'));
 const LessonDetailPage = lazy(() => import('@/pages/lessons/LessonDetailPage'));
-const BookLessonPage = lazy(() => import('@/pages/lessons/BookLessonPage'));
 const ChatPage = lazy(() => import('@/pages/chat/ChatPage'));
 const EventsPage = lazy(() => import('@/pages/events/EventsPage'));
 const EventsArchivePage = lazy(() => import('@/pages/events/EventsArchivePage'));
@@ -74,7 +73,7 @@ export const appRoutes = [
         children: [
           { path: '/home', element: <HomePage /> },
           { path: '/lessons', element: <LessonsPage /> },
-          { path: '/lessons/book', element: <BookLessonPage /> },
+          { path: '/lessons/book', element: <Navigate to="/lessons" replace /> },
           { path: '/lessons/availability', element: <AvailabilityPage /> },
           { path: '/lessons/:id', element: <LessonDetailPage /> },
           { path: '/chat', element: <ChatPage /> },

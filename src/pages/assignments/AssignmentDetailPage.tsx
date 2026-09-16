@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { getAssignmentGroupLabel } from '@/services/assignments/groups/helpers';
 import { formatUserName } from '@/utils';
 import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
+import type { Assignment } from '@/types';
 
 export default function AssignmentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -49,12 +50,29 @@ export default function AssignmentDetailPage() {
 
   const deleteMutation = useMutation({
     mutationFn: () => api.assignments.deleteAssignment(id!, user.id),
+    onMutate: async () => {
+      const assignmentId = id!;
+      await queryClient.cancelQueries({ queryKey: ['assignments'] });
+      const previous = queryClient.getQueriesData<Assignment[]>({ queryKey: ['assignments'] });
+      queryClient.setQueriesData<Assignment[]>(
+        { queryKey: ['assignments'] },
+        (old) => (old ?? []).filter((a) => a.id !== assignmentId),
+      );
+      return { previous };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previous) {
+        for (const [key, data] of ctx.previous) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+      setDeleteError(e instanceof ApiError ? e.message : 'Не удалось удалить задание');
+    },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['assignments'] });
       navigate('/assignments', { replace: true });
     },
-    onError: (e) => {
-      setDeleteError(e instanceof ApiError ? e.message : 'Не удалось удалить задание');
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 

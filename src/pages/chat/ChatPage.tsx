@@ -19,8 +19,14 @@ import { useBackNavigation } from '@/hooks/useBackNavigation';
 import { useClearChatSeen } from '@/hooks/useClearChatSeen';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { canManageChats } from '@/services/chat/access';
-import { canPinMessage } from '@/services/chat/messages';
-import { getConversationDisplayTitle, isGroupLike, orderPinnedMessagesNewestFirst, sortConversationsWithPins } from '@/services/chat/helpers';
+import { canPinMessage, toggleReactionList } from '@/services/chat/messages';
+import {
+  getConversationDisplayTitle,
+  isGroupLike,
+  isOptimisticConversationId,
+  orderPinnedMessagesNewestFirst,
+  sortConversationsWithPins,
+} from '@/services/chat/helpers';
 import type { ChatFilter } from '@/services/chat/helpers';
 import { useConversationMembers } from '@/hooks/useConversationMembers';
 import { ForwardMessageModal } from '@/components/chat/ForwardMessageModal';
@@ -44,6 +50,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MessageCircle } from 'lucide-react';
+import { PINNED_MESSAGES_LIMIT } from '@/services/chat/constants';
 
 export default function ChatPage() {
   const { id: activeId } = useParams<{ id: string }>();
@@ -77,6 +84,12 @@ export default function ChatPage() {
   const freezePinnedScrollSyncRef = useRef(false);
 
   const { draft, setDraft, clearDraft } = useChatDraft(activeId);
+
+  useEffect(() => {
+    if (activeId && isOptimisticConversationId(activeId)) {
+      navigate('/chat', { replace: true });
+    }
+  }, [activeId, navigate]);
 
   useChatRealtime(user.id, activeId);
 
@@ -117,13 +130,28 @@ export default function ChatPage() {
 
   const deleteConversationMutation = useMutation({
     mutationFn: (conversationId: string) => api.chat.deleteConversation(conversationId, user.id),
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations', user.id] });
+      const previous = queryClient.getQueryData<Conversation[]>(['conversations', user.id]);
+      queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
+        (old ?? []).filter((c) => c.id !== conversationId),
+      );
+      return { previous, conversationId };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(['conversations', user.id], ctx.previous);
+      }
+    },
     onSuccess: (_void, conversationId) => {
       setPendingDeleteId(null);
-      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
       if (activeId === conversationId) {
         navigate('/chat');
       }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+      void queryClient.invalidateQueries({ queryKey: ['chat-unread', user.id] });
     },
   });
 
@@ -407,31 +435,112 @@ export default function ChatPage() {
 
   const handleReact = (message: Message, emoji: string) => {
     if (!activeId) return;
-    void api.chat.setMessageReaction(activeId, message.id, user.id, emoji).then(() => {
-      queryClient.invalidateQueries({ queryKey: ['messages', activeId, user.id] });
+    const messagesKey = ['messages', activeId, user.id] as const;
+    const previous = queryClient.getQueryData(messagesKey);
+    const nextReactions = toggleReactionList(
+      message.reactions ?? message.metadata?.reactions ?? [],
+      emoji,
+      user.id,
+    );
+    queryClient.setQueryData(messagesKey, (old: unknown) => {
+      if (!old || typeof old !== 'object' || !('pages' in old)) return old;
+      const data = old as { pages: { messages: Message[] }[] };
+      return {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          messages: page.messages.map((m) =>
+            m.id === message.id
+              ? {
+                  ...m,
+                  reactions: nextReactions,
+                  metadata: { ...m.metadata, reactions: nextReactions },
+                }
+              : m,
+          ),
+        })),
+      };
     });
+    void api.chat.setMessageReaction(activeId, message.id, user.id, emoji).then(
+      (updated) => {
+        queryClient.setQueryData(messagesKey, (old: unknown) => {
+          if (!old || typeof old !== 'object' || !('pages' in old)) return old;
+          const data = old as { pages: { messages: Message[] }[] };
+          return {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              messages: page.messages.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)),
+            })),
+          };
+        });
+      },
+      () => {
+        queryClient.setQueryData(messagesKey, previous);
+      },
+    );
+  };
+
+  const patchPinnedIds = (messageId: string, pin: boolean) => {
+    if (!activeId) return;
+    const apply = (ids: string[] | undefined) => {
+      const current = ids ?? [];
+      if (pin) {
+        return current.includes(messageId)
+          ? current
+          : [messageId, ...current].slice(0, PINNED_MESSAGES_LIMIT);
+      }
+      return current.filter((id) => id !== messageId);
+    };
+    queryClient.setQueryData<Conversation>(['conversation', activeId, user.id], (old) =>
+      old ? { ...old, pinnedMessageIds: apply(old.pinnedMessageIds) } : old,
+    );
+    queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
+      (old ?? []).map((c) =>
+        c.id === activeId ? { ...c, pinnedMessageIds: apply(c.pinnedMessageIds) } : c,
+      ),
+    );
   };
 
   const handlePinMessage = (message: Message) => {
     if (!activeId) return;
     const alreadyPinned = activeConversation?.pinnedMessageIds?.includes(message.id);
-    const op = alreadyPinned
-      ? api.chat.unpinMessage(activeId, message.id, user.id)
-      : api.chat.pinMessage(activeId, message.id, user.id);
-    void op.then(() => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', activeId, user.id] });
-      queryClient.invalidateQueries({ queryKey: ['pinned-messages', activeId, user.id] });
-    });
+    const pin = !alreadyPinned;
+    const prevConversation = queryClient.getQueryData(['conversation', activeId, user.id]);
+    const prevConversations = queryClient.getQueryData(['conversations', user.id]);
+    patchPinnedIds(message.id, pin);
+    const op = pin
+      ? api.chat.pinMessage(activeId, message.id, user.id)
+      : api.chat.unpinMessage(activeId, message.id, user.id);
+    void op.then(
+      () => {
+        void queryClient.invalidateQueries({ queryKey: ['pinned-messages', activeId, user.id] });
+        void queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+        void queryClient.invalidateQueries({ queryKey: ['conversation', activeId, user.id] });
+      },
+      () => {
+        queryClient.setQueryData(['conversation', activeId, user.id], prevConversation);
+        queryClient.setQueryData(['conversations', user.id], prevConversations);
+      },
+    );
   };
 
   const handleUnpinMessage = (message: Message) => {
     if (!activeId) return;
-    void api.chat.unpinMessage(activeId, message.id, user.id).then(() => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', activeId, user.id] });
-      queryClient.invalidateQueries({ queryKey: ['pinned-messages', activeId, user.id] });
-    });
+    const prevConversation = queryClient.getQueryData(['conversation', activeId, user.id]);
+    const prevConversations = queryClient.getQueryData(['conversations', user.id]);
+    patchPinnedIds(message.id, false);
+    void api.chat.unpinMessage(activeId, message.id, user.id).then(
+      () => {
+        void queryClient.invalidateQueries({ queryKey: ['pinned-messages', activeId, user.id] });
+        void queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
+        void queryClient.invalidateQueries({ queryKey: ['conversation', activeId, user.id] });
+      },
+      () => {
+        queryClient.setQueryData(['conversation', activeId, user.id], prevConversation);
+        queryClient.setQueryData(['conversations', user.id], prevConversations);
+      },
+    );
   };
 
   const handlePinnedBarClick = () => {
@@ -734,6 +843,7 @@ export default function ChatPage() {
         currentUser={user}
         users={users ?? []}
         onCreated={(conversationId) => {
+          if (isOptimisticConversationId(conversationId)) return;
           setCreateOpen(false);
           navigate(`/chat/${conversationId}`);
         }}

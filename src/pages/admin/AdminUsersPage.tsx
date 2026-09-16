@@ -39,8 +39,19 @@ export default function AdminUsersPage() {
   const roleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: 'student' | 'teacher' }) =>
       api.users.updateUserRole(currentUser.id, userId, role),
-    onMutate: ({ userId }) => {
+    onMutate: async ({ userId, role }) => {
       setPromotingUserId(userId);
+      await queryClient.cancelQueries({ queryKey: ['users'] });
+      const previous = queryClient.getQueryData<User[]>(['users']);
+      queryClient.setQueryData<User[]>(['users'], (old) =>
+        (old ?? []).map((u) => (u.id === userId ? { ...u, role } : u)),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(['users'], ctx.previous);
+      }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['users'] });

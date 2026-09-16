@@ -1,12 +1,9 @@
-import { Link } from 'react-router-dom';
 import type { Lesson, User } from '@/types';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Button } from '@/components/ui/Button';
 import { CalendarDays } from 'lucide-react';
 import { CalendarLessonItem } from './CalendarLessonItem';
 import { sortLessonsByTime } from '@/services/calendar/helpers';
 import { formatFullDate } from '@/utils/dates';
-import { can } from '@/permissions';
 
 interface DayViewProps {
   date: string;
@@ -15,7 +12,6 @@ interface DayViewProps {
   teachers: Map<string, User>;
   students: Map<string, User>;
   viewer: User;
-  showBookAction?: boolean;
 }
 
 export function DayView({
@@ -25,7 +21,6 @@ export function DayView({
   teachers,
   students,
   viewer,
-  showBookAction,
 }: DayViewProps) {
   const dayLessons = sortLessonsByTime(lessons.filter((l) => l.date === date));
 
@@ -35,13 +30,6 @@ export function DayView({
         icon={CalendarDays}
         title="Нет занятий"
         description="На выбранную дату занятий нет."
-        action={
-          showBookAction && can(viewer, 'lessons:book') ? (
-            <Link to="/lessons/book">
-              <Button>Записаться на занятие</Button>
-            </Link>
-          ) : undefined
-        }
       />
     );
   }

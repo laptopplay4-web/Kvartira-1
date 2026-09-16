@@ -321,6 +321,73 @@ async function findMemberRecord(conversationId: string, userId: string) {
   }
 }
 
+function isPbUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof ClientResponseError)) return false;
+  if (error.status === 409) return true;
+  const raw =
+    typeof error.response?.message === 'string' ? error.response.message : error.message;
+  if (/unique|not unique|duplicate/i.test(raw)) return true;
+  const data = error.response?.data;
+  if (data && typeof data === 'object') {
+    for (const field of Object.values(data as Record<string, unknown>)) {
+      if (!field || typeof field !== 'object') continue;
+      const code = String((field as { code?: string }).code ?? '');
+      const message = String((field as { message?: string }).message ?? '');
+      if (/unique/i.test(code) || /unique/i.test(message)) return true;
+    }
+  }
+  return false;
+}
+
+function memberRoleFromRecord(record: RecordModel): string {
+  const withGet = record as RecordModel & { get?: (key: string) => unknown; getString?: (key: string) => string };
+  if (typeof withGet.getString === 'function') {
+    try {
+      return withGet.getString('role') || '';
+    } catch {
+      /* fall through */
+    }
+  }
+  return String((record as { role?: unknown }).role ?? '');
+}
+
+/**
+ * Create membership idempotently — races with joinAdmins hooks (idx_conv_member).
+ * Promotes to owner when needed.
+ */
+async function ensureConversationMember(
+  conversationId: string,
+  userId: string,
+  role: 'owner' | 'admin' | 'member',
+): Promise<void> {
+  const pb = getPocketBase();
+  const existing = await findMemberRecord(conversationId, userId);
+  if (existing) {
+    if (role === 'owner' && memberRoleFromRecord(existing) !== 'owner') {
+      await pb.collection('conversation_members').update(existing.id, { role: 'owner' });
+    }
+    return;
+  }
+  try {
+    await pb.collection('conversation_members').create({
+      conversation: conversationId,
+      user: userId,
+      role,
+    });
+  } catch (error) {
+    if (isPbUniqueViolation(error)) {
+      if (role === 'owner') {
+        const raced = await findMemberRecord(conversationId, userId);
+        if (raced && memberRoleFromRecord(raced) !== 'owner') {
+          await pb.collection('conversation_members').update(raced.id, { role: 'owner' });
+        }
+      }
+      return;
+    }
+    throw error;
+  }
+}
+
 async function assertConversationAccess(
   conversationId: string,
   userId: string,
@@ -499,7 +566,10 @@ async function createSystemMessage(
     messageType: 'system',
     metadata: { system: event },
   });
-  return resolveMessage(mapMessageRecord(record));
+  // System lines have no attachments — skip file resolve.
+  const message = mapMessageRecord(record);
+  chatRealtimeService.emit({ type: 'message.created', conversationId, message });
+  return message;
 }
 
 async function updateParticipantIds(conversationId: string, participantIds: string[]): Promise<void> {
@@ -683,22 +753,16 @@ export const pocketbaseChatApi: ChatApi = {
 
   async sendMessage(conversationId, userId, text, options: SendMessageOptions = {}) {
     return withPbError(async () => {
-      const { user, conversation, members } = await assertConversationAccess(conversationId, userId);
+      const pb = getPocketBase();
+      // Fast path: self user + conversation + own membership (not full member list).
+      const [user, conversation, memberRecord] = await Promise.all([
+        getRequesterUser(userId),
+        loadConversationOrThrow(conversationId),
+        findMemberRecord(conversationId, userId),
+      ]);
+      const members = memberRecord ? [mapConversationMemberRecord(memberRecord)] : [];
       if (!canSendToConversation(user, conversation, members)) {
         throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
-      }
-
-      const pb = getPocketBase();
-
-      if (options.clientMutationId) {
-        try {
-          const dup = await pb.collection('messages').getFirstListItem(
-            `conversation = "${escapePbFilter(conversationId)}" && sender = "${escapePbFilter(userId)}" && clientMutationId = "${escapePbFilter(options.clientMutationId)}"`,
-          );
-          return resolveMessage(mapMessageRecord(dup));
-        } catch (error) {
-          if (!(error instanceof ClientResponseError) || error.status !== 404) throw error;
-        }
       }
 
       const attachments = options.attachments ?? [];
@@ -739,28 +803,56 @@ export const pocketbaseChatApi: ChatApi = {
       if (options.replyToMessageId) body.replyToMessageId = options.replyToMessageId;
       if (attachments.length > 0) body.attachments = attachments;
 
-      const record = await pb.collection('messages').create(body);
-      const msg = await resolveMessage(mapMessageRecord(record));
-
-      // Side-effects must not fail the send — otherwise the client marks the
-      // already-created message as failed until the next refetch.
+      let record;
       try {
-        const memberRecord = await findMemberRecord(conversationId, userId);
-        if (memberRecord) {
-          await pb.collection('conversation_members').update(memberRecord.id, {
-            lastReadMessageId: msg.id,
-            lastReadAt: new Date().toISOString(),
-          });
+        record = await pb.collection('messages').create(body);
+      } catch (error) {
+        // Retry path: unique clientMutationId — return existing instead of pre-flight 404 roundtrip.
+        if (
+          options.clientMutationId &&
+          error instanceof ClientResponseError &&
+          (error.status === 400 || error.status === 409)
+        ) {
+          try {
+            const dup = await pb.collection('messages').getFirstListItem(
+              `conversation = "${escapePbFilter(conversationId)}" && sender = "${escapePbFilter(userId)}" && clientMutationId = "${escapePbFilter(options.clientMutationId)}"`,
+            );
+            return attachments.length > 0
+              ? resolveMessage(mapMessageRecord(dup))
+              : mapMessageRecord(dup);
+          } catch {
+            /* fall through */
+          }
         }
-      } catch {
-        /* best-effort read cursor */
+        throw error;
       }
+      // Text-only: skip attachment URL resolve (extra PB file roundtrips).
+      const msg =
+        attachments.length > 0
+          ? await resolveMessage(mapMessageRecord(record))
+          : mapMessageRecord(record);
 
       try {
         chatRealtimeService.emit({ type: 'message.created', conversationId, message: msg });
       } catch {
         /* local UI emit only */
       }
+
+      // Fire-and-forget read cursor — must not delay the optimistic → sent transition.
+      void (async () => {
+        try {
+          const row = memberRecord ?? (await findMemberRecord(conversationId, userId));
+          if (row) {
+            await pb.collection('conversation_members').update(row.id, {
+              lastReadMessageId: msg.id,
+              lastReadAt: new Date().toISOString(),
+            });
+          }
+        } catch {
+          /* best-effort */
+        }
+      })();
+
       return msg;
     });
   },
@@ -984,36 +1076,43 @@ export const pocketbaseChatApi: ChatApi = {
         avatarRef,
       );
 
-      // Owner first (access), then the rest in parallel — omit muted (PB bool blank issues)
-      await pb.collection('conversation_members').create({
-        conversation: convRecord.id,
-        user: userId,
-        role: 'owner',
-      });
+      // Owner + members idempotently (hooks may already have joined admins).
+      await ensureConversationMember(convRecord.id, userId, 'owner');
       const others = uniqueParticipants.filter((id) => id !== userId);
       const memberResults = await Promise.allSettled(
         others.map((participantId) =>
-          pb.collection('conversation_members').create({
-            conversation: convRecord.id,
-            user: participantId,
-            role: 'member',
-          }),
+          ensureConversationMember(convRecord.id, participantId, 'member'),
         ),
       );
       const memberFailures = memberResults.filter((r) => r.status === 'rejected');
-      if (memberFailures.length > 0 && memberFailures.length === others.length) {
+      if (memberFailures.length > 0) {
+        const first = memberFailures[0] as PromiseRejectedResult;
+        throw first.reason instanceof Error
+          ? first.reason
+          : new ApiError('Не удалось добавить участников', 'INTERNAL', 500);
+      }
+
+      // Heal participantIds from actual membership (selected students must be present).
+      const membersAfter = await loadMembers(convRecord.id);
+      const memberIds = [...new Set(membersAfter.map((m) => m.userId))];
+      const missing = uniqueParticipants.filter((id) => !memberIds.includes(id));
+      if (missing.length > 0) {
         throw new ApiError('Не удалось добавить участников', 'INTERNAL', 500);
       }
+      const healedParticipantIds = [...new Set([...uniqueParticipants, ...memberIds])];
+      await updateParticipantIds(convRecord.id, healedParticipantIds);
 
       if (avatarRef) {
         const fileId = parseStoredFileRef(avatarRef);
         if (fileId) await linkStoredFilesToContext([fileId], convRecord.id);
       }
 
-      const conv = await resolveConversationAvatar(mapConversationRecord(convRecord));
-      const members = await loadMembers(conv.id);
+      const conv = await resolveConversationAvatar({
+        ...(await loadConversationOrThrow(convRecord.id)),
+        participantIds: healedParticipantIds,
+      });
       chatRealtimeService.emit({ type: 'conversation.updated', conversationId: conv.id, conversation: conv });
-      return enrichConversation(conv, userId, [], members);
+      return enrichConversation(conv, userId, [], membersAfter);
     });
   },
 
@@ -1105,23 +1204,25 @@ export const pocketbaseChatApi: ChatApi = {
       }
 
       const targets = await Promise.all(toAdd.map((id) => getRequesterUser(id)));
-      const pb = getPocketBase();
-      const records = await Promise.all(
-        toAdd.map((targetUserId) =>
-          pb.collection('conversation_members').create({
-            conversation: conversationId,
-            user: targetUserId,
-            role: 'member',
-            muted: false,
-          }),
-        ),
+      await Promise.all(
+        toAdd.map((targetUserId) => ensureConversationMember(conversationId, targetUserId, 'member')),
       );
 
       await updateParticipantIds(conversationId, [
         ...new Set([...conversation.participantIds, ...toAdd]),
       ]);
 
-      await Promise.all(
+      const now = new Date().toISOString();
+      const added: ConversationMember[] = toAdd.map((targetUserId) => ({
+        conversationId,
+        userId: targetUserId,
+        role: 'member',
+        joinedAt: now,
+        muted: false,
+      }));
+
+      // System messages + member.joined — fire-and-forget so UI is not blocked 3–4s.
+      void Promise.all(
         targets.map((target, index) => {
           const targetUserId = toAdd[index]!;
           return createSystemMessage(
@@ -1133,13 +1234,21 @@ export const pocketbaseChatApi: ChatApi = {
               actorId: userId,
               targetUserId,
             },
-          ).then(() => {
-            chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
-          });
+          )
+            .then(() => {
+              chatRealtimeService.emit({
+                type: 'member.joined',
+                conversationId,
+                userId: targetUserId,
+              });
+            })
+            .catch(() => {
+              /* best-effort system line */
+            });
         }),
       );
 
-      return records.map(mapConversationMemberRecord);
+      return added;
     });
   },
 
@@ -1257,14 +1366,18 @@ export const pocketbaseChatApi: ChatApi = {
       if (!memberRecord) throw new ApiError('Участник не найден', 'NOT_FOUND', 404);
 
       const pb = getPocketBase();
-      const record = await pb.collection('conversation_members').update(memberRecord.id, {
-        // PB bool: false often stored as blank — use null to clear mute
-        muted: input.muted ? true : null,
-        mutedUntil: input.mutedUntil ?? null,
-      });
+      // PB optional bool: false/blank clears; never send mutedUntil:null together with mute-on
+      // (some PB builds clear sibling fields oddly). Unmute clears until explicitly.
+      const body: Record<string, unknown> = input.muted
+        ? { muted: true }
+        : { muted: null, mutedUntil: null };
+      if (input.muted && input.mutedUntil) {
+        body.mutedUntil = input.mutedUntil;
+      }
+      const record = await pb.collection('conversation_members').update(memberRecord.id, body);
       const member = mapConversationMemberRecord(record);
       member.muted = input.muted;
-      member.mutedUntil = input.mutedUntil ?? null;
+      member.mutedUntil = input.muted ? (input.mutedUntil ?? null) : null;
       return member;
     });
   },

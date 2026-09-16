@@ -1,11 +1,11 @@
 # Graph Report - Kvartira 1  (2026-09-16)
 
 ## Corpus Check
-- 459 files · ~215,001 words
+- 460 files · ~216,262 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2884 nodes · 3201 edges · 441 communities (295 shown, 146 thin omitted)
+- 2893 nodes · 3216 edges · 446 communities (297 shown, 149 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 123 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
@@ -84,6 +84,7 @@
 - useChatMessages.ts
 - TypingIndicator.tsx
 - assignments/validation.ts
+- useCreateConversation.ts
 - home.test.tsx
 - nav.test.tsx
 - routes.test.tsx
@@ -198,7 +199,7 @@
 - auth.ts
 - users.ts
 - pocketbaseAdapter.test.ts
-- pocketbase/groups.ts
+- pocketbase/helpers.ts
 - events.ts
 - kvartiraEvents.js
 - kvartiraChat.js
@@ -307,10 +308,15 @@
 - zod
 - ReportMessageModal.tsx
 - kvartiraAuth.js
-- pocketbase/helpers.ts
+- kvartiraSecurity.js
+- pocketbase
 - adminInbox.ts
 - kvartiraLegalBootstrap.js
 - clsx
+- kvartiraNotifications.js
+- 1792400000_kvartira_legal_docs_bootstrap.js
+- 1789104000_kvartira_all_autodate.js
+- messageCache.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
@@ -339,7 +345,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (441 total, 146 thin omitted)
+## Communities (446 total, 149 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -725,9 +731,9 @@ Nodes (5): extractPbFieldError(), mapPocketBaseError(), PB_FIELD_MESSAGE_MAP, PB
 Cohesion: 0.05
 Nodes (29): coerceJsonObjectFromContacts(), mapSchoolSettingsRecord(), mapUserRecord(), MapUserRecordOptions, parseDirectionIds(), parseSchoolContacts(), PbAssignmentGroupRecord, PbAssignmentRecord (+21 more)
 
-### Community 249 - "pocketbase/groups.ts"
-Cohesion: 0.29
-Nodes (5): ensureGeneralAssignmentGroup(), pocketbaseAssignmentGroupsApi, resolveAssignmentGroupIdForWrite(), relId(), mapAssignmentGroupRecord()
+### Community 249 - "pocketbase/helpers.ts"
+Cohesion: 0.17
+Nodes (10): ensureGeneralAssignmentGroup(), pocketbaseAssignmentGroupsApi, resolveAssignmentGroupIdForWrite(), escapePbFilter(), getPbRecordCreatedAt(), getPbRecordUpdatedAt(), normalizePbDateTime(), pbEqOr() (+2 more)
 
 ### Community 251 - "events.ts"
 Cohesion: 0.19
@@ -750,8 +756,8 @@ Cohesion: 0.41
 Nodes (11): assertAssignmentCreate(), assertAssignmentGroupCreate(), assertAssignmentGroupDelete(), assertAssignmentGroupUpdate(), assertAssignmentUpdate(), assertMembersAreStudents(), isUsersAuth(), notifyAssignmentCreated() (+3 more)
 
 ### Community 260 - "pocketbase/chat.ts"
-Cohesion: 0.13
-Nodes (15): assertConversationAccess(), createConversationWithAvatar(), ensureAdminGroupMembershipPb(), ensureSchoolWideMembershipPb(), isPbUrlFieldError(), loadConversationOrThrow(), loadMembers(), loadUserMembers() (+7 more)
+Cohesion: 0.12
+Nodes (19): assertConversationAccess(), createConversationWithAvatar(), ensureAdminGroupMembershipPb(), ensureConversationMember(), ensureSchoolWideMembershipPb(), findMemberRecord(), isPbUniqueViolation(), isPbUrlFieldError() (+11 more)
 
 ### Community 261 - "Готовность к выкладке на сервер"
 Cohesion: 0.25
@@ -950,33 +956,45 @@ Cohesion: 0.24
 Nodes (10): acceptCookieConsent(), buildPreferences(), decideCookieConsent(), getCookieConsentPreferences(), hasAcceptedCookieConsent(), hasCookieConsentDecision(), parseStored(), preferencesFromDecision() (+2 more)
 
 ### Community 429 - "kvartiraAuth.js"
-Cohesion: 0.05
-Nodes (30): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+22 more)
+Cohesion: 0.28
+Nodes (11): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+3 more)
 
-### Community 434 - "pocketbase/helpers.ts"
-Cohesion: 0.39
-Nodes (5): escapePbFilter(), getPbRecordCreatedAt(), getPbRecordUpdatedAt(), normalizePbDateTime(), pbEqOr()
+### Community 434 - "kvartiraSecurity.js"
+Cohesion: 0.31
+Nodes (8): assertSecuritySessionCreate(), assertSecuritySessionUpdate(), auth, fingerprintToken(), markOnlyCurrentSession(), recordSecuritySession(), relId(), trimSecuritySessions()
 
 ### Community 437 - "kvartiraLegalBootstrap.js"
 Cohesion: 0.67
 Nodes (3): DOCS, ensureRequiredLegalDocuments(), findExisting()
 
+### Community 440 - "kvartiraNotifications.js"
+Cohesion: 0.36
+Nodes (6): assertNotificationCreate(), assertNotificationPreferencesCreate(), assertNotificationPreferencesUpdate(), isUsersAuth(), relId(), teacherSharesContextWith()
+
+### Community 441 - "1792400000_kvartira_legal_docs_bootstrap.js"
+Cohesion: 0.40
+Nodes (3): BOOTSTRAP_DOCS, bootstrapMissingLegalDocuments(), findExisting()
+
+### Community 445 - "messageCache.ts"
+Cohesion: 0.60
+Nodes (4): appendMessagesInInfiniteCache(), MessagesInfiniteData, sameSystemEvent(), upsertMessageInInfiniteCache()
+
 ## Knowledge Gaps
-- **947 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+942 more)
+- **948 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+943 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **146 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **149 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
   _High betweenness centrality (0.002) - this node is a cross-community bridge._
+- **Why does `AssignmentGroupsApi` connect `AssignmentGroupsApi` to `types.ts`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `UsersApi` connect `UsersApi` to `types.ts`?**
-  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _947 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _948 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

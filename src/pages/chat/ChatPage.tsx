@@ -18,7 +18,7 @@ import { useSearchMessages } from '@/hooks/useSearchMessages';
 import { useBackNavigation } from '@/hooks/useBackNavigation';
 import { useClearChatSeen } from '@/hooks/useClearChatSeen';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
-import { canManageChats } from '@/services/chat/access';
+import { canManageChats, isMemberMuted } from '@/services/chat/access';
 import { canPinMessage } from '@/services/chat/messages';
 import { getConversationDisplayTitle, isGroupLike, orderPinnedMessagesNewestFirst, sortConversationsWithPins } from '@/services/chat/helpers';
 import type { ChatFilter } from '@/services/chat/helpers';
@@ -123,6 +123,7 @@ export default function ChatPage() {
       queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
         (old ?? []).filter((c) => c.id !== conversationId),
       );
+      setPendingDeleteId(null);
       if (activeId === conversationId) {
         navigate('/chat');
       }
@@ -132,9 +133,6 @@ export default function ChatPage() {
       if (ctx?.previous) {
         queryClient.setQueryData(['conversations', user.id], ctx.previous);
       }
-    },
-    onSuccess: () => {
-      setPendingDeleteId(null);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
@@ -180,7 +178,7 @@ export default function ChatPage() {
     onSuccess: (member, { conversationId }) => {
       queryClient.setQueryData<Conversation[]>(['conversations', user.id], (old) =>
         (old ?? []).map((c) =>
-          c.id === conversationId ? { ...c, viewerMuted: !!member.muted } : c,
+          c.id === conversationId ? { ...c, viewerMuted: isMemberMuted(member) } : c,
         ),
       );
       queryClient.setQueryData<ConversationMember[]>(
@@ -188,10 +186,6 @@ export default function ChatPage() {
         (old) =>
           (old ?? []).map((m) => (m.userId === user.id ? { ...m, ...member } : m)),
       );
-    },
-    onSettled: (_data, _err, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['members', vars.conversationId, user.id] });
     },
   });
 

@@ -632,6 +632,32 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     });
     expect(member.lastReadAt).toBe('2026-08-01T12:00:00.000Z');
 
+    const mutedTrue = mapConversationMemberRecord({
+      id: 'cm-mute',
+      collectionId: 'conversation_members',
+      collectionName: 'conversation_members',
+      created: '2026-08-01 12:00:00.000Z',
+      updated: '2026-08-01 12:00:00.000Z',
+      conversation: 'conv-1',
+      user: 'user-student',
+      role: 'member',
+      muted: true,
+    });
+    expect(mutedTrue.muted).toBe(true);
+
+    const mutedBlank = mapConversationMemberRecord({
+      id: 'cm-blank',
+      collectionId: 'conversation_members',
+      collectionName: 'conversation_members',
+      created: '2026-08-01 12:00:00.000Z',
+      updated: '2026-08-01 12:00:00.000Z',
+      conversation: 'conv-1',
+      user: 'user-student',
+      role: 'member',
+      muted: null,
+    });
+    expect(mutedBlank.muted).toBe(false);
+
     const message = mapMessageRecord({
       id: 'msg-1',
       collectionId: 'messages',
@@ -728,6 +754,13 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(chatApi).toContain('reconcileParticipantIds');
     expect(chatApi).toMatch(/deleteRows\('messages'\)/);
     expect(chatApi).toMatch(/deleteRows\('conversation_members'\)/);
+  });
+
+  it('chat createConversation uses idempotent membership (hook race safe)', () => {
+    const chatApi = readFileSync(resolve(ROOT, 'src/services/api/pocketbase/chat.ts'), 'utf8');
+    expect(chatApi).toContain('ensureConversationMember');
+    expect(chatApi).toContain('isPbUniqueViolation');
+    expect(chatApi).toMatch(/ensureConversationMember\(convRecord\.id, userId, 'owner'\)/);
   });
 
   it('buildUnreadCandidateFilter scopes by lastReadAt and excludes own/system', async () => {

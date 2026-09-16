@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { ChatAvatarEditor } from '@/components/chat/ChatAvatarEditor';
 import { AddGroupMembersModal } from '@/components/assignments/AddGroupMembersModal';
 import { api } from '@/services/api';
-import type { Conversation, ConversationMember, User } from '@/types';
+import type { Conversation, ConversationMember, Message, User } from '@/types';
 import { formatUserName } from '@/utils';
 import { getRoleLabel } from '@/permissions';
 import { filterUsersBySearchQuery } from '@/services/users/helpers';
@@ -19,6 +19,10 @@ import {
 } from '@/services/chat/access';
 import { isSchoolWideConversation } from '@/services/chat/schoolWide';
 import { sortConversationsWithPins } from '@/services/chat/helpers';
+import {
+  appendMessagesInInfiniteCache,
+  type MessagesInfiniteData,
+} from '@/services/chat/messageCache';
 import { useConversationMembers } from '@/hooks/useConversationMembers';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { Avatar } from '@/components/ui/Avatar';
@@ -158,10 +162,6 @@ export function ConversationSettings({
           ),
       );
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
-    },
   });
 
   const pinListMutation = useMutation({
@@ -222,22 +222,24 @@ export function ConversationSettings({
     onMutate: async (studentIds) => {
       const membersKey = ['members', conversation.id, currentUser.id] as const;
       const conversationKey = ['conversation', conversation.id] as const;
+      const messagesKey = ['messages', conversation.id, currentUser.id] as const;
       await queryClient.cancelQueries({ queryKey: membersKey });
       await queryClient.cancelQueries({ queryKey: conversationKey });
+      void queryClient.cancelQueries({ queryKey: messagesKey });
 
       const prevMembers = queryClient.getQueryData<ConversationMember[]>(membersKey);
       const prevConversation = queryClient.getQueryData<Conversation>(conversationKey);
+      const prevMessages = queryClient.getQueryData<MessagesInfiniteData>(messagesKey);
       const now = new Date().toISOString();
       const existing = new Set((prevMembers ?? []).map((m) => m.userId));
-      const optimistic: ConversationMember[] = studentIds
-        .filter((id) => !existing.has(id))
-        .map((userId) => ({
-          conversationId: conversation.id,
-          userId,
-          role: 'member' as const,
-          joinedAt: now,
-          muted: false,
-        }));
+      const toAdd = studentIds.filter((id) => !existing.has(id));
+      const optimistic: ConversationMember[] = toAdd.map((userId) => ({
+        conversationId: conversation.id,
+        userId,
+        role: 'member' as const,
+        joinedAt: now,
+        muted: false,
+      }));
 
       if (optimistic.length > 0) {
         queryClient.setQueryData<ConversationMember[]>(membersKey, [
@@ -251,10 +253,37 @@ export function ConversationSettings({
             participantIds: [...new Set([...base.participantIds, ...studentIds])],
           };
         });
+
+        const actorName = formatUserName(currentUser);
+        const systemMessages: Message[] = toAdd.map((targetId, index) => {
+          const target = users.find((u) => u.id === targetId);
+          const targetName = target ? formatUserName(target) : 'участника';
+          return {
+            id: `optimistic-add-${conversation.id}-${targetId}-${now}-${index}`,
+            conversationId: conversation.id,
+            senderId: currentUser.id,
+            text: `${actorName} добавил ${targetName}`,
+            createdAt: now,
+            status: 'sent' as const,
+            readBy: [currentUser.id],
+            messageType: 'system' as const,
+            metadata: {
+              system: {
+                event: 'member_added' as const,
+                actorId: currentUser.id,
+                targetUserId: targetId,
+              },
+            },
+            clientMutationId: `optimistic-add-${targetId}`,
+          };
+        });
+        queryClient.setQueryData<MessagesInfiniteData>(messagesKey, (old) =>
+          appendMessagesInInfiniteCache(old, systemMessages),
+        );
       }
 
       setAddMembersOpen(false);
-      return { prevMembers, prevConversation };
+      return { prevMembers, prevConversation, prevMessages };
     },
     onError: (_err, _ids, ctx) => {
       if (ctx?.prevMembers) {
@@ -263,12 +292,18 @@ export function ConversationSettings({
       if (ctx?.prevConversation) {
         queryClient.setQueryData(['conversation', conversation.id], ctx.prevConversation);
       }
+      if (ctx?.prevMessages) {
+        queryClient.setQueryData(
+          ['messages', conversation.id, currentUser.id],
+          ctx.prevMessages,
+        );
+      }
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
       void queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
       void queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
-      void queryClient.invalidateQueries({ queryKey: ['messages', conversation.id, currentUser.id] });
+      // Messages arrive via optimistic + realtime message.created — no full refetch.
     },
   });
 
@@ -278,11 +313,16 @@ export function ConversationSettings({
     onMutate: async (targetUserId) => {
       const membersKey = ['members', conversation.id, currentUser.id] as const;
       const conversationKey = ['conversation', conversation.id] as const;
+      const messagesKey = ['messages', conversation.id, currentUser.id] as const;
       await queryClient.cancelQueries({ queryKey: membersKey });
       await queryClient.cancelQueries({ queryKey: conversationKey });
+      void queryClient.cancelQueries({ queryKey: messagesKey });
 
       const prevMembers = queryClient.getQueryData<ConversationMember[]>(membersKey);
       const prevConversation = queryClient.getQueryData<Conversation>(conversationKey);
+      const prevMessages = queryClient.getQueryData<MessagesInfiniteData>(messagesKey);
+      const target = users.find((u) => u.id === targetUserId);
+      const now = new Date().toISOString();
 
       queryClient.setQueryData<ConversationMember[]>(membersKey, (prev) =>
         (prev ?? []).filter((m) => m.userId !== targetUserId),
@@ -295,7 +335,29 @@ export function ConversationSettings({
         };
       });
 
-      return { prevMembers, prevConversation };
+      const removeMsg: Message = {
+        id: `optimistic-remove-${conversation.id}-${targetUserId}-${now}`,
+        conversationId: conversation.id,
+        senderId: currentUser.id,
+        text: `${formatUserName(currentUser)} удалил ${target ? formatUserName(target) : 'участника'}`,
+        createdAt: now,
+        status: 'sent',
+        readBy: [currentUser.id],
+        messageType: 'system',
+        metadata: {
+          system: {
+            event: 'member_removed',
+            actorId: currentUser.id,
+            targetUserId,
+          },
+        },
+        clientMutationId: `optimistic-remove-${targetUserId}`,
+      };
+      queryClient.setQueryData<MessagesInfiniteData>(messagesKey, (old) =>
+        appendMessagesInInfiniteCache(old, [removeMsg]),
+      );
+
+      return { prevMembers, prevConversation, prevMessages };
     },
     onError: (_err, _id, ctx) => {
       if (ctx?.prevMembers) {
@@ -304,11 +366,17 @@ export function ConversationSettings({
       if (ctx?.prevConversation) {
         queryClient.setQueryData(['conversation', conversation.id], ctx.prevConversation);
       }
+      if (ctx?.prevMessages) {
+        queryClient.setQueryData(
+          ['messages', conversation.id, currentUser.id],
+          ctx.prevMessages,
+        );
+      }
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['members', conversation.id, currentUser.id] });
       void queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      void queryClient.invalidateQueries({ queryKey: ['messages', conversation.id, currentUser.id] });
+      // Messages via optimistic + realtime — no messages refetch.
     },
   });
 

@@ -518,12 +518,13 @@ export function mapConversationMemberRecord(
   record: PbConversationMemberRecord | RecordModel,
 ): ConversationMember {
   const r = record as PbConversationMemberRecord;
+  const mutedRaw = readRecordField(record, 'muted') ?? r.muted;
   const member: ConversationMember = {
     conversationId: relId(r.conversation),
     userId: relId(r.user),
     role: r.role,
     joinedAt: getPbRecordCreatedAt(record, r.lastReadAt),
-    muted: Boolean(r.muted),
+    muted: mutedRaw === true || mutedRaw === 1 || mutedRaw === 'true',
   };
 
   const lastReadMessageId = emptyToUndefined(r.lastReadMessageId);

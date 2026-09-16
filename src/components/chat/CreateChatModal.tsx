@@ -72,53 +72,59 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
     onCreated(conversationId);
   };
 
-  const submitPersonal = async () => {
+  const submitPersonal = () => {
     const studentId = selectedUserIds[0];
     if (!studentId || createMutation.isPending) return;
     setSubmitError('');
-    try {
-      const conv = await createMutation.mutateAsync({
-        type: 'personal',
-        participantIds: [studentId],
-      });
-      finishCreated(conv.id);
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать чат');
-    }
+    createMutation.mutate(
+      { type: 'personal', participantIds: [studentId] },
+      {
+        onSuccess: (conv) => finishCreated(conv.id),
+        onError: (error) => {
+          setSubmitError(error instanceof Error ? error.message : 'Не удалось создать чат');
+        },
+      },
+    );
   };
 
-  const submitGroup = async () => {
+  const submitGroup = () => {
     if (!title.trim() || selectedUserIds.length === 0 || createMutation.isPending) return;
     setSubmitError('');
-    try {
-      const conv = await createMutation.mutateAsync({
+    createMutation.mutate(
+      {
         type: 'group',
         title: title.trim(),
         participantIds: selectedUserIds,
         ...(avatarUrl ? { avatarUrl } : {}),
-      });
-      finishCreated(conv.id);
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать группу');
-    }
+      },
+      {
+        onSuccess: (conv) => finishCreated(conv.id),
+        onError: (error) => {
+          setSubmitError(error instanceof Error ? error.message : 'Не удалось создать группу');
+        },
+      },
+    );
   };
 
-  const submitSchoolWide = async () => {
+  const submitSchoolWide = () => {
     if (!title.trim() || createMutation.isPending) return;
     setSubmitError('');
-    try {
-      const conv = await createMutation.mutateAsync({
+    createMutation.mutate(
+      {
         type: 'group',
         title: title.trim(),
         // Pass visible directory so PB does not re-fetch + getOne every user (RBAC/hangs)
         participantIds: users.map((u) => u.id),
         allUsers: true,
         ...(avatarUrl ? { avatarUrl } : {}),
-      });
-      finishCreated(conv.id);
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать общий чат');
-    }
+      },
+      {
+        onSuccess: (conv) => finishCreated(conv.id),
+        onError: (error) => {
+          setSubmitError(error instanceof Error ? error.message : 'Не удалось создать общий чат');
+        },
+      },
+    );
   };
 
   const modalTitle =

@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.176 Chat delete purge + member count heal · 2026-09-16
+Версия: 1.178 Chat UX: system msgs / send / mute · 2026-09-16
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -465,7 +465,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 
-**Итого:** 731 passed (48 files); booking cancel past-slot flake вне scope.
+**Итого:** 734 passed (48 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -619,6 +619,8 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Chat list load speed (unread + batch files) | ✅ 2026-09-13, см. §174 |
 | Chat group members batch + optimistic UI | ✅ 2026-09-16, см. §175 |
 | Chat delete purge + member count heal | ✅ 2026-09-16, см. §176 |
+| Chat create unique race + optimistic UX | ✅ 2026-09-16, см. §177 |
+| Chat UX: system msgs / send / mute | ✅ 2026-09-16, см. §178 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1431,8 +1433,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **731** (48 files); booking cancel / authStoreSync / routes waitFor flake вне scope; §176 chat delete |
-| Graphify | 2884 nodes, 3201 edges, 441 communities |
+| Тесты | **734** (48 files); booking cancel flake вне scope; §178 chat UX |
+| Graphify | 2893 nodes, 3216 edges, 446 communities |
 
 ### Фазы (кратко)
 
@@ -1454,7 +1456,76 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2884 nodes, 3201 edges, 441 communities (post-§176).
+**Graphify stats:** 2893 nodes, 3216 edges, 446 communities (post-§178).
+
+---
+
+## 178. Chat UX — system messages / send lag / mute flash (2026-09-16)
+
+**Scope:** system «добавил участника» с задержкой 3–4 с; send 2–3 с до «sent»; mute-иконка мигает и пропадает.
+
+**Graphify:** `messageCache` → `useChatRealtime` / `useSendMessage` / `ConversationSettings`; `createSystemMessage` emit; `muteConversation` PB bool.
+
+### System messages (✅)
+
+- Optimistic system lines в `ConversationSettings` add/remove (мгновенно в ленте).
+- PB `addMembers`: system messages fire-and-forget после roster update (не блокируют return).
+- Mock + PB: `message.created` emit; realtime merge в cache без full refetch.
+- `upsertMessageInInfiniteCache` заменяет optimistic system по `metadata.system`.
+
+### Send lag (✅)
+
+- Realtime `message.created` → cache upsert (не invalidate messages).
+- `sendMessage`: без pre-flight dedup 404; text без `resolveMessage`; success без invalidate conversations.
+- Dedup только при unique conflict на create.
+
+### Mute flash (✅)
+
+- Убран `onSettled` invalidate members/conversations (overwrite optimistic).
+- PB mute-on: только `{ muted: true }` (без `mutedUntil: null`).
+- Mapper: muted только `true`/`1`/`'true'`; ответ API форсирует `input.muted`.
+- ChatPage: импорт `isMemberMuted`.
+
+### Tests
+
+`chat` messageCache + system after addMembers; adapter muted true/null; suite **734**. typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2893 nodes, 3216 edges, 446 communities.
+
+---
+
+## 177. Chat create unique race + optimistic create/delete UX (2026-09-16)
+
+**Scope:** «Value must be unique» при создании группы/общего чата; модалка не закрывалась; выбранные ученики не попадали в группу; create/delete без мгновенного UI.
+
+**Graphify:** `createConversation()` → `ensureConversationMember()` ↔ `joinAdminsToGroupConversation` hook; `useCreateConversation` optimistic list.
+
+### Root cause (✅)
+
+- PB hook после create conversation сразу пишет admins в `conversation_members`.
+- Клиент снова create тех же user (в т.ч. admin-создатель как owner) → `idx_conv_member` unique → throw.
+- Чат уже создан, memberships обрывались → пустой/неполный roster.
+
+### Fix (✅)
+
+- `ensureConversationMember` — idempotent create + promote to owner; unique = success.
+- После create — verify все `uniqueParticipants` в members, heal `participantIds`.
+- `useCreateConversation` — optimistic строка в списке; модалка закрывается по success.
+- Delete confirm — `setPendingDeleteId(null)` в `onMutate` (диалог не висит после optimistic remove).
+
+### Tests
+
+adapter ensureConversationMember wiring +1; suite **732**. typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2888 nodes, 3209 edges, 440 communities.
 
 ---
 

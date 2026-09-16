@@ -7,6 +7,10 @@ import {
   bumpConversationInList,
   conversationPreviewFromMessage,
 } from '@/services/chat/helpers';
+import {
+  upsertMessageInInfiniteCache,
+  type MessagesInfiniteData,
+} from '@/services/chat/messageCache';
 
 export function useChatRealtime(userId: string | undefined, activeConversationId?: string) {
   const queryClient = useQueryClient();
@@ -35,17 +39,25 @@ export function useChatRealtime(userId: string | undefined, activeConversationId
                 userId,
               );
             });
+            // Merge into open message caches — avoid full refetch (2–3s lag after send).
+            queryClient.setQueriesData<MessagesInfiniteData>(
+              { queryKey: ['messages', event.conversationId] },
+              (old) => upsertMessageInInfiniteCache(old, event.message!),
+            );
           }
-          queryClient.invalidateQueries({ queryKey: ['messages', event.conversationId] });
-          queryClient.invalidateQueries({ queryKey: ['conversations', userId] });
-          queryClient.invalidateQueries({ queryKey: ['conversation', event.conversationId, userId] });
           queryClient.invalidateQueries({ queryKey: ['chat-unread', userId] });
           break;
         case 'message.updated':
         case 'message.deleted':
-          queryClient.invalidateQueries({ queryKey: ['messages', event.conversationId] });
+          if (event.message) {
+            queryClient.setQueriesData<MessagesInfiniteData>(
+              { queryKey: ['messages', event.conversationId] },
+              (old) => upsertMessageInInfiniteCache(old, event.message!),
+            );
+          } else {
+            queryClient.invalidateQueries({ queryKey: ['messages', event.conversationId] });
+          }
           queryClient.invalidateQueries({ queryKey: ['conversations', userId] });
-          queryClient.invalidateQueries({ queryKey: ['conversation', event.conversationId, userId] });
           queryClient.invalidateQueries({ queryKey: ['chat-unread', userId] });
           break;
         case 'message.read':
@@ -54,8 +66,12 @@ export function useChatRealtime(userId: string | undefined, activeConversationId
         case 'member.left':
           queryClient.invalidateQueries({ queryKey: ['conversations', userId] });
           if (event.conversationId) {
-            queryClient.invalidateQueries({ queryKey: ['conversation', event.conversationId, userId] });
-            queryClient.invalidateQueries({ queryKey: ['members', event.conversationId, userId] });
+            queryClient.invalidateQueries({
+              queryKey: ['conversation', event.conversationId, userId],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ['members', event.conversationId, userId],
+            });
           }
           break;
         default:

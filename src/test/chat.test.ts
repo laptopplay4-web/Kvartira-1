@@ -8,8 +8,56 @@ import {
   resolvePinnedIndexForViewport,
   sortConversationsWithPins,
 } from '@/services/chat/helpers';
+import {
+  appendMessagesInInfiniteCache,
+  upsertMessageInInfiniteCache,
+} from '@/services/chat/messageCache';
 import type { Conversation, Message } from '@/types';
 import { users } from '@/mocks/seed';
+
+describe('messageCache', () => {
+  it('upserts by id and replaces optimistic system lines by event', () => {
+    const optimistic: Message = {
+      id: 'optimistic-add-u2',
+      conversationId: 'c1',
+      senderId: 'u1',
+      text: 'A добавил B',
+      createdAt: '2026-09-13T10:00:00.000Z',
+      status: 'sent',
+      readBy: ['u1'],
+      messageType: 'system',
+      clientMutationId: 'optimistic-add-u2',
+      metadata: { system: { event: 'member_added', actorId: 'u1', targetUserId: 'u2' } },
+    };
+    let cache = upsertMessageInInfiniteCache(undefined, optimistic);
+    expect(cache.pages[0]!.messages).toHaveLength(1);
+
+    const real: Message = {
+      ...optimistic,
+      id: 'msg-real',
+      clientMutationId: undefined,
+      text: 'A добавил B',
+    };
+    cache = upsertMessageInInfiniteCache(cache, real);
+    expect(cache.pages[0]!.messages).toHaveLength(1);
+    expect(cache.pages[0]!.messages[0]!.id).toBe('msg-real');
+  });
+
+  it('appendMessagesInInfiniteCache merges several messages', () => {
+    const base = {
+      conversationId: 'c1',
+      senderId: 'u1',
+      status: 'sent' as const,
+      readBy: ['u1'],
+      messageType: 'user' as const,
+    };
+    const cache = appendMessagesInInfiniteCache(undefined, [
+      { ...base, id: '1', text: 'a', createdAt: '2026-09-13T10:00:00.000Z' },
+      { ...base, id: '2', text: 'b', createdAt: '2026-09-13T10:01:00.000Z' },
+    ]);
+    expect(cache.pages[0]!.messages.map((m) => m.id)).toEqual(['1', '2']);
+  });
+});
 
 describe('chat access', () => {
   beforeEach(() => {
@@ -1026,6 +1074,10 @@ describe('group management', () => {
     const refreshed = await mockChatApi.getConversation(conv.id, 'user-teacher-1');
     expect(refreshed.participantIds).toEqual(
       expect.arrayContaining(['user-student', 'user-student-2']),
+    );
+    const page = await mockChatApi.getMessages(conv.id, 'user-teacher-1');
+    expect(page.messages.some((m) => m.messageType === 'system' && m.text.includes('добавил'))).toBe(
+      true,
     );
   });
 

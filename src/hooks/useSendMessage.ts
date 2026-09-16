@@ -2,8 +2,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import type { Conversation, Message, MessageAttachment } from '@/types';
 import { ApiError } from '@/services/api/types';
+import {
+  bumpConversationInList,
+  conversationPreviewFromMessage,
+} from '@/services/chat/helpers';
+import {
+  upsertMessageInInfiniteCache,
+  type MessagesInfiniteData,
+} from '@/services/chat/messageCache';
 import { getAttachmentsPreviewLabel } from '@/services/chat/attachments';
-import { bumpConversationInList } from '@/services/chat/helpers';
 
 function uid() {
   return `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -51,21 +58,9 @@ export function useSendMessage() {
         messageType: 'user',
       };
 
-      queryClient.setQueryData(['messages', conversationId, userId], (old: unknown) => {
-        if (!old || typeof old !== 'object' || !('pages' in old)) return old;
-        const data = old as { pages: { messages: Message[]; hasMore: boolean; nextCursor?: string }[] };
-        const pages = [...data.pages];
-        // Page 0 = newest window — append new messages there (not to last/oldest page)
-        if (pages.length === 0) {
-          pages.push({ messages: [optimistic], hasMore: false });
-        } else {
-          pages[0] = {
-            ...pages[0]!,
-            messages: [...pages[0]!.messages, optimistic],
-          };
-        }
-        return { ...data, pages };
-      });
+      queryClient.setQueryData<MessagesInfiniteData>(['messages', conversationId, userId], (old) =>
+        upsertMessageInInfiniteCache(old, optimistic),
+      );
 
       const previewText =
         text.trim() || getAttachmentsPreviewLabel(attachments) || 'Вложение';
@@ -90,21 +85,10 @@ export function useSendMessage() {
       return { previous, previousConversations, clientMutationId };
     },
     onSuccess: (msg, { conversationId, userId, clientMutationId }) => {
-      queryClient.setQueryData(['messages', conversationId, userId], (old: unknown) => {
-        if (!old || typeof old !== 'object' || !('pages' in old)) return old;
-        const data = old as { pages: { messages: Message[]; hasMore: boolean; nextCursor?: string }[] };
-        return {
-          ...data,
-          pages: data.pages.map((page) => ({
-            ...page,
-            messages: page.messages.map((m) =>
-              m.clientMutationId === clientMutationId || m.id === clientMutationId
-                ? { ...msg, status: 'sent' as const, clientMutationId }
-                : m,
-            ),
-          })),
-        };
-      });
+      const confirmed = { ...msg, status: 'sent' as const, clientMutationId };
+      queryClient.setQueryData<MessagesInfiniteData>(['messages', conversationId, userId], (old) =>
+        upsertMessageInInfiniteCache(old, confirmed),
+      );
       queryClient.setQueryData<Conversation[]>(['conversations', userId], (old) => {
         if (!old) return old;
         return bumpConversationInList(
@@ -112,22 +96,13 @@ export function useSendMessage() {
           conversationId,
           {
             lastMessageAt: msg.createdAt,
-            lastMessage: {
-              id: msg.id,
-              text:
-                msg.text ||
-                getAttachmentsPreviewLabel(msg.attachments) ||
-                'Вложение',
-              senderId: msg.senderId,
-              createdAt: msg.createdAt,
-            },
+            lastMessage: conversationPreviewFromMessage(confirmed),
           },
           userId,
         );
       });
-      queryClient.invalidateQueries({ queryKey: ['conversations', userId] });
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId, userId] });
-      queryClient.invalidateQueries({ queryKey: ['chat-unread', userId] });
+      // No conversations/messages invalidate — cache already patched (avoids 2–3s refetch lag).
+      void queryClient.invalidateQueries({ queryKey: ['chat-unread', userId] });
     },
     onError: (_err, { conversationId, userId, clientMutationId }, ctx) => {
       if (ctx?.previousConversations) {

@@ -410,8 +410,8 @@
     "semantic_hash": ""
   },
   "src/components/chat/CreateChatModal.tsx": {
-    "mtime": 1789562097.6033132,
-    "ast_hash": "f1376bce544282547001f389dd44b047",
+    "mtime": 1789564963.9005804,
+    "ast_hash": "32b1be73b583d10253289240a4f213f9",
     "semantic_hash": ""
   },
   "src/components/chat/MessageBubble.tsx": {
@@ -440,18 +440,18 @@
     "semantic_hash": ""
   },
   "src/hooks/useCreateConversation.ts": {
-    "mtime": 1789562097.6115053,
-    "ast_hash": "c0cdecdf012e85d132169ba07fe59477",
+    "mtime": 1789564935.1064749,
+    "ast_hash": "1f9e36f45b97f1ac6867a5697fdb1eab",
     "semantic_hash": ""
   },
   "src/hooks/useSendMessage.ts": {
-    "mtime": 1789562077.3318863,
-    "ast_hash": "0839adbe9dcd940f56b8d471ab9f2cf0",
+    "mtime": 1789565617.4088535,
+    "ast_hash": "8f6024304fc91f3fac2c54e2dab1f893",
     "semantic_hash": ""
   },
   "src/pages/chat/ChatPage.tsx": {
-    "mtime": 1789563832.0352848,
-    "ast_hash": "3d34d3e2a24b936c30973eff5493b2f5",
+    "mtime": 1789565516.0413938,
+    "ast_hash": "6d351f270d359debd24f35efb416e0fb",
     "semantic_hash": ""
   },
   "src/services/chat/access.ts": {
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "src/test/chat.test.ts": {
-    "mtime": 1789563042.585062,
-    "ast_hash": "d52d53a75c2cc84a3ef8db833514ec81",
+    "mtime": 1789565730.9912887,
+    "ast_hash": "bca5281024bb0978a18ee7c911cc85ad",
     "semantic_hash": ""
   },
   "src/components/chat/AttachmentList.tsx": {
@@ -485,8 +485,8 @@
     "semantic_hash": ""
   },
   "src/components/chat/ConversationSettings.tsx": {
-    "mtime": 1789563832.0352848,
-    "ast_hash": "2110d4f7dc405e479813cb96c834a70c",
+    "mtime": 1789565617.177225,
+    "ast_hash": "6d7ebfde67a98d389c1d2775c0a3b1b7",
     "semantic_hash": ""
   },
   "src/components/chat/ImageViewer.tsx": {
@@ -530,8 +530,8 @@
     "semantic_hash": ""
   },
   "src/hooks/useChatRealtime.ts": {
-    "mtime": 1789562077.3278885,
-    "ast_hash": "c576556a0e714171cda37bd0cd482d66",
+    "mtime": 1789565412.1981783,
+    "ast_hash": "9a758f147e22a806fdc8210bd347b5be",
     "semantic_hash": ""
   },
   "src/hooks/useConversationMembers.ts": {
@@ -560,8 +560,8 @@
     "semantic_hash": ""
   },
   "src/services/api/mock/chat.ts": {
-    "mtime": 1789562942.9414215,
-    "ast_hash": "3262910187c3d08a0189333110225bd9",
+    "mtime": 1789565542.9525442,
+    "ast_hash": "00d6ec2ae922af4650084232c73924a9",
     "semantic_hash": ""
   },
   "src/services/chat/attachments.ts": {
@@ -1225,8 +1225,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/mappers.ts": {
-    "mtime": 1789563791.5811467,
-    "ast_hash": "a6fee2f50726866af19596836fdefd1e",
+    "mtime": 1789565448.3904023,
+    "ast_hash": "344ba25d55400595f713ba359afb935a",
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/users.ts": {
@@ -1235,8 +1235,8 @@
     "semantic_hash": ""
   },
   "src/test/pocketbaseAdapter.test.ts": {
-    "mtime": 1789563876.920919,
-    "ast_hash": "31f81f86efbd0ebd4c77bc7b7fef1ec6",
+    "mtime": 1789565732.7944226,
+    "ast_hash": "6b1683d12d084e0e22693e88f5f54449",
     "semantic_hash": ""
   },
   "pocketbase/pb_migrations/1788499200_kvartira_lessons_adapter.js": {
@@ -1290,8 +1290,8 @@
     "semantic_hash": ""
   },
   "src/services/api/pocketbase/chat.ts": {
-    "mtime": 1789563844.366702,
-    "ast_hash": "0f0de7a289f98f140dc634f7ab974bcf",
+    "mtime": 1789565560.9198334,
+    "ast_hash": "776ce1e5f35b77c7cc03a4f1e5f1a842",
     "semantic_hash": ""
   },
   "pocketbase/pb_hooks/assignments.pb.js": {
@@ -2307,6 +2307,11 @@
   "src/services/api/pocketbase/requester.ts": {
     "mtime": 1789562077.373872,
     "ast_hash": "ab13e800c01384581de8b12a8ba54024",
+    "semantic_hash": ""
+  },
+  "src/services/chat/messageCache.ts": {
+    "mtime": 1789565664.2112195,
+    "ast_hash": "5744329c8379c71a02f78dfc4ba96634",
     "semantic_hash": ""
   }
 }

@@ -733,6 +733,7 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
           },
         );
         db.messages.push(sysMsg);
+        chatRealtimeService.emit({ type: 'message.created', conversationId, message: sysMsg });
         chatRealtimeService.emit({ type: 'member.joined', conversationId, userId: targetUserId });
       }
 
@@ -764,7 +765,7 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         targetUserId,
       });
       db.messages.push(sysMsg);
-
+      chatRealtimeService.emit({ type: 'message.created', conversationId, message: sysMsg });
       chatRealtimeService.emit({ type: 'member.left', conversationId, userId: targetUserId });
     },
 
@@ -786,7 +787,7 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
         actorId: userId,
       });
       db.messages.push(sysMsg);
-
+      chatRealtimeService.emit({ type: 'message.created', conversationId, message: sysMsg });
       chatRealtimeService.emit({ type: 'member.left', conversationId, userId });
     },
 
@@ -814,6 +815,7 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
           newTitle: conv.title,
         });
         db.messages.push(sysMsg);
+        chatRealtimeService.emit({ type: 'message.created', conversationId, message: sysMsg });
       }
 
       chatRealtimeService.emit({ type: 'conversation.updated', conversationId, conversation: conv });

@@ -19,6 +19,10 @@ export function withAdminsInParticipants(participantIds: string[], users: User[]
 /**
  * Idempotent: add admin to every non-personal chat (membership + participantIds).
  * Personal chats stay IDOR-safe (admin is not auto-joined).
+ *
+ * Call when:
+ * - admin opens chat list / conversation (mock + PB client heal)
+ * - user is promoted to admin (PB hook `joinAdminToAllGroupChats`)
  */
 export function ensureAdminGroupMembership(
   db: Pick<AdminGroupMembershipDb, 'conversations' | 'conversationMembers'>,

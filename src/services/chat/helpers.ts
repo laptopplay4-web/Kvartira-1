@@ -188,6 +188,36 @@ export function isGroupLike(conversation: Conversation): boolean {
   return conversation.type !== 'personal';
 }
 
+/**
+ * Counterpart user ids that already share a personal 1:1 chat with `currentUserId`.
+ * Used to hide those students from the "new personal chat" picker.
+ */
+export function collectPersonalChatCounterpartIds(
+  conversations: Conversation[],
+  currentUserId: string,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const conversation of conversations) {
+    if (conversation.type !== 'personal') continue;
+    if (!conversation.participantIds.includes(currentUserId)) continue;
+    for (const participantId of conversation.participantIds) {
+      if (participantId !== currentUserId) ids.add(participantId);
+    }
+  }
+  return ids;
+}
+
+/** Students without an existing personal chat with the current staff user. */
+export function filterStudentsAvailableForPersonalChat(
+  students: User[],
+  conversations: Conversation[],
+  currentUserId: string,
+): User[] {
+  const occupied = collectPersonalChatCounterpartIds(conversations, currentUserId);
+  if (occupied.size === 0) return students;
+  return students.filter((student) => !occupied.has(student.id));
+}
+
 export function filterConversations(
   conversations: Conversation[],
   options: {

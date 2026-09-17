@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.181 Chat delete concurrent tombstones · 2026-09-17
+Версия: 1.186 Student events badge tab-seen · 2026-09-17
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -139,6 +139,7 @@ kvartira/
 │   │       ├── access.ts        # canAccessConversation, canManageMembers, mute, …
 │   │       ├── helpers.ts       # filter, sort, grouping, message search helpers
 │   │       ├── deleteTombstones.ts # in-flight delete ids (concurrent-safe)
+│   │       ├── scroll.ts        # near-bottom + pin scroll container to latest
 │   │       ├── constants.ts     # limits, MIME, typing debounce, draft prefix
 │   │       ├── messages.ts      # canEditMessage, canDeleteMessage, read receipts
 │   │       ├── validation.ts    # attachment + message server-side validation rules
@@ -231,7 +232,8 @@ kvartira/
 | `src/services/images/contrast.ts` | `detectImageTextContrast` — luminance нижней половины изображения |
 | `src/hooks/useImageTextContrast.ts` | Hook для `HomeEventCard` |
 | `src/pages/chat/ChatPage.tsx` | Messenger: list + active conversation (responsive split) |
-| `src/components/chat/MessageList.tsx` | Сообщения, date separators, pagination, auto-scroll |
+| `src/components/chat/MessageList.tsx` | Сообщения, date separators, pagination, stick-to-bottom scroll |
+| `src/services/chat/scroll.ts` | Near-bottom detect + `scrollElementToBottom` (open pin) |
 | `src/services/chat/access.ts` | IDOR-safe access helpers для чатов |
 | `src/services/api/mock/chat.ts` | Mock ChatApi: edit/delete/reply/attachments/search/group/mute/pin/realtime events |
 | `src/services/chat/realtime.ts` | `ChatRealtimeService` — mock emitter или PB subscriptions по `VITE_API_MODE` |
@@ -247,7 +249,7 @@ kvartira/
 | `src/hooks/useDeleteMessage.ts` | Soft-delete optimistic |
 | `src/hooks/useDeleteConversation.ts` | Concurrent-safe conversation delete + tombstones |
 | `src/hooks/useMarkPassiveNotificationsOnLeave.ts` | Leave `/notifications` → mark passive as read (urgent keep) |
-| `src/test/chat.test.ts` | 94 tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch, forward, delete tombstones |
+| `src/test/chat.test.ts` | 99 tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch, forward, delete tombstones, scroll helpers, personal picker filter, protect admin remove, promote→join groups |
 
 ---
 
@@ -442,7 +444,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `availability.test.ts` | validation, period form, planningPeriod slots, permissions, exceptions, mock save (29 tests) |
 | `calendar.test.ts` | date ranges, IDOR filters, booking/reschedule/cancel → calendar data |
 | `events.test.ts` | competition form, imageUrl, admin CRUD, canViewSchoolEvent, normalizeEventInput, register count/notify/participants/unread, image write-back (38 tests) |
-| `chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort by lastMessage, attachments, realtime, pagination, IDOR, notifications, cache isolation, addMembers batch |
+| `chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort by lastMessage, attachments, realtime, pagination, IDOR, notifications, cache isolation, addMembers batch, personal picker filter, protect admin remove, promote→join groups |
 | `home.test.tsx` | getNextUpcomingEvent; Home P0/P1; admin as teacher; progress block (skipped when UI hidden, §85) |
 | `nav.test.tsx` | MobileHeader assignments + bell + «О школе»; SidebarNav без notifications + «О школе»; aria-current; admin active; BottomNav brand (15 tests) |
 | `backNavigation.test.tsx` | canNavigateBack, BackLink fallback + history back + outline style (6 tests) |
@@ -476,7 +478,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 | `warmAppCache.test.ts` | persist filter, conversation warm select, shell + messages prefetch (5 tests) |
 
-**Итого:** 741 passed (49 files); booking cancel past-slot flake вне scope.
+**Итого:** 744 passed (49 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -635,6 +637,11 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Chat forward: optimistic / single target | ✅ 2026-09-16, см. §179 |
 | Cold start: RQ persist + warm prefetch | ✅ 2026-09-16, см. §180 |
 | Chat delete concurrent tombstones | ✅ 2026-09-17, см. §181 |
+| Chat open scroll to latest | ✅ 2026-09-17, см. §182 |
+| Personal chat picker — exclude existing | ✅ 2026-09-17, см. §183 |
+| Protect admin from group remove | ✅ 2026-09-17, см. §184 |
+| Admin promote → auto-join all groups | ✅ 2026-09-17, см. §185 |
+| Student events badge tab-seen | ✅ 2026-09-17, см. §186 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1447,8 +1454,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **741** (49 files); booking cancel flake вне scope; §181 chat delete |
-| Graphify | 2930 nodes, 3262 edges, 451 communities |
+| Тесты | **746** (49 files); booking cancel flake вне scope; §186 student events badge |
+| Graphify | 2940 nodes, 3276 edges, 452 communities |
 
 ### Фазы (кратко)
 
@@ -1470,7 +1477,138 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2930 nodes, 3262 edges, 451 communities (post-§181).
+**Graphify stats:** 2940 nodes, 3276 edges, 452 communities (post-§186).
+
+---
+
+## 186. Student events badge — tab seen (2026-09-17)
+
+**Scope:** у ученика бейдж на иконке «События» не гас после визита вкладки (`ignoreTabSeen` + `markEventsTabSeen` только у staff).
+
+**Graphify:** `EventsPage()` → `markEventsTabSeen()` → `countUnreadEventParticipationsForNav()` → AppLayout / BottomNav; `useMarkEventParticipationViewed()` → `+N` на карточке.
+
+### Fix (✅)
+
+- `EventsPage`: `markEventsTabSeen` для **всех** ролей + bump `['notifications']` (пересчёт бейджа).
+- `AppLayout`: убран `ignoreTabSeen` для student — иконка = unread новее `eventsTabSeen`.
+- Деталка: `markEventNotificationsRead` с optimistic + `.catch` (как ДЗ) — снимает `+N` на карточке.
+- Гибрид как у staff / §142: вкладка → иконка; деталка → карточка.
+
+### Tests
+
+`events` unread helpers (student tab seen); typecheck ✅; suite **746**.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2940 nodes, 3276 edges, 452 communities.
+
+---
+
+## 185. Admin promote → auto-join all groups (2026-09-17)
+
+**Scope:** при назначении роли `admin` пользователь сразу становится участником всех групповых чатов (не личных); idempotent heal.
+
+**Graphify:** `users.pb.js` AfterUpdate → `joinAdminToAllGroupChats()` → `ensureMemberInConversation()`; FE `ensureAdminGroupMembership()`.
+
+### Fix / harden (✅)
+
+- PB: фильтр `type = "group"` (+ fallback scan) — `!= "personal"` мог вернуть пустой список без throw.
+- PB: `asParticipantIdArray` — корректный JSONRaw decode; не затирает `participantIds` байтовым массивом.
+- Hook `onRecordAfterUpdateSuccess(users)`: любой update пользователя с `role=admin` → join (heal legacy).
+- Domain: `ensureAdminGroupMembership` — тот же контракт для mock/client heal.
+
+### Tests
+
+`chat.test.ts` +1 (promote → groups only); adapter wiring `asParticipantIdArray` / `type = "group"` → **99** в chat; suite **746**. typecheck ✅.
+
+### Deploy
+
+Выложить `pb_hooks` (`kvartiraChat.js`, `users.pb.js`) + фронт; **перезапуск PocketBase**.
+
+**Graphify stats:** 2940 nodes, 3276 edges, 452 communities.
+
+---
+
+## 184. Protect admin from group remove (2026-09-17)
+
+**Scope:** школьных администраторов (`User.role === 'admin'`) нельзя удалить из группового чата — они постоянные участники (§150 `ensureAdminGroupMembership`).
+
+**Graphify:** `canRemoveMember()` → mock/PB `removeMember` → `ConversationSettings`.
+
+### Behavior (✅)
+
+- Domain: `canRemoveMember(..., targetUser)` — fail-closed без `targetUser` в group; `role === 'admin'` → false.
+- Mock + PB: lookup target до проверки; сообщение «Администратора нельзя удалить из группового чата».
+- UI: кнопка «Удалить» только через `canRemoveMember` (скрыта у админов).
+- PB delete-hook на `conversation_members` **не** добавлен — иначе ломается purge при `deleteConversation`.
+
+### Tests
+
+`chat.test.ts` +1 (cannot remove school admin) → **98** в файле; suite **745**. typecheck ✅.
+
+### Deploy
+
+Только фронт (adapter + domain); перезапуск PB не обязателен.
+
+**Graphify stats:** 2938 nodes, 3272 edges, 447 communities.
+
+---
+
+## 183. Personal chat picker — exclude existing (2026-09-17)
+
+**Scope:** при создании личного чата в пикере не показывать учеников, с которыми у текущего staff уже есть personal 1:1.
+
+**Graphify:** `CreateChatModal()` → `filterStudentsAvailableForPersonalChat()` → `ChatPage` conversations.
+
+### Behavior (✅)
+
+- Domain: `collectPersonalChatCounterpartIds` / `filterStudentsAvailableForPersonalChat` в `services/chat/helpers.ts`.
+- Фильтр только для шага «Личный чат»; группа / общий чат — полный список учеников.
+- `CreateChatModal` получает `conversations` из `ChatPage`; empty copy: «Нет учеников без личного чата».
+- Выбор сбрасывается, если ученик пропал из доступных (список чатов обновился).
+
+### Tests
+
+`chat.test.ts` +1 (hide existing personal counterpart) → **97** в файле; suite **744**. typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2937 nodes, 3270 edges, 447 communities.
+
+---
+
+## 182. Chat open — scroll to latest (2026-09-17)
+
+**Scope:** при открытии диалога лента оставалась выше последнего сообщения (особенно с warm/persist cache); приходилось скроллить вниз вручную.
+
+**Graphify:** `MessageList()` → `scroll.ts` → `ChatPage` (`key={activeId}`).
+
+### Root cause (✅)
+
+- Initial pin зависел только от `isLoading`; при кэше `isLoading` остаётся `false` при смене чата → эффект не перезапускался.
+- `prevCountRef` / отсутствие `key` по conversation сохраняли состояние между чатами.
+- `scrollIntoView` на sentinel ненадёжен при flex-layout, финализирующемся после paint / загрузке вложений.
+
+### Fix (✅)
+
+- `key={activeId}` + `conversationId` на `MessageList`.
+- `useLayoutEffect` pin через `scrollElementToBottom` (прямой `scrollTop`).
+- `ResizeObserver` + rAF stick-to-bottom, пока пользователь у низа (не при load-more).
+- Domain helpers: `src/services/chat/scroll.ts`.
+
+### Tests
+
+`chat.test.ts` +2 (near-bottom / scrollTop) → **96** в файле; suite **743**. typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2935 nodes, 3267 edges, 452 communities.
 
 ---
 
@@ -2392,6 +2530,7 @@ adapter hook assertions + events unread; typecheck ✅.
 - Mock/PB: create event → `type: event` notify всем ученикам (invited → только invited).
 - Не в inbox колокольчика; бейдж + `+N` + mark read на деталке / tab seen.
 - AppLayout: eventsBadge для всех ролей.
+- Tab-seen для ученика восстановлен в §186 (регресс `ignoreTabSeen`).
 
 ### Deploy
 

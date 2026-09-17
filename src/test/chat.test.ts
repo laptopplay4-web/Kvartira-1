@@ -4,6 +4,7 @@ import { ApiError } from '@/services/api/types';
 import {
   bumpConversationInList,
   filterConversations,
+  filterStudentsAvailableForPersonalChat,
   orderPinnedMessagesNewestFirst,
   removeConversationFromList,
   resolvePinnedIndexForViewport,
@@ -20,8 +21,37 @@ import {
   appendMessagesInInfiniteCache,
   upsertMessageInInfiniteCache,
 } from '@/services/chat/messageCache';
-import type { Conversation, Message } from '@/types';
+import {
+  CHAT_NEAR_BOTTOM_PX,
+  getDistanceFromBottom,
+  isNearBottom,
+  scrollElementToBottom,
+} from '@/services/chat/scroll';
+import type { Conversation, Message, User } from '@/types';
 import { users } from '@/mocks/seed';
+
+describe('chat scroll helpers', () => {
+  it('detects near-bottom and distance', () => {
+    const el = { scrollHeight: 1000, scrollTop: 900, clientHeight: 80 };
+    expect(getDistanceFromBottom(el)).toBe(20);
+    expect(isNearBottom(el)).toBe(true);
+    expect(isNearBottom({ ...el, scrollTop: 0 })).toBe(false);
+    expect(isNearBottom({ scrollHeight: 1000, scrollTop: 920, clientHeight: 80 }, CHAT_NEAR_BOTTOM_PX)).toBe(
+      true,
+    );
+  });
+
+  it('scrollElementToBottom sets scrollTop to scrollHeight', () => {
+    const el = {
+      scrollHeight: 2400,
+      scrollTop: 0,
+      clientHeight: 400,
+      scrollTo: undefined as unknown as HTMLElement['scrollTo'],
+    };
+    scrollElementToBottom(el as unknown as HTMLElement, 'instant');
+    expect(el.scrollTop).toBe(2400);
+  });
+});
 
 describe('messageCache', () => {
   it('upserts by id and replaces optimistic system lines by event', () => {
@@ -109,6 +139,81 @@ describe('chat access', () => {
     expect(members.some((m) => m.userId === 'user-admin')).toBe(true);
   });
 
+  it('newly promoted admin joins every group chat (not personal)', async () => {
+    const { ensureAdminGroupMembership } = await import('@/services/chat/adminGroups');
+    const now = '2026-09-17T00:00:00.000Z';
+    const db = {
+      conversations: [
+        {
+          id: 'g-study',
+          type: 'group' as const,
+          title: 'Учёба',
+          participantIds: ['user-teacher-1', 'user-student'],
+          createdAt: now,
+          updatedAt: now,
+          lastMessageAt: now,
+        },
+        {
+          id: 'p-dm',
+          type: 'personal' as const,
+          title: '',
+          participantIds: ['user-teacher-1', 'user-student'],
+          createdAt: now,
+          updatedAt: now,
+          lastMessageAt: now,
+        },
+      ],
+      conversationMembers: [
+        {
+          conversationId: 'g-study',
+          userId: 'user-teacher-1',
+          role: 'owner' as const,
+          joinedAt: now,
+          muted: false,
+        },
+        {
+          conversationId: 'g-study',
+          userId: 'user-student',
+          role: 'member' as const,
+          joinedAt: now,
+          muted: false,
+        },
+        {
+          conversationId: 'p-dm',
+          userId: 'user-teacher-1',
+          role: 'member' as const,
+          joinedAt: now,
+          muted: false,
+        },
+        {
+          conversationId: 'p-dm',
+          userId: 'user-student',
+          role: 'member' as const,
+          joinedAt: now,
+          muted: false,
+        },
+      ],
+    };
+
+    const added = ensureAdminGroupMembership(db, 'user-promoted-admin');
+    expect(added).toBe(1);
+    expect(db.conversations[0]?.participantIds).toContain('user-promoted-admin');
+    expect(db.conversations[1]?.participantIds).not.toContain('user-promoted-admin');
+    expect(
+      db.conversationMembers.some(
+        (m) => m.conversationId === 'g-study' && m.userId === 'user-promoted-admin',
+      ),
+    ).toBe(true);
+    expect(
+      db.conversationMembers.some(
+        (m) => m.conversationId === 'p-dm' && m.userId === 'user-promoted-admin',
+      ),
+    ).toBe(false);
+
+    // Idempotent on repeat (already admin of all groups).
+    expect(ensureAdminGroupMembership(db, 'user-promoted-admin')).toBe(0);
+  });
+
   it('user can read own conversation messages', async () => {
     const result = await mockChatApi.getMessages('conv-1', 'user-student');
     expect(result.messages.length).toBeGreaterThan(0);
@@ -178,6 +283,43 @@ describe('read state', () => {
 describe('personal chat creation', () => {
   beforeEach(() => {
     resetMockDatabase();
+  });
+
+  it('hides students who already have a personal chat with the staff user', () => {
+    const students = users.filter((u) => u.role === 'student') as User[];
+    const conversations: Conversation[] = [
+      {
+        id: 'c1',
+        type: 'personal',
+        title: 'A',
+        participantIds: ['user-teacher-1', 'user-student'],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'c2',
+        type: 'group',
+        title: 'G',
+        participantIds: ['user-teacher-1', 'user-student-2'],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'c3',
+        type: 'personal',
+        title: 'Other teacher',
+        participantIds: ['user-teacher-2', 'user-student-2'],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const available = filterStudentsAvailableForPersonalChat(
+      students,
+      conversations,
+      'user-teacher-1',
+    );
+    expect(available.map((s) => s.id)).not.toContain('user-student');
+    expect(available.map((s) => s.id)).toContain('user-student-2');
   });
 
   it('returns existing personal conversation instead of duplicate', async () => {
@@ -1172,6 +1314,35 @@ describe('group management', () => {
     await mockChatApi.removeMember('conv-2', 'user-teacher-1', 'user-student-2');
     const members = await mockChatApi.getMembers('conv-2', 'user-teacher-1');
     expect(members.some((m) => m.userId === 'user-student-2')).toBe(false);
+  });
+
+  it('cannot remove school admin from group chat', async () => {
+    const { canRemoveMember } = await import('@/services/chat/access');
+    const { users } = await import('@/mocks/seed');
+
+    // Ensure admin is a member (auto-join on getConversations).
+    await mockChatApi.getConversations('user-admin');
+    const members = await mockChatApi.getMembers('conv-2', 'user-teacher-1');
+    const teacher = users.find((u) => u.id === 'user-teacher-1')!;
+    const admin = users.find((u) => u.id === 'user-admin')!;
+    const conv = await mockChatApi.getConversation('conv-2', 'user-teacher-1');
+
+    expect(
+      canRemoveMember(teacher, 'conv-2', 'user-admin', members, conv, admin),
+    ).toBe(false);
+    expect(
+      canRemoveMember(admin, 'conv-2', 'user-admin', members, conv, admin),
+    ).toBe(false);
+
+    await expect(
+      mockChatApi.removeMember('conv-2', 'user-teacher-1', 'user-admin'),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Администратора нельзя удалить из группового чата',
+    });
+
+    const after = await mockChatApi.getMembers('conv-2', 'user-teacher-1');
+    expect(after.some((m) => m.userId === 'user-admin')).toBe(true);
   });
 });
 

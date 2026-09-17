@@ -616,7 +616,9 @@ export default function ChatPage() {
           ) : (
             <>
               <MessageList
+                key={activeId}
                 ref={messageListRef}
+                conversationId={activeId}
                 messages={messages}
                 currentUserId={user.id}
                 user={user}
@@ -723,6 +725,7 @@ export default function ChatPage() {
         onClose={() => setCreateOpen(false)}
         currentUser={user}
         users={users ?? []}
+        conversations={conversations ?? []}
         onCreated={(conversationId) => {
           setCreateOpen(false);
           navigate(`/chat/${conversationId}`);

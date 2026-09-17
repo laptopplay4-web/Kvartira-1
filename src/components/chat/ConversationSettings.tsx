@@ -14,6 +14,7 @@ import {
   canDeleteConversation,
   canLeaveConversation,
   canManageMembers,
+  canRemoveMember,
   canUpdateConversation,
   isMemberMuted,
 } from '@/services/chat/access';
@@ -497,7 +498,16 @@ export function ConversationSettings({
                           <p className="text-caption text-text-muted">{getRoleLabel(user.role)}</p>
                         </div>
                       </UserPreviewTrigger>
-                      {canManage && member.userId !== currentUser.id && member.role !== 'owner' && (
+                      {canManage &&
+                        members &&
+                        canRemoveMember(
+                          currentUser,
+                          conversation.id,
+                          member.userId,
+                          members,
+                          conversation,
+                          user,
+                        ) && (
                         <Button
                           variant="ghost"
                           size="sm"

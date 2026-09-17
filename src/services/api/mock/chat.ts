@@ -741,7 +741,15 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       const user = getUserById(userId);
       assertConversationAccess(conversationId, userId);
       const conv = getConversationOrThrow(conversationId);
-      if (!canRemoveMember(user, conversationId, targetUserId, db.conversationMembers, conv)) {
+      const target = getUserById(targetUserId);
+      if (!canRemoveMember(user, conversationId, targetUserId, db.conversationMembers, conv, target)) {
+        if (target.role === 'admin' && conv.type !== 'personal') {
+          throw new ApiError(
+            'Администратора нельзя удалить из группового чата',
+            'FORBIDDEN',
+            403,
+          );
+        }
         throw new ApiError('Нет прав на удаление участника', 'FORBIDDEN', 403);
       }
       if (isSchoolWideConversation(conv)) {
@@ -752,7 +760,6 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       );
       conv.participantIds = conv.participantIds.filter((id) => id !== targetUserId);
 
-      const target = getUserById(targetUserId);
       const actor = getUserById(userId);
       const sysMsg = createSystemMessage(conv.id, `${formatUserName(actor)} удалил ${formatUserName(target)}`, {
         event: 'member_removed',

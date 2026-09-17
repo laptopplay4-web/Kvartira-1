@@ -127,16 +127,16 @@ export function markEventCardSeen(
 }
 
 /**
- * Бейдж на иконке «События»: непрочитанные event-уведомления.
- * Staff: новее визита вкладки (записи учеников).
- * Ученик: все unread до открытия мероприятия (ignoreTabSeen).
+ * Бейдж на иконке «События»: непрочитанные event-уведомления новее визита вкладки.
+ * Staff: записи/отмены учеников; ученик: новые мероприятия.
+ * После markEventsTabSeen бейдж = 0, пока не появятся более новые.
+ * (+N на карточке / деталка — отдельно через read / cardSeen.)
  */
 export function countUnreadEventParticipationsForNav(
   notifications: Pick<AppNotification, 'read' | 'type' | 'link' | 'createdAt'>[],
   userId: string,
-  options?: { ignoreTabSeen?: boolean },
 ): number {
-  const seenAt = options?.ignoreTabSeen ? null : getEventsTabSeenAt(userId);
+  const seenAt = getEventsTabSeenAt(userId);
   let count = 0;
   for (const n of notifications) {
     if (!isUnreadEventParticipationNotification(n)) continue;

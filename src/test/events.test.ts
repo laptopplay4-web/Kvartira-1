@@ -651,12 +651,10 @@ describe('event unread helpers', () => {
     expect(countUnreadEventParticipationsForNav(notifications, 'user-admin')).toBe(1);
     expect(countUnreadForEvent(notifications, 'event-2')).toBe(2);
 
-    // Ученик: бейдж не сбрасывается визитом вкладки — только markAsRead на деталке.
-    expect(
-      countUnreadEventParticipationsForNav(notifications, 'user-student', {
-        ignoreTabSeen: true,
-      }),
-    ).toBe(3);
+    // Ученик: иконка гасится визитом вкладки; +N на карточке — пока !read.
+    markEventsTabSeen('user-student', '2026-09-12T11:30:00.000Z');
+    expect(countUnreadEventParticipationsForNav(notifications, 'user-student')).toBe(1);
+    expect(countUnreadForEvent(notifications, 'event-2')).toBe(2);
   });
 
   it('card highlight clears on detail open; participants badge stays until read', async () => {

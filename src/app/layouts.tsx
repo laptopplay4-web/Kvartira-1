@@ -72,9 +72,7 @@ export function AppLayout() {
       : 0;
 
   const eventsBadge = user
-    ? countUnreadEventParticipationsForNav(notifications ?? [], user.id, {
-        ignoreTabSeen: user.role === 'student',
-      })
+    ? countUnreadEventParticipationsForNav(notifications ?? [], user.id)
     : 0;
 
   const showAdminSupportInbox = !!user && can(user, 'support:view-all-tickets');

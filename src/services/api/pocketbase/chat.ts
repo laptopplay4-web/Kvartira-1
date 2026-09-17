@@ -1255,9 +1255,6 @@ export const pocketbaseChatApi: ChatApi = {
   async removeMember(conversationId, userId, targetUserId) {
     return withPbError(async () => {
       const { user, conversation, members } = await assertConversationAccess(conversationId, userId);
-      if (!canRemoveMember(user, conversationId, targetUserId, members, conversation)) {
-        throw new ApiError('Нет прав на удаление участника', 'FORBIDDEN', 403);
-      }
       if (isSchoolWideConversation(conversation)) {
         throw new ApiError('В общем чате нельзя управлять участниками', 'FORBIDDEN', 403);
       }
@@ -1267,6 +1264,17 @@ export const pocketbaseChatApi: ChatApi = {
         findMemberRecord(conversationId, targetUserId),
         getRequesterUser(targetUserId),
       ]);
+
+      if (!canRemoveMember(user, conversationId, targetUserId, members, conversation, target)) {
+        if (target.role === 'admin' && conversation.type !== 'personal') {
+          throw new ApiError(
+            'Администратора нельзя удалить из группового чата',
+            'FORBIDDEN',
+            403,
+          );
+        }
+        throw new ApiError('Нет прав на удаление участника', 'FORBIDDEN', 403);
+      }
 
       await Promise.all([
         targetRecord

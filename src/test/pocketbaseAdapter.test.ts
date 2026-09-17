@@ -738,6 +738,8 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(lib).toContain('assertConversationPinUpdate');
     expect(lib).toContain('joinAdminsToGroupConversation');
     expect(lib).toContain('joinAdminToAllGroupChats');
+    expect(lib).toContain('asParticipantIdArray');
+    expect(lib).toContain('type = "group"');
   });
 
   it('chat list loads unread candidates instead of full message history', () => {

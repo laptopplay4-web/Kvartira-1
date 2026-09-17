@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -11,21 +11,31 @@ import {
   canCreateSchoolWideChat,
 } from '@/services/chat/access';
 import { SCHOOL_WIDE_CHAT_DEFAULT_TITLE } from '@/services/chat/constants';
+import { filterStudentsAvailableForPersonalChat } from '@/services/chat/helpers';
 import { useCreateConversation } from '@/hooks/useCreateConversation';
 import { api } from '@/services/api';
-import type { User } from '@/types';
+import type { Conversation, User } from '@/types';
 
 interface CreateChatModalProps {
   open: boolean;
   onClose: () => void;
   currentUser: User;
   users: User[];
+  /** Current user's conversations — used to hide students with an existing personal chat. */
+  conversations?: Conversation[];
   onCreated: (conversationId: string) => void;
 }
 
 type Step = 'choose' | 'personal' | 'group' | 'school';
 
-export function CreateChatModal({ open, onClose, currentUser, users, onCreated }: CreateChatModalProps) {
+export function CreateChatModal({
+  open,
+  onClose,
+  currentUser,
+  users,
+  conversations = [],
+  onCreated,
+}: CreateChatModalProps) {
   const [step, setStep] = useState<Step>('choose');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [title, setTitle] = useState('');
@@ -43,9 +53,19 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
   const canPersonal = canCreatePersonalChat(currentUser);
   const canGroup = canCreateGroupChat(currentUser);
   const canSchoolWide = canCreateSchoolWideChat(currentUser);
-  const students = users
-    .filter((u) => u.role === 'student')
-    .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'ru'));
+  const students = useMemo(
+    () =>
+      users
+        .filter((u) => u.role === 'student')
+        .sort((a, b) =>
+          `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'ru'),
+        ),
+    [users],
+  );
+  const personalStudents = useMemo(
+    () => filterStudentsAvailableForPersonalChat(students, conversations, currentUser.id),
+    [students, conversations, currentUser.id],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -57,6 +77,16 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
     setSubmitError('');
     // Do not reset mutation here — can abort in-flight school-wide create on remount
   }, [open]);
+
+  useEffect(() => {
+    if (step !== 'personal') return;
+    setSelectedUserIds((ids) => {
+      if (ids.length === 0) return ids;
+      const allowed = new Set(personalStudents.map((s) => s.id));
+      const next = ids.filter((id) => allowed.has(id));
+      return next.length === ids.length ? ids : next;
+    });
+  }, [step, personalStudents]);
 
   const openSetup = (next: 'personal' | 'group' | 'school') => {
     setSelectedUserIds([]);
@@ -195,13 +225,13 @@ export function CreateChatModal({ open, onClose, currentUser, users, onCreated }
       {step === 'personal' && (
         <div className="flex flex-col gap-4">
           <StudentPickerList
-            students={students}
+            students={personalStudents}
             directions={directions}
             selectedIds={selectedUserIds}
             onChange={setSelectedUserIds}
             mode="single"
             disabled={createMutation.isPending}
-            emptyAllLabel="Нет учеников для чата"
+            emptyAllLabel="Нет учеников без личного чата"
           />
           {submitError && <p className="text-caption text-danger">{submitError}</p>}
         </div>

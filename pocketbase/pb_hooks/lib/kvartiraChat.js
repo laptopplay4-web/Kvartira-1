@@ -18,6 +18,56 @@ function relId(value) {
 }
 
 /**
+ * Decode conversations.participantIds from JS array or PB JSONRaw ([]byte).
+ * Must not treat JSONRaw byte arrays as id lists — that would wipe participants.
+ *
+ * @param {unknown} raw
+ * @returns {string[]}
+ */
+function asParticipantIdArray(raw) {
+  if (raw == null) return [];
+
+  if (typeof raw === 'string') {
+    try {
+      return asParticipantIdArray(JSON.parse(raw));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  if (typeof raw === 'object') {
+    const keys = Object.keys(/** @type {object} */ (raw));
+    const len = Array.isArray(raw) ? raw.length : keys.length;
+    const looksIndexed =
+      Array.isArray(raw) || (keys.length > 0 && keys.every((k) => /^\d+$/.test(k)));
+
+    if (looksIndexed && len > 0) {
+      const first = /** @type {any} */ (raw)[0];
+      // JSONRaw: numeric char codes → JSON text like `["id1","id2"]`
+      if (typeof first === 'number') {
+        let jsonText = '';
+        for (let i = 0; i < len; i += 1) {
+          const code = /** @type {any} */ (raw)[i];
+          if (typeof code !== 'number') return [];
+          jsonText += String.fromCharCode(code);
+        }
+        try {
+          return asParticipantIdArray(JSON.parse(jsonText));
+        } catch (_) {
+          return [];
+        }
+      }
+    }
+
+    if (Array.isArray(raw)) {
+      return [...new Set(raw.map(String).filter(Boolean))];
+    }
+  }
+
+  return [];
+}
+
+/**
  * @param {core.Record} record
  * @returns {boolean}
  */
@@ -228,8 +278,7 @@ function joinUserToSchoolWideChats(app, userId) {
 
       let participantIds = [];
       try {
-        const rawIds = conv.get('participantIds');
-        if (Array.isArray(rawIds)) participantIds = rawIds.map(String);
+        participantIds = asParticipantIdArray(conv.get('participantIds'));
       } catch (_) {
         participantIds = [];
       }
@@ -274,8 +323,7 @@ function ensureMemberInConversation(app, conversationId, userId) {
     const conv = app.findRecordById('conversations', conversationId);
     let participantIds = [];
     try {
-      const rawIds = conv.get('participantIds');
-      if (Array.isArray(rawIds)) participantIds = rawIds.map(String);
+      participantIds = asParticipantIdArray(conv.get('participantIds'));
     } catch (_) {
       participantIds = [];
     }
@@ -320,7 +368,7 @@ function joinAdminsToGroupConversation(app, conversationRecord) {
 }
 
 /**
- * When a user becomes admin — join every non-personal conversation.
+ * When a user becomes admin — join every group conversation (not personal).
  *
  * @param {core.App} app
  * @param {string} userId
@@ -331,13 +379,17 @@ function joinAdminToAllGroupChats(app, userId) {
   try {
     /** @type {core.Record[]} */
     let convs = [];
+    // Prefer type = "group" — `!=` filters are unreliable across PB versions
+    // and may return an empty list without throwing (skipping the fallback).
     try {
-      convs = app.findRecordsByFilter('conversations', 'type != "personal"', '-id', 500, 0) || [];
+      convs = app.findRecordsByFilter('conversations', 'type = "group"', '-id', 500, 0) || [];
     } catch (_) {
-      // Fallback: scan all and filter in JS (older PB filter quirks)
+      convs = [];
+    }
+    if (!Array.isArray(convs) || convs.length === 0) {
       try {
         convs = (app.findRecordsByFilter('conversations', '', '-id', 500, 0) || []).filter(
-          (c) => String(c.getString('type') || '') !== 'personal',
+          (c) => String(c.getString('type') || '') === 'group',
         );
       } catch (_) {
         convs = [];
@@ -346,7 +398,7 @@ function joinAdminToAllGroupChats(app, userId) {
     if (!Array.isArray(convs)) convs = [];
 
     for (const conv of convs) {
-      if (String(conv.getString('type') || '') === 'personal') continue;
+      if (String(conv.getString('type') || '') !== 'group') continue;
       ensureMemberInConversation(app, String(conv.id), userId);
     }
   } catch (err) {
@@ -406,6 +458,7 @@ function assertConversationPinUpdate(e) {
 
 module.exports = {
   relId,
+  asParticipantIdArray,
   isDeletedMessage,
   syncConversationLastMessage,
   syncReadReceipts,

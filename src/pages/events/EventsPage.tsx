@@ -28,6 +28,7 @@ import { EventFormModal } from '@/components/events/EventFormModal';
 import { EventParticipationDeltaBadges } from '@/components/events/EventParticipationDeltaBadges';
 import { formatFullDate } from '@/utils/dates';
 import { EVENT_TYPE_LABELS } from '@/services/events/constants';
+import type { AppNotification } from '@/types';
 import { cn } from '@/utils';
 
 export default function EventsPage() {
@@ -53,11 +54,13 @@ export default function EventsPage() {
     queryFn: () => api.notifications.getNotifications(user.id),
   });
 
+  // Иконка «События»: гасим при входе во вкладку (staff и ученик). +N на карточке — до деталки.
   useEffect(() => {
-    if (!canManage) return;
     markEventsTabSeen(user.id);
-    void queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
-  }, [canManage, user.id, queryClient]);
+    queryClient.setQueryData<AppNotification[]>(['notifications', user.id], (old) =>
+      old ? [...old] : old,
+    );
+  }, [user.id, queryClient]);
 
   function invalidateEvents() {
     void queryClient.invalidateQueries({ queryKey: ['events'] });

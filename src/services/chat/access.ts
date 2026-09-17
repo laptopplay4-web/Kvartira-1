@@ -131,14 +131,26 @@ export function canAddMember(
   return canManageMembers(user, conversationId, members, conversation);
 }
 
+/**
+ * School admins are permanent members of group chats (ensureAdminGroupMembership).
+ * Pass `targetUser` so global role can be checked — conversation role alone is not enough
+ * (admins are often stored as conversation `member`).
+ */
 export function canRemoveMember(
   user: User,
   conversationId: string,
   targetUserId: string,
   members: ConversationMember[],
   conversation?: Conversation,
+  targetUser?: Pick<User, 'role'> | null,
 ): boolean {
   if (!canManageMembers(user, conversationId, members, conversation)) return false;
+
+  // Fail closed for groups when caller omitted targetUser (cannot verify school-admin protection).
+  if (!conversation || isGroupConversation(conversation.type)) {
+    if (!targetUser) return false;
+    if (targetUser.role === 'admin') return false;
+  }
 
   const target = getConversationMember(conversationId, targetUserId, members);
   if (!target) return false;

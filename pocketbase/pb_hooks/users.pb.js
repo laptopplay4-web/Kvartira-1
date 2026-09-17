@@ -72,12 +72,11 @@ onRecordUpdateRequest((e) => {
 
 onRecordAfterUpdateSuccess((e) => {
   try {
-    if (e.record.getString('role') !== 'admin') {
-      e.next();
-      return;
+    // School admin → member of every group chat (idempotent; also heals legacy gaps).
+    if (e.record.getString('role') === 'admin') {
+      const chat = require(`${__hooks}/lib/kvartiraChat.js`);
+      chat.joinAdminToAllGroupChats($app, String(e.record.id));
     }
-    const chat = require(`${__hooks}/lib/kvartiraChat.js`);
-    chat.joinAdminToAllGroupChats($app, String(e.record.id));
   } catch (_) {
     /* never block role change on chat join */
   }

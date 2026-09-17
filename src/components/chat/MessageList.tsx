@@ -1,9 +1,22 @@
-import { useCallback, useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useImperativeHandle,
+  forwardRef,
+} from 'react';
 import type { Conversation, ConversationMember, Message, User } from '@/types';
 import {
   buildMessageListWithSeparators,
   resolvePinnedIndexForViewport,
 } from '@/services/chat/helpers';
+import {
+  CHAT_NEAR_BOTTOM_PX,
+  isNearBottom,
+  scrollElementToBottom,
+} from '@/services/chat/scroll';
 import { formatChatDateSeparator } from '@/utils/dates';
 import { MessageBubble } from './MessageBubble';
 import { SystemMessage } from './SystemMessage';
@@ -25,6 +38,8 @@ interface MessageListProps {
   currentUserId: string;
   user: User;
   users: User[];
+  /** Remount/pin key — when it changes, jump to latest message. */
+  conversationId?: string;
   isGroup?: boolean;
   isLoading?: boolean;
   isError?: boolean;
@@ -61,6 +76,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     currentUserId,
     user,
     users,
+    conversationId,
     isGroup,
     isLoading,
     isError,
@@ -94,9 +110,11 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [showNewIndicator, setShowNewIndicator] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const prevCountRef = useRef(messages.length);
+  const prevCountRef = useRef(0);
   const prevScrollHeightRef = useRef(0);
   const loadingMoreRef = useRef(false);
+  /** Stick to latest while user is at bottom (open + image layout growth). */
+  const stickToBottomRef = useRef(!preserveDeepLinkScroll);
   const pinSyncRafRef = useRef(0);
   const lastEmittedPinIndexRef = useRef<number | null>(null);
   const pinnedIdsRef = useRef(pinnedIdsNewestFirst);
@@ -105,13 +123,17 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   onPinnedIndexChangeRef.current = onPinnedIndexChange;
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    bottomRef.current?.scrollIntoView({ behavior });
+    const el = containerRef.current;
+    if (!el) return;
+    stickToBottomRef.current = true;
+    scrollElementToBottom(el, behavior);
   }, []);
 
   const scrollToMessage = useCallback(
     (messageId: string) => {
       const el = document.getElementById(`message-${messageId}`);
       if (el) {
+        stickToBottomRef.current = false;
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return true;
       }
@@ -128,6 +150,45 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     },
     scrollToBottom: () => scrollToBottom(),
   }));
+
+  const hasMessages = messages.length > 0;
+
+  // Open / switch conversation / leave loading → pin to latest before paint.
+  useLayoutEffect(() => {
+    if (preserveDeepLinkScroll) {
+      stickToBottomRef.current = false;
+      return;
+    }
+    if (isLoading || !hasMessages) return;
+    stickToBottomRef.current = true;
+    prevCountRef.current = messages.length;
+    scrollToBottom('instant');
+  }, [conversationId, isLoading, hasMessages, preserveDeepLinkScroll, scrollToBottom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Flex height / attachment decode can grow content after the first pin.
+  useEffect(() => {
+    if (preserveDeepLinkScroll || isLoading || !hasMessages) return;
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+
+    const pinIfStuck = () => {
+      if (!stickToBottomRef.current || loadingMoreRef.current) return;
+      scrollElementToBottom(el, 'instant');
+    };
+
+    const ro = new ResizeObserver(pinIfStuck);
+    ro.observe(el);
+    const inner = el.firstElementChild;
+    if (inner) ro.observe(inner);
+
+    // One extra frame after mount — parent flex often finalizes then.
+    const raf = requestAnimationFrame(pinIfStuck);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [conversationId, isLoading, hasMessages, preserveDeepLinkScroll]);
 
   useEffect(() => {
     if (preserveDeepLinkScroll) return;
@@ -148,16 +209,10 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   }, [messages, isLoading, isAtBottom, scrollToBottom, currentUserId, preserveDeepLinkScroll]);
 
   useEffect(() => {
-    if (preserveDeepLinkScroll) return;
-    if (!isLoading && messages.length > 0 && !loadingMoreRef.current) {
-      scrollToBottom('instant');
-    }
-  }, [isLoading, preserveDeepLinkScroll]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
     const el = containerRef.current;
     if (!el || !isFetchingMore) return;
     loadingMoreRef.current = true;
+    stickToBottomRef.current = false;
     prevScrollHeightRef.current = el.scrollHeight;
   }, [isFetchingMore]);
 
@@ -168,6 +223,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       const diff = el.scrollHeight - prevScrollHeightRef.current;
       el.scrollTop += diff;
       loadingMoreRef.current = false;
+      stickToBottomRef.current = isNearBottom(el);
+      setIsAtBottom(stickToBottomRef.current);
     }
   }, [isFetchingMore, messages.length]);
 
@@ -225,7 +282,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const atBottom = isNearBottom(el, CHAT_NEAR_BOTTOM_PX);
+    stickToBottomRef.current = atBottom;
     setIsAtBottom(atBottom);
     if (atBottom) setShowNewIndicator(false);
 

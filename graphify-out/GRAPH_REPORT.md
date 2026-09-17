@@ -1,12 +1,12 @@
 # Graph Report - Kvartira 1  (2026-09-17)
 
 ## Corpus Check
-- 467 files · ~218,617 words
+- 468 files · ~220,001 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2930 nodes · 3262 edges · 451 communities (300 shown, 151 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 124 edges (avg confidence: 0.56)
+- 2940 nodes · 3276 edges · 452 communities (301 shown, 151 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 125 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -98,7 +98,7 @@
 - layouts.test.tsx
 - offline.test.tsx
 - AssignmentsApi
-- assignments.test.ts
+- chat.test.ts
 - assignments/helpers.ts
 - kvartiraAudit.js
 - CreateAssignmentPage.tsx
@@ -182,7 +182,7 @@
 - AvatarPhotoViewer.tsx
 - PocketBase schema — «Квартира»
 - pocketbaseSchema.test.ts
-- kvartiraInvite.js
+- kvartiraAuth.js
 - pocketbaseAuth.test.ts
 - queryPersist.ts
 - AvailabilityMonthCalendar.tsx
@@ -287,10 +287,10 @@
 - useMarkEventParticipationViewed.ts
 - EventParticipationDeltaBadges.tsx
 - dependencies
-- kvartiraSecurity.js
+- kvartiraInvite.js
 - package.json
 - pb-serve.mjs
-- pocketbase
+- kvartiraSecurity.js
 - imageCrop.ts
 - analytics.ts
 - CookieConsentBanner.tsx
@@ -303,11 +303,11 @@
 - lucide-react
 - date-fns
 - cookies/constants.ts
-- kvartiraNotifications.js
+- pocketbase
 - cookies/helpers.ts
 - zod
 - ReportMessageModal.tsx
-- kvartiraAuth.js
+- kvartiraNotifications.js
 - 1792400000_kvartira_legal_docs_bootstrap.js
 - 1789104000_kvartira_all_autodate.js
 - adminInbox.ts
@@ -320,6 +320,7 @@
 - @hookform/resolvers
 - react
 - zustand
+- scroll.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `КВАРТИРА — PROJECT SPECIFICATION` - 34 edges
@@ -348,7 +349,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (451 total, 151 thin omitted)
+## Communities (452 total, 151 thin omitted)
 
 ### Community 0 - "КВАРТИРА — PROJECT SPECIFICATION"
 Cohesion: 0.06
@@ -455,8 +456,8 @@ Cohesion: 0.22
 Nodes (12): buildLegalDocuments(), documentFilter(), EnsureLegalResult, escapeFilterValue(), SeedLegalDoc, todayISO(), LEGAL_GUARDIAN_CONSENT_TEXT, LEGAL_PERSONAL_DATA_CONSENT_TEXT (+4 more)
 
 ### Community 46 - "chat/helpers.ts"
-Cohesion: 0.10
-Nodes (20): buildMessageListWithSeparators(), bumpConversationInList(), ChatFilter, ChatListEntry, DateSeparator, filterConversations(), getConversationDisplayTitle(), groupMessagesForDisplay() (+12 more)
+Cohesion: 0.09
+Nodes (22): buildMessageListWithSeparators(), bumpConversationInList(), ChatFilter, ChatListEntry, collectPersonalChatCounterpartIds(), DateSeparator, filterConversations(), filterStudentsAvailableForPersonalChat() (+14 more)
 
 ### Community 47 - "chat/constants.ts"
 Cohesion: 0.08
@@ -503,8 +504,8 @@ Cohesion: 0.50
 Nodes (4): 3. Роли, Администратор, Преподаватель, Ученик
 
 ### Community 74 - "chat/access.ts"
-Cohesion: 0.21
-Nodes (14): canAccessConversation(), canAddMember(), canCreateGroupChat(), canCreatePersonalChat(), canCreateSchoolWideChat(), canDeleteConversation(), canLeaveConversation(), canManageChats() (+6 more)
+Cohesion: 0.20
+Nodes (15): canAccessConversation(), canAddMember(), canCreateGroupChat(), canCreatePersonalChat(), canCreateSchoolWideChat(), canDeleteConversation(), canLeaveConversation(), canManageChats() (+7 more)
 
 ### Community 75 - "ConversationItem.tsx"
 Cohesion: 0.28
@@ -542,8 +543,8 @@ Nodes (8): filterActiveEvents(), filterArchivedEvents(), getEventEndMs(), getEve
 Cohesion: 0.29
 Nodes (4): mockGetTeacherAvailability, mockUpdateTeacherAvailability, mockUseOnlineStatus, teacherUser
 
-### Community 112 - "assignments.test.ts"
-Cohesion: 0.08
+### Community 112 - "chat.test.ts"
+Cohesion: 0.07
 Nodes (8): admin, baseAssignment, guitarGroup, otherStudent, student, teacher, vocalGroup, teacher
 
 ### Community 113 - "assignments/helpers.ts"
@@ -671,12 +672,12 @@ Cohesion: 0.10
 Nodes (21): AVATAR_EXT_TO_MIME, AvatarCropState, AvatarCropZoomBounds, AvatarUploadInput, clampCropState(), getCoverScale(), getCropZoomBounds(), getInitialCropState() (+13 more)
 
 ### Community 210 - "messages.ts"
-Cohesion: 0.16
-Nodes (12): isGroupConversation(), canDeleteMessage(), canDeleteMessageForEveryone(), canDeleteMessageForMe(), canEditMessage(), DELETED_MESSAGE_TEXT, DeleteMessageScope, isMessageDeleted() (+4 more)
+Cohesion: 0.15
+Nodes (13): getReplyPreviewText(), canDeleteMessage(), canDeleteMessageForEveryone(), canDeleteMessageForMe(), canEditMessage(), DELETED_MESSAGE_TEXT, DeleteMessageScope, getMessageDisplayText() (+5 more)
 
 ### Community 211 - "attachments.ts"
-Cohesion: 0.17
-Nodes (11): createAttachmentFromFile(), getAttachmentPreviewLabel(), getAttachmentsPreviewLabel(), isSyntheticMediaCaption(), isVoiceAttachment(), MEDIA_CAPTION_PLACEHOLDERS, conversationPreviewFromMessage(), getReplyPreviewText() (+3 more)
+Cohesion: 0.21
+Nodes (9): createAttachmentFromFile(), getAttachmentPreviewLabel(), getAttachmentsPreviewLabel(), isSyntheticMediaCaption(), isVoiceAttachment(), MEDIA_CAPTION_PLACEHOLDERS, conversationPreviewFromMessage(), detectAttachmentType() (+1 more)
 
 ### Community 212 - "AvatarCropModal.tsx"
 Cohesion: 0.43
@@ -694,9 +695,9 @@ Nodes (16): Assignments adapter (ROADMAP 2.5 ✅), Auth (ROADMAP 1.3 ✅), Chat 
 Cohesion: 0.18
 Nodes (10): AVATAR_TEXT_MAX_MIGRATION, AVATAR_TEXT_MIGRATION, MIGRATION, REQUIRED_COLLECTIONS, ROOT, SCHEMA_DOC, USER_CASCADE_FIX_MIGRATION, USER_CASCADE_MIGRATION (+2 more)
 
-### Community 226 - "kvartiraInvite.js"
-Cohesion: 0.36
-Nodes (11): asObject(), assertRegistrationInviteOnUserCreate(), decodeJsonField(), findSchoolSettingsRecord(), isDevEnvironment(), isValidInviteToken(), readInviteFromRequest(), readJsonObjectField() (+3 more)
+### Community 226 - "kvartiraAuth.js"
+Cohesion: 0.28
+Nodes (11): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+3 more)
 
 ### Community 227 - "pocketbaseAuth.test.ts"
 Cohesion: 0.18
@@ -747,8 +748,8 @@ Cohesion: 0.23
 Nodes (9): assertRegistrationCapacity(), assertRegistrationCreate(), notifyStaffEventRegistration(), notifyStaffEventUnregistration(), pendingUnregistrationNotifies, purgingEventIds, relId(), stashUnregistrationNotify() (+1 more)
 
 ### Community 254 - "kvartiraChat.js"
-Cohesion: 0.22
-Nodes (15): assertConversationPinUpdate(), attachmentsPreviewLabel(), ensureMemberInConversation(), isDeletedMessage(), isSchoolWideMetadata(), isSyntheticMediaCaption(), isUsersAuth(), joinAdminsToGroupConversation() (+7 more)
+Cohesion: 0.21
+Nodes (16): asParticipantIdArray(), assertConversationPinUpdate(), attachmentsPreviewLabel(), ensureMemberInConversation(), isDeletedMessage(), isSchoolWideMetadata(), isSyntheticMediaCaption(), isUsersAuth() (+8 more)
 
 ### Community 257 - "pocketbase/public.ts"
 Cohesion: 0.33
@@ -926,9 +927,9 @@ Nodes (3): EventParticipationDeltaBadges(), EventParticipationDeltaBadgesProps, 
 Cohesion: 0.15
 Nodes (13): class-variance-authority, dependencies, class-variance-authority, pocketbase, qrcode, react-router-dom, tailwind-merge, @tanstack/react-query (+5 more)
 
-### Community 401 - "kvartiraSecurity.js"
-Cohesion: 0.31
-Nodes (8): assertSecuritySessionCreate(), assertSecuritySessionUpdate(), auth, fingerprintToken(), markOnlyCurrentSession(), recordSecuritySession(), relId(), trimSecuritySessions()
+### Community 401 - "kvartiraInvite.js"
+Cohesion: 0.36
+Nodes (11): asObject(), assertRegistrationInviteOnUserCreate(), decodeJsonField(), findSchoolSettingsRecord(), isDevEnvironment(), isValidInviteToken(), readInviteFromRequest(), readJsonObjectField() (+3 more)
 
 ### Community 402 - "package.json"
 Cohesion: 0.40
@@ -937,6 +938,10 @@ Nodes (4): name, private, type, version
 ### Community 403 - "pb-serve.mjs"
 Cohesion: 0.40
 Nodes (4): child, exe, pbDir, root
+
+### Community 404 - "kvartiraSecurity.js"
+Cohesion: 0.31
+Nodes (8): assertSecuritySessionCreate(), assertSecuritySessionUpdate(), auth, fingerprintToken(), markOnlyCurrentSession(), recordSecuritySession(), relId(), trimSecuritySessions()
 
 ### Community 405 - "imageCrop.ts"
 Cohesion: 0.10
@@ -954,17 +959,13 @@ Nodes (3): AdminGroupMembershipDb, listAdminUserIds(), withAdminsInParticipants(
 Cohesion: 0.33
 Nodes (5): COOKIE_CONSENT_BODY, COOKIE_CONSENT_LABELS, COOKIE_CONSENT_STORAGE_KEY, COOKIE_CONSENT_TITLE, COOKIE_CONSENT_VERSION
 
-### Community 421 - "kvartiraNotifications.js"
-Cohesion: 0.36
-Nodes (6): assertNotificationCreate(), assertNotificationPreferencesCreate(), assertNotificationPreferencesUpdate(), isUsersAuth(), relId(), teacherSharesContextWith()
-
 ### Community 422 - "cookies/helpers.ts"
 Cohesion: 0.24
 Nodes (10): acceptCookieConsent(), buildPreferences(), decideCookieConsent(), getCookieConsentPreferences(), hasAcceptedCookieConsent(), hasCookieConsentDecision(), parseStored(), preferencesFromDecision() (+2 more)
 
-### Community 429 - "kvartiraAuth.js"
-Cohesion: 0.28
-Nodes (11): assertLoginNotThrottled(), detectBrowserName(), detectOsName(), getClientIp(), getDeviceLabel(), getRequestInfoSafe(), isValidPhone(), normalizePhone() (+3 more)
+### Community 429 - "kvartiraNotifications.js"
+Cohesion: 0.36
+Nodes (6): assertNotificationCreate(), assertNotificationPreferencesCreate(), assertNotificationPreferencesUpdate(), isUsersAuth(), relId(), teacherSharesContextWith()
 
 ### Community 434 - "1792400000_kvartira_legal_docs_bootstrap.js"
 Cohesion: 0.40
@@ -986,8 +987,12 @@ Nodes (6): applyThemePreference(), getStoredThemePreference(), initThemePreferen
 Cohesion: 0.60
 Nodes (4): appendMessagesInInfiniteCache(), MessagesInfiniteData, sameSystemEvent(), upsertMessageInInfiniteCache()
 
+### Community 451 - "scroll.ts"
+Cohesion: 0.50
+Nodes (3): CHAT_NEAR_BOTTOM_PX, getDistanceFromBottom(), isNearBottom()
+
 ## Knowledge Gaps
-- **957 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+952 more)
+- **958 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+953 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **151 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -1001,7 +1006,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _957 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _958 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

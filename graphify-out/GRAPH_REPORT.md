@@ -1,12 +1,12 @@
 # Graph Report - Kvartira 1  (2026-09-17)
 
 ## Corpus Check
-- 468 files · ~220,001 words
+- 468 files · ~221,016 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2940 nodes · 3276 edges · 452 communities (301 shown, 151 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 125 edges (avg confidence: 0.56)
+- 2952 nodes · 3293 edges · 452 communities (301 shown, 151 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 128 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -79,7 +79,7 @@
 - CreateChatModal.tsx
 - MessageSearchResults.tsx
 - PinnedMessageBar.tsx
-- ChatHeader.tsx
+- ConversationSettings.tsx
 - MessageComposer.tsx
 - useChatMessages.ts
 - TypingIndicator.tsx
@@ -519,9 +519,9 @@ Nodes (3): createClientMutationId(), SendMessageVars, uid()
 Cohesion: 0.11
 Nodes (6): ChatRealtimeCallback, ChatRealtimeEvent, ChatRealtimeEventType, ChatRealtimeService, Listener, MockChatRealtimeService
 
-### Community 84 - "ChatHeader.tsx"
-Cohesion: 0.38
-Nodes (5): ChatHeader(), ChatHeaderProps, formatMemberCountLabel(), ConversationSettings(), ConversationSettingsProps
+### Community 84 - "ConversationSettings.tsx"
+Cohesion: 0.24
+Nodes (8): ChatHeader(), ChatHeaderProps, formatMemberCountLabel(), ConversationSettings(), ConversationSettingsProps, MemberRoleFilter, ROLE_FILTER_ACTIVE, ROLE_FILTER_IDLE
 
 ### Community 85 - "MessageComposer.tsx"
 Cohesion: 0.15
@@ -748,8 +748,8 @@ Cohesion: 0.23
 Nodes (9): assertRegistrationCapacity(), assertRegistrationCreate(), notifyStaffEventRegistration(), notifyStaffEventUnregistration(), pendingUnregistrationNotifies, purgingEventIds, relId(), stashUnregistrationNotify() (+1 more)
 
 ### Community 254 - "kvartiraChat.js"
-Cohesion: 0.21
-Nodes (16): asParticipantIdArray(), assertConversationPinUpdate(), attachmentsPreviewLabel(), ensureMemberInConversation(), isDeletedMessage(), isSchoolWideMetadata(), isSyntheticMediaCaption(), isUsersAuth() (+8 more)
+Cohesion: 0.19
+Nodes (18): asParticipantIdArray(), assertConversationPinUpdate(), attachmentsPreviewLabel(), ensureMemberInConversation(), isDeletedMessage(), isSchoolWideMetadata(), isSyntheticMediaCaption(), isUsersAuth() (+10 more)
 
 ### Community 257 - "pocketbase/public.ts"
 Cohesion: 0.33
@@ -761,7 +761,7 @@ Nodes (11): assertAssignmentCreate(), assertAssignmentGroupCreate(), assertAssig
 
 ### Community 260 - "pocketbase/chat.ts"
 Cohesion: 0.12
-Nodes (19): assertConversationAccess(), createConversationWithAvatar(), ensureAdminGroupMembershipPb(), ensureConversationMember(), ensureSchoolWideMembershipPb(), findMemberRecord(), isPbUniqueViolation(), isPbUrlFieldError() (+11 more)
+Nodes (19): assertConversationAccess(), createConversationWithAvatar(), ensureConversationMember(), ensureSchoolWideMembershipPb(), ensureStaffGroupMembershipPb(), findMemberRecord(), isPbUniqueViolation(), isPbUrlFieldError() (+11 more)
 
 ### Community 261 - "Готовность к выкладке на сервер"
 Cohesion: 0.25
@@ -864,8 +864,8 @@ Cohesion: 0.43
 Nodes (5): canChangeUserRole(), canToggleUserStaffRole(), getUserRoleChangeError(), isStaffRole(), StaffRole
 
 ### Community 348 - "users/helpers.ts"
-Cohesion: 0.31
-Nodes (6): filterUsersBySearchQuery(), formatUserDirectionLabels(), normalizeUserSearchQuery(), resolveUserDirections(), sanitizeUserPhoneForViewer(), sanitizeUsersPhoneForViewer()
+Cohesion: 0.23
+Nodes (9): compareUsersByRoleAndName(), filterUsersBySearchQuery(), formatUserDirectionLabels(), normalizeUserSearchQuery(), resolveUserDirections(), ROLE_SORT_RANK, sanitizeUserPhoneForViewer(), sanitizeUsersPhoneForViewer() (+1 more)
 
 ### Community 349 - "ownPhone.ts"
 Cohesion: 0.39
@@ -952,8 +952,8 @@ Cohesion: 0.27
 Nodes (7): applyCookieConsentScripts(), loadGoogleAnalytics(), loadMarketingTags(), loadYandexMetrika(), TODO: insert Metrika counter, e.g.:, TODO: insert GA4, e.g.:, TODO: insert remarketing / ads pixels here.
 
 ### Community 413 - "adminGroups.ts"
-Cohesion: 0.50
-Nodes (3): AdminGroupMembershipDb, listAdminUserIds(), withAdminsInParticipants()
+Cohesion: 0.31
+Nodes (6): AdminGroupMembershipDb, ensureAdminGroupMembership(), ensureStaffGroupMembership(), listStaffUserIds(), withAdminsInParticipants(), withStaffInParticipants()
 
 ### Community 420 - "cookies/constants.ts"
 Cohesion: 0.33
@@ -992,21 +992,21 @@ Cohesion: 0.50
 Nodes (3): CHAT_NEAR_BOTTOM_PX, getDistanceFromBottom(), isNearBottom()
 
 ## Knowledge Gaps
-- **958 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+953 more)
+- **962 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+957 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **151 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
+- **Why does `NotificationsApi` connect `NotificationsApi` to `types.ts`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **Why does `ChatApi` connect `ChatApi` to `types.ts`?**
-  _High betweenness centrality (0.002) - this node is a cross-community bridge._
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **Why does `LessonsApi` connect `LessonsApi` to `types.ts`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `EventsApi` connect `EventsApi` to `types.ts`?**
-  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _958 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _962 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `КВАРТИРА — PROJECT SPECIFICATION` be split into smaller, more focused modules?**
   _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

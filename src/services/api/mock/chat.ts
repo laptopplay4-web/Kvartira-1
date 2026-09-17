@@ -65,8 +65,8 @@ import { chatRealtimeService } from '@/services/chat/realtime';
 import { findConversationForLesson } from '@/services/lessons/helpers';
 import { ensureSchoolWideMembership, isSchoolWideConversation } from '@/services/chat/schoolWide';
 import {
-  ensureAdminGroupMembership,
-  withAdminsInParticipants,
+  ensureStaffGroupMembership,
+  withStaffInParticipants,
 } from '@/services/chat/adminGroups';
 
 export interface MockChatDb {
@@ -130,9 +130,12 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
     if (user.role === 'admin') {
       // Moderation / report deep-link: admin may open any chat by id (list stays membership-based).
       if (conv.type !== 'personal') {
-        ensureAdminGroupMembership(db, userId);
+        ensureStaffGroupMembership(db, userId);
       }
       return conv;
+    }
+    if (user.role === 'teacher' && conv.type !== 'personal') {
+      ensureStaffGroupMembership(db, userId);
     }
     if (!canAccessConversation(user, conv, db.conversationMembers)) {
       throw new ApiError('Нет доступа к чату', 'FORBIDDEN', 403);
@@ -248,8 +251,8 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       const user = getUserById(userId);
       if (!can(user, 'chat:read')) throw new ApiError('Нет доступа', 'FORBIDDEN', 403);
       ensureSchoolWideMembership(db, userId);
-      if (user.role === 'admin') {
-        ensureAdminGroupMembership(db, userId);
+      if (user.role === 'admin' || user.role === 'teacher') {
+        ensureStaffGroupMembership(db, userId);
       }
       const list = db.conversations
         .filter((c) => canAccessConversation(user, c, db.conversationMembers))
@@ -572,8 +575,8 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
           const title = input.title?.trim();
           if (!title) throw new ApiError('Укажите название группы', 'VALIDATION', 400);
         }
-        // Admin is always a participant of every group chat.
-        uniqueParticipants = withAdminsInParticipants(uniqueParticipants, db.users);
+        // Admins + teachers are always participants of every group chat.
+        uniqueParticipants = withStaffInParticipants(uniqueParticipants, db.users);
       }
 
       const now = new Date().toISOString();
@@ -743,12 +746,21 @@ export function createMockChatApi(db: MockChatDb, delay: (ms?: number) => Promis
       const conv = getConversationOrThrow(conversationId);
       const target = getUserById(targetUserId);
       if (!canRemoveMember(user, conversationId, targetUserId, db.conversationMembers, conv, target)) {
-        if (target.role === 'admin' && conv.type !== 'personal') {
-          throw new ApiError(
-            'Администратора нельзя удалить из группового чата',
-            'FORBIDDEN',
-            403,
-          );
+        if (conv.type !== 'personal') {
+          if (target.role === 'admin') {
+            throw new ApiError(
+              'Администратора нельзя удалить из группового чата',
+              'FORBIDDEN',
+              403,
+            );
+          }
+          if (target.role === 'teacher') {
+            throw new ApiError(
+              'Преподавателя может удалить только администратор',
+              'FORBIDDEN',
+              403,
+            );
+          }
         }
         throw new ApiError('Нет прав на удаление участника', 'FORBIDDEN', 403);
       }

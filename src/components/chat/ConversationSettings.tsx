@@ -7,9 +7,9 @@ import { ChatAvatarEditor } from '@/components/chat/ChatAvatarEditor';
 import { AddGroupMembersModal } from '@/components/assignments/AddGroupMembersModal';
 import { api } from '@/services/api';
 import type { Conversation, ConversationMember, Message, User } from '@/types';
-import { formatUserName } from '@/utils';
-import { getRoleLabel } from '@/permissions';
-import { filterUsersBySearchQuery } from '@/services/users/helpers';
+import { cn, formatUserName } from '@/utils';
+import { getRoleBadgeVariant, getRoleLabel } from '@/permissions';
+import { filterUsersBySearchQuery, sortUsersByRoleAndName } from '@/services/users/helpers';
 import {
   canDeleteConversation,
   canLeaveConversation,
@@ -28,8 +28,22 @@ import { useConversationMembers } from '@/hooks/useConversationMembers';
 import { useDeleteConversation } from '@/hooks/useDeleteConversation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { Avatar } from '@/components/ui/Avatar';
-import { Bell, BellOff, LogOut, Pin, Search, Trash2, UserPlus } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
+import { Bell, BellOff, GraduationCap, LogOut, Pin, Search, Trash2, UserPlus, Users } from 'lucide-react';
 import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
+
+/** Idle = soft role tint; active = stronger fill + ring. */
+const ROLE_FILTER_IDLE: Record<'student' | 'teacher', string> = {
+  student: 'bg-info-muted/45 text-info/80 border-info/25',
+  teacher: 'bg-brand-muted/45 text-brand/80 border-brand/25',
+};
+
+const ROLE_FILTER_ACTIVE: Record<'student' | 'teacher', string> = {
+  student: 'bg-info-muted text-info border-info/50 ring-2 ring-info/35',
+  teacher: 'bg-brand-muted text-brand border-brand/50 ring-2 ring-brand/35',
+};
+
+type MemberRoleFilter = 'student' | 'teacher';
 
 interface ConversationSettingsProps {
   open: boolean;
@@ -57,6 +71,7 @@ export function ConversationSettings({
   const [avatarUrl, setAvatarUrl] = useState(conversation.avatarUrl ?? '');
   const [avatarError, setAvatarError] = useState('');
   const [memberQuery, setMemberQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<MemberRoleFilter | null>(null);
   const [addMembersOpen, setAddMembersOpen] = useState(false);
 
   const { data: directions = [] } = useQuery({
@@ -74,6 +89,7 @@ export function ConversationSettings({
     setAvatarUrl(conversation.avatarUrl ?? '');
     setAvatarError('');
     setMemberQuery('');
+    setRoleFilter(null);
     setAddMembersOpen(false);
   }, [open, conversation.id, conversation.title, conversation.avatarUrl]);
 
@@ -399,18 +415,27 @@ export function ConversationSettings({
       const user = users.find((u) => u.id === member.userId);
       if (user) rows.push({ member, user });
     }
-    return rows;
+    const sortedUsers = sortUsersByRoleAndName(rows.map((r) => r.user));
+    const byId = new Map(rows.map((r) => [r.user.id, r]));
+    return sortedUsers.map((u) => byId.get(u.id)!).filter(Boolean);
   }, [members, users]);
 
   const visibleMembers = useMemo(() => {
+    const byRole = roleFilter
+      ? memberUsers.filter((x) => x.user.role === roleFilter)
+      : memberUsers;
     const matched = new Set(
       filterUsersBySearchQuery(
-        memberUsers.map((x) => x.user),
+        byRole.map((x) => x.user),
         memberQuery,
       ).map((u) => u.id),
     );
-    return memberUsers.filter((x) => matched.has(x.user.id));
-  }, [memberUsers, memberQuery]);
+    return byRole.filter((x) => matched.has(x.user.id));
+  }, [memberUsers, memberQuery, roleFilter]);
+
+  function toggleRoleFilter(role: MemberRoleFilter) {
+    setRoleFilter((prev) => (prev === role ? null : role));
+  }
 
   const memberIds = useMemo(() => {
     if (members?.length) return new Set(members.map((m) => m.userId));
@@ -462,22 +487,54 @@ export function ConversationSettings({
         ) : conversation.type === 'personal' ? null : (
           <>
             <div>
-              <p className="mb-2 text-sm font-medium">Участники ({memberUsers.length})</p>
+              <p className="mb-2 text-sm font-medium">
+                Участники ({visibleMembers.length}
+                {roleFilter || memberQuery.trim() ? ` из ${memberUsers.length}` : ''}
+                )
+              </p>
               {memberUsers.length > 0 && (
-                <div className="relative mb-2">
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
-                    aria-hidden
-                  />
-                  <input
-                    type="search"
-                    value={memberQuery}
-                    onChange={(e) => setMemberQuery(e.target.value)}
-                    placeholder="Поиск по имени или телефону"
-                    aria-label="Поиск участника"
-                    className="w-full rounded-xl border border-border bg-surface-elevated py-2.5 pl-10 pr-4 text-sm focus-ring"
-                  />
-                </div>
+                <>
+                  <div className="relative mb-2">
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
+                      aria-hidden
+                    />
+                    <input
+                      type="search"
+                      value={memberQuery}
+                      onChange={(e) => setMemberQuery(e.target.value)}
+                      placeholder="Поиск по имени или телефону"
+                      aria-label="Поиск участника"
+                      className="w-full rounded-xl border border-border bg-surface-elevated py-2.5 pl-10 pr-4 text-sm focus-ring"
+                    />
+                  </div>
+                  <div className="mb-2 flex gap-2" role="group" aria-label="Фильтр по роли">
+                    {(
+                      [
+                        { role: 'student' as const, label: 'Ученики', Icon: Users },
+                        { role: 'teacher' as const, label: 'Преподаватели', Icon: GraduationCap },
+                      ] as const
+                    ).map(({ role, label, Icon }) => {
+                      const active = roleFilter === role;
+                      return (
+                        <button
+                          key={role}
+                          type="button"
+                          aria-pressed={active}
+                          aria-label={label}
+                          title={label}
+                          onClick={() => toggleRoleFilter(role)}
+                          className={cn(
+                            'inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border transition-[color,background-color,box-shadow] focus-ring',
+                            active ? ROLE_FILTER_ACTIVE[role] : ROLE_FILTER_IDLE[role],
+                          )}
+                        >
+                          <Icon className="h-5 w-5" aria-hidden />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
               <ul className="popup-scroll max-h-48 space-y-2">
                 {visibleMembers.length > 0 ? (
@@ -495,7 +552,12 @@ export function ConversationSettings({
                         />
                         <div className="min-w-0 text-left">
                           <p className="truncate text-sm">{formatUserName(user)}</p>
-                          <p className="text-caption text-text-muted">{getRoleLabel(user.role)}</p>
+                          <Badge
+                            variant={getRoleBadgeVariant(user.role)}
+                            className="mt-0.5 border border-current/25 font-normal"
+                          >
+                            {getRoleLabel(user.role)}
+                          </Badge>
                         </div>
                       </UserPreviewTrigger>
                       {canManage &&
@@ -525,7 +587,7 @@ export function ConversationSettings({
                   ))
                 ) : (
                   <li className="py-4 text-center text-body-sm text-text-muted">
-                    {memberQuery.trim() ? 'Ничего не найдено' : 'Нет участников'}
+                    {memberQuery.trim() || roleFilter ? 'Ничего не найдено' : 'Нет участников'}
                   </li>
                 )}
               </ul>

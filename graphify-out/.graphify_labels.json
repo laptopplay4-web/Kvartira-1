@@ -83,7 +83,7 @@
   "81": "useChatConversations.ts",
   "82": "MessageSearchResults.tsx",
   "83": "PinnedMessageBar.tsx",
-  "84": "ChatHeader.tsx",
+  "84": "ConversationSettings.tsx",
   "85": "MessageComposer.tsx",
   "86": "useChatMessages.ts",
   "87": "TypingIndicator.tsx",

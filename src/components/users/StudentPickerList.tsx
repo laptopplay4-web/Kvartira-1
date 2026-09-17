@@ -7,7 +7,7 @@ import {
   formatStudentDirectionLabels,
   type GroupMemberDirectionFilter,
 } from '@/services/assignments/groups/helpers';
-import { dedupeUsersById, filterUsersBySearchQuery } from '@/services/users/helpers';
+import { dedupeUsersById, filterUsersBySearchQuery, sortUsersByRoleAndName } from '@/services/users/helpers';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 
@@ -45,7 +45,7 @@ export function StudentPickerList({
   const filteredStudents = useMemo(() => {
     const byDirection = filterStudentsByDirection(uniqueStudents, directionFilter);
     const byQuery = filterUsersBySearchQuery(byDirection, query);
-    return [...byQuery].sort((a, b) => formatUserName(a).localeCompare(formatUserName(b), 'ru'));
+    return sortUsersByRoleAndName(byQuery);
   }, [uniqueStudents, directionFilter, query]);
 
   const selectedDirection = useMemo(

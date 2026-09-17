@@ -376,6 +376,7 @@ describe('group creation', () => {
     expect(conv.title).toBe('Новая группа');
     expect(conv.participantIds).toContain('user-teacher-1');
     expect(conv.participantIds).toContain('user-admin');
+    expect(conv.participantIds).toContain('user-teacher-2');
   });
 
   it('admin is auto-added to group created by teacher', async () => {
@@ -391,6 +392,21 @@ describe('group creation', () => {
 
     const members = await mockChatApi.getMembers(conv.id, 'user-admin');
     expect(members.some((m) => m.userId === 'user-admin')).toBe(true);
+  });
+
+  it('all teachers are auto-added to group created by teacher', async () => {
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Класс Б',
+      participantIds: ['user-student'],
+    });
+    expect(conv.participantIds).toContain('user-teacher-2');
+
+    const list = await mockChatApi.getConversations('user-teacher-2');
+    expect(list.some((c) => c.id === conv.id)).toBe(true);
+
+    const members = await mockChatApi.getMembers(conv.id, 'user-teacher-2');
+    expect(members.some((m) => m.userId === 'user-teacher-2')).toBe(true);
   });
 
   it('student cannot create group', async () => {
@@ -1343,6 +1359,39 @@ describe('group management', () => {
 
     const after = await mockChatApi.getMembers('conv-2', 'user-teacher-1');
     expect(after.some((m) => m.userId === 'user-admin')).toBe(true);
+  });
+
+  it('only school admin can remove teacher from group chat', async () => {
+    const { canRemoveMember } = await import('@/services/chat/access');
+    const { users } = await import('@/mocks/seed');
+
+    const conv = await mockChatApi.createConversation('user-teacher-1', {
+      type: 'group',
+      title: 'Staff protect',
+      participantIds: ['user-student'],
+    });
+    const members = await mockChatApi.getMembers(conv.id, 'user-teacher-1');
+    const teacher1 = users.find((u) => u.id === 'user-teacher-1')!;
+    const teacher2 = users.find((u) => u.id === 'user-teacher-2')!;
+    const admin = users.find((u) => u.id === 'user-admin')!;
+
+    expect(
+      canRemoveMember(teacher1, conv.id, 'user-teacher-2', members, conv, teacher2),
+    ).toBe(false);
+    expect(
+      canRemoveMember(admin, conv.id, 'user-teacher-2', members, conv, teacher2),
+    ).toBe(true);
+
+    await expect(
+      mockChatApi.removeMember(conv.id, 'user-teacher-1', 'user-teacher-2'),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Преподавателя может удалить только администратор',
+    });
+
+    await mockChatApi.removeMember(conv.id, 'user-admin', 'user-teacher-2');
+    const after = await mockChatApi.getMembers(conv.id, 'user-admin');
+    expect(after.some((m) => m.userId === 'user-teacher-2')).toBe(false);
   });
 });
 

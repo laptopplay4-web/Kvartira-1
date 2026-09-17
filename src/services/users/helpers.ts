@@ -1,5 +1,37 @@
 import { formatUserName } from '@/utils';
-import type { Direction, User } from '@/types';
+import type { Direction, User, UserRole } from '@/types';
+
+/** Display order: admins → teachers → students. */
+const ROLE_SORT_RANK: Record<UserRole, number> = {
+  admin: 0,
+  teacher: 1,
+  student: 2,
+};
+
+/** Compare by school role, then full name A→Z (`ru`). */
+export function compareUsersByRoleAndName(
+  a: Pick<User, 'role' | 'firstName' | 'lastName'>,
+  b: Pick<User, 'role' | 'firstName' | 'lastName'>,
+): number {
+  const byRole = (ROLE_SORT_RANK[a.role] ?? 99) - (ROLE_SORT_RANK[b.role] ?? 99);
+  if (byRole !== 0) return byRole;
+  const nameA = formatUserName({
+    firstName: a.firstName ?? '',
+    lastName: a.lastName ?? '',
+  });
+  const nameB = formatUserName({
+    firstName: b.firstName ?? '',
+    lastName: b.lastName ?? '',
+  });
+  return nameA.localeCompare(nameB, 'ru', { sensitivity: 'base' });
+}
+
+/** Admins A→Z, then teachers A→Z, then students A→Z. */
+export function sortUsersByRoleAndName<T extends Pick<User, 'role' | 'firstName' | 'lastName'>>(
+  users: T[],
+): T[] {
+  return [...users].sort(compareUsersByRoleAndName);
+}
 
 /** Названия направлений пользователя через « · ». */
 export function formatUserDirectionLabels(

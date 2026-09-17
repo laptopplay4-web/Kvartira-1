@@ -11,13 +11,30 @@ import {
   getToggledStaffRole,
   getUserRoleChangeError,
 } from '@/services/users/access';
-import { filterUsersBySearchQuery, sanitizeUserPhoneForViewer, preserveOwnPhone, dedupeUsersById } from '@/services/users/helpers';
+import { filterUsersBySearchQuery, sanitizeUserPhoneForViewer, preserveOwnPhone, dedupeUsersById, sortUsersByRoleAndName } from '@/services/users/helpers';
 import { users } from '@/mocks/seed';
 import type { User } from '@/types';
 
 const student = users.find((u) => u.id === 'user-student')!;
 const teacher = users.find((u) => u.id === 'user-teacher-1')!;
 const admin = users.find((u) => u.role === 'admin')!;
+
+describe('sortUsersByRoleAndName', () => {
+  it('orders admin → teacher → student, A→Z within role', () => {
+    const zStudent = { ...student, firstName: 'Яна', lastName: 'Яковлева', id: 's-z' };
+    const aStudent = { ...student, firstName: 'Анна', lastName: 'Алексеева', id: 's-a' };
+    const zTeacher = { ...teacher, firstName: 'Яков', lastName: 'Яшин', id: 't-z' };
+    const aTeacher = { ...teacher, firstName: 'Артём', lastName: 'Авдеев', id: 't-a' };
+    const sorted = sortUsersByRoleAndName([zStudent, zTeacher, admin, aStudent, aTeacher]);
+    expect(sorted.map((u) => u.id)).toEqual([
+      admin.id,
+      't-a',
+      't-z',
+      's-a',
+      's-z',
+    ]);
+  });
+});
 
 describe('admin user role change access', () => {
   it('toggles student ↔ teacher', () => {

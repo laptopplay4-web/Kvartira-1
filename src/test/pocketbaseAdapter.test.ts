@@ -181,8 +181,9 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).not.toMatch(/hide\.apply\s*\(/);
     // Superuser Admin UI must not hit hide (otherwise enrich fails / fields vanish).
     expect(hook).toContain('isUsersAuth');
-    expect(hook).toContain('joinAdminToAllGroupChats');
+    expect(hook).toContain('joinStaffUserToAllGroupChats');
     expect(hook).toContain('onRecordAfterUpdateSuccess');
+    expect(hook).toMatch(/role === 'admin' \|\| role === 'teacher'/);
   });
 
   it('userToPbRecord round-trips through mapUserRecord', () => {
@@ -729,17 +730,18 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(hook).toContain('messages');
     expect(hook).toContain('conversation_members');
     expect(hook).toContain('assertConversationPinUpdate');
-    expect(hook).toContain('joinAdminsToGroupConversation');
+    expect(hook).toContain('joinStaffToGroupConversation');
     expect(lib).toContain('syncConversationLastMessage');
     expect(lib).toContain('previewTextFromMessage');
     expect(lib).toContain('attachmentsPreviewLabel');
     expect(lib).toMatch(/findRecordsByFilter\(\s*'messages'[\s\S]*?'-created'/);
     expect(lib).toContain('syncReadReceipts');
     expect(lib).toContain('assertConversationPinUpdate');
-    expect(lib).toContain('joinAdminsToGroupConversation');
-    expect(lib).toContain('joinAdminToAllGroupChats');
+    expect(lib).toContain('joinStaffToGroupConversation');
+    expect(lib).toContain('joinStaffUserToAllGroupChats');
     expect(lib).toContain('asParticipantIdArray');
     expect(lib).toContain('type = "group"');
+    expect(lib).toContain('role = "admin" || role = "teacher"');
   });
 
   it('chat list loads unread candidates instead of full message history', () => {

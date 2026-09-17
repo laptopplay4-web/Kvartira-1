@@ -155,8 +155,8 @@ async function ensureSchoolWideMembershipPb(userId: string, conversations: Conve
   }
 }
 
-/** Join admin into every non-personal chat (idempotent). */
-async function ensureAdminGroupMembershipPb(
+/** Join admin|teacher into every non-personal chat (idempotent). */
+async function ensureStaffGroupMembershipPb(
   userId: string,
   conversations: Conversation[],
 ): Promise<void> {
@@ -400,10 +400,13 @@ async function assertConversationAccess(
   if (user.role === 'admin') {
     // Moderation / report deep-link: admin may open any chat by id (list stays membership-based).
     if (conversation.type !== 'personal') {
-      await ensureAdminGroupMembershipPb(userId, [conversation]);
+      await ensureStaffGroupMembershipPb(userId, [conversation]);
     }
     const members = await loadMembers(conversationId);
     return { user, conversation, members };
+  }
+  if (user.role === 'teacher' && conversation.type !== 'personal') {
+    await ensureStaffGroupMembershipPb(userId, [conversation]);
   }
   const members = await loadMembers(conversationId);
   if (!canAccessConversation(user, conversation, members)) {
@@ -639,8 +642,8 @@ export const pocketbaseChatApi: ChatApi = {
       });
       const conversations = records.map(mapConversationRecord);
       await ensureSchoolWideMembershipPb(userId, conversations);
-      if (user.role === 'admin') {
-        await ensureAdminGroupMembershipPb(userId, conversations);
+      if (user.role === 'admin' || user.role === 'teacher') {
+        await ensureStaffGroupMembershipPb(userId, conversations);
       }
       const userMembers = await loadUserMembers(userId);
       const accessible = conversations.filter((c) => canAccessConversation(user, c, userMembers));
@@ -1019,16 +1022,16 @@ export const pocketbaseChatApi: ChatApi = {
         }
       }
 
-      // Admin is always a participant of every group chat (hooks also enforce).
-      let autoAdminIds: string[] = [];
+      // Admins + teachers are always participants of every group chat (hooks also enforce).
+      let autoStaffIds: string[] = [];
       if (input.type !== 'personal') {
         try {
-          const adminRecords = await pb.collection('users').getFullList({
-            filter: 'role = "admin"',
+          const staffRecords = await pb.collection('users').getFullList({
+            filter: 'role = "admin" || role = "teacher"',
             fields: 'id',
           });
-          autoAdminIds = adminRecords.map((r) => r.id);
-          uniqueParticipants = [...new Set([...uniqueParticipants, ...autoAdminIds])];
+          autoStaffIds = staffRecords.map((r) => r.id);
+          uniqueParticipants = [...new Set([...uniqueParticipants, ...autoStaffIds])];
         } catch {
           /* directory RBAC — fall through; hooks + getConversations ensure */
         }
@@ -1036,9 +1039,9 @@ export const pocketbaseChatApi: ChatApi = {
 
       // School-wide: skip per-user getOne (directory RBAC can 403 on some roles and
       // N serial requests hang the create modal). IDs already come from list/client.
-      // Auto-added admins: skip getOne (same RBAC risk); membership created below / by hook.
+      // Auto-added staff: skip getOne (same RBAC risk); membership created below / by hook.
       if (!input.allUsers) {
-        const skipValidate = new Set(autoAdminIds);
+        const skipValidate = new Set(autoStaffIds);
         for (const participantId of uniqueParticipants) {
           if (skipValidate.has(participantId)) continue;
           await getRequesterUser(participantId);
@@ -1266,12 +1269,21 @@ export const pocketbaseChatApi: ChatApi = {
       ]);
 
       if (!canRemoveMember(user, conversationId, targetUserId, members, conversation, target)) {
-        if (target.role === 'admin' && conversation.type !== 'personal') {
-          throw new ApiError(
-            'Администратора нельзя удалить из группового чата',
-            'FORBIDDEN',
-            403,
-          );
+        if (conversation.type !== 'personal') {
+          if (target.role === 'admin') {
+            throw new ApiError(
+              'Администратора нельзя удалить из группового чата',
+              'FORBIDDEN',
+              403,
+            );
+          }
+          if (target.role === 'teacher') {
+            throw new ApiError(
+              'Преподавателя может удалить только администратор',
+              'FORBIDDEN',
+              403,
+            );
+          }
         }
         throw new ApiError('Нет прав на удаление участника', 'FORBIDDEN', 403);
       }

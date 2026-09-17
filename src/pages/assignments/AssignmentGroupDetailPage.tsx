@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
 import { formatUserName } from '@/utils';
+import { sortUsersByRoleAndName } from '@/services/users/helpers';
 
 export default function AssignmentGroupDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -108,7 +109,7 @@ export default function AssignmentGroupDetailPage() {
     return <Navigate to="/assignments/groups" replace />;
   }
 
-  const members = group.members;
+  const members = sortUsersByRoleAndName(group.members);
 
   const closeDeleteModal = () => {
     if (deleteMutation.isPending) return;

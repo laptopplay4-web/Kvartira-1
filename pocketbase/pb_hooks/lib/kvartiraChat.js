@@ -338,42 +338,64 @@ function ensureMemberInConversation(app, conversationId, userId) {
 }
 
 /**
- * After a group chat is created — every admin becomes a member.
+ * After a group chat is created — every admin and teacher becomes a member.
  *
  * @param {core.App} app
  * @param {core.Record} conversationRecord
  */
-function joinAdminsToGroupConversation(app, conversationRecord) {
+function joinStaffToGroupConversation(app, conversationRecord) {
   if (!conversationRecord) return;
   const type = String(conversationRecord.getString('type') || '');
   if (type === 'personal') return;
 
   const convId = String(conversationRecord.id);
   /** @type {core.Record[]} */
-  let admins = [];
+  let staff = [];
   try {
-    admins = app.findRecordsByFilter('users', 'role = "admin"', '-id', 100, 0) || [];
+    staff =
+      app.findRecordsByFilter(
+        'users',
+        'role = "admin" || role = "teacher"',
+        '-id',
+        500,
+        0,
+      ) || [];
   } catch (_) {
-    admins = [];
+    staff = [];
   }
-  if (!Array.isArray(admins)) admins = [];
-
-  for (const admin of admins) {
+  if (!Array.isArray(staff) || staff.length === 0) {
+    // Fallback: two queries if OR filter unsupported
     try {
-      ensureMemberInConversation(app, convId, String(admin.id));
+      const admins = app.findRecordsByFilter('users', 'role = "admin"', '-id', 100, 0) || [];
+      const teachers = app.findRecordsByFilter('users', 'role = "teacher"', '-id', 500, 0) || [];
+      staff = [...(Array.isArray(admins) ? admins : []), ...(Array.isArray(teachers) ? teachers : [])];
+    } catch (_) {
+      staff = [];
+    }
+  }
+  if (!Array.isArray(staff)) staff = [];
+
+  for (const user of staff) {
+    try {
+      ensureMemberInConversation(app, convId, String(user.id));
     } catch (err) {
-      console.error('joinAdminsToGroupConversation', err);
+      console.error('joinStaffToGroupConversation', err);
     }
   }
 }
 
+/** @deprecated Prefer `joinStaffToGroupConversation`. */
+function joinAdminsToGroupConversation(app, conversationRecord) {
+  joinStaffToGroupConversation(app, conversationRecord);
+}
+
 /**
- * When a user becomes admin — join every group conversation (not personal).
+ * When a user becomes admin|teacher — join every group conversation (not personal).
  *
  * @param {core.App} app
  * @param {string} userId
  */
-function joinAdminToAllGroupChats(app, userId) {
+function joinStaffUserToAllGroupChats(app, userId) {
   if (!userId) return;
 
   try {
@@ -402,8 +424,13 @@ function joinAdminToAllGroupChats(app, userId) {
       ensureMemberInConversation(app, String(conv.id), userId);
     }
   } catch (err) {
-    console.error('joinAdminToAllGroupChats', err);
+    console.error('joinStaffUserToAllGroupChats', err);
   }
+}
+
+/** @deprecated Prefer `joinStaffUserToAllGroupChats`. */
+function joinAdminToAllGroupChats(app, userId) {
+  joinStaffUserToAllGroupChats(app, userId);
 }
 
 function isUsersAuth(auth) {
@@ -463,7 +490,9 @@ module.exports = {
   syncConversationLastMessage,
   syncReadReceipts,
   joinUserToSchoolWideChats,
+  joinStaffToGroupConversation,
   joinAdminsToGroupConversation,
+  joinStaffUserToAllGroupChats,
   joinAdminToAllGroupChats,
   assertConversationPinUpdate,
 };

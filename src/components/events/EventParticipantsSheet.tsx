@@ -13,10 +13,12 @@ import { markEventNotificationsRead } from '@/hooks/useMarkEventParticipationVie
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import { getUnreadParticipationParticipantIds } from '@/services/events/unread';
-import { getRoleLabel } from '@/permissions';
+import { getRoleBadgeVariant, getRoleLabel } from '@/permissions';
+import { compareUsersByRoleAndName } from '@/services/users/helpers';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { cn } from '@/utils';
 import type { User } from '@/types';
+import { Badge } from '@/components/ui/Badge';
 
 interface EventParticipantsSheetProps {
   open: boolean;
@@ -73,7 +75,13 @@ export function EventParticipantsSheet({
       for (const user of ghosts) {
         if (user) rows.push({ user, kind: 'left' });
       }
-      return rows;
+      return rows.sort((a, b) => {
+        // Active/joined first, then left ghosts; within group — role then name.
+        const kindRank = (k: RosterRow['kind']) => (k === 'left' ? 1 : 0);
+        const byKind = kindRank(a.kind) - kindRank(b.kind);
+        if (byKind !== 0) return byKind;
+        return compareUsersByRoleAndName(a.user, b.user);
+      });
     },
     enabled: open && !!eventId,
   });
@@ -151,9 +159,16 @@ export function EventParticipantsSheet({
                   <p className="truncate text-body font-medium">
                     {user.firstName} {user.lastName}
                   </p>
-                  <p className="text-caption text-text-muted">
-                    {kind === 'left' ? 'Отменил(а) участие' : getRoleLabel(user.role)}
-                  </p>
+                  {kind === 'left' ? (
+                    <p className="text-caption text-text-muted">Отменил(а) участие</p>
+                  ) : (
+                    <Badge
+                      variant={getRoleBadgeVariant(user.role)}
+                      className="mt-0.5 border border-current/25 font-normal"
+                    >
+                      {getRoleLabel(user.role)}
+                    </Badge>
+                  )}
                 </div>
               </UserPreviewTrigger>
               {kind !== 'left' && (

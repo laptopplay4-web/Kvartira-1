@@ -20,6 +20,7 @@ import { AdminPageHeader } from '@/components/ui/AdminPageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
 import { formatUserName } from '@/utils';
+import { sortUsersByRoleAndName } from '@/services/users/helpers';
 import type { User, UserRole } from '@/types';
 
 const SECTION_ORDER: UserRole[] = ['admin', 'teacher', 'student'];
@@ -54,10 +55,11 @@ export default function AdminUsersPage() {
 
   if (error) return <div className="page-container"><ErrorState onRetry={() => refetch()} /></div>;
 
+  const sorted = sortUsersByRoleAndName(users ?? []);
   const grouped = {
-    admin: users?.filter((u) => u.role === 'admin') ?? [],
-    teacher: users?.filter((u) => u.role === 'teacher') ?? [],
-    student: users?.filter((u) => u.role === 'student') ?? [],
+    admin: sorted.filter((u) => u.role === 'admin'),
+    teacher: sorted.filter((u) => u.role === 'teacher'),
+    student: sorted.filter((u) => u.role === 'student'),
   };
 
   const isEmpty = !isLoading && users?.length === 0;

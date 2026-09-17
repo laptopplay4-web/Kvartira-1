@@ -132,9 +132,10 @@ export function canAddMember(
 }
 
 /**
- * School admins are permanent members of group chats (ensureAdminGroupMembership).
+ * School admins are permanent group members (ensureStaffGroupMembership).
+ * Teachers are also auto-joined to every group; only a school admin may remove them.
  * Pass `targetUser` so global role can be checked — conversation role alone is not enough
- * (admins are often stored as conversation `member`).
+ * (staff are often stored as conversation `member`).
  */
 export function canRemoveMember(
   user: User,
@@ -146,10 +147,12 @@ export function canRemoveMember(
 ): boolean {
   if (!canManageMembers(user, conversationId, members, conversation)) return false;
 
-  // Fail closed for groups when caller omitted targetUser (cannot verify school-admin protection).
+  // Fail closed for groups when caller omitted targetUser (cannot verify staff protection).
   if (!conversation || isGroupConversation(conversation.type)) {
     if (!targetUser) return false;
     if (targetUser.role === 'admin') return false;
+    // Teachers: only school administrator may remove (not conversation owner/teacher).
+    if (targetUser.role === 'teacher' && user.role !== 'admin') return false;
   }
 
   const target = getConversationMember(conversationId, targetUserId, members);

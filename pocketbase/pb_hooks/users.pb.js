@@ -72,10 +72,11 @@ onRecordUpdateRequest((e) => {
 
 onRecordAfterUpdateSuccess((e) => {
   try {
-    // School admin → member of every group chat (idempotent; also heals legacy gaps).
-    if (e.record.getString('role') === 'admin') {
+    // School admin|teacher → member of every group chat (idempotent; also heals legacy gaps).
+    const role = e.record.getString('role');
+    if (role === 'admin' || role === 'teacher') {
       const chat = require(`${__hooks}/lib/kvartiraChat.js`);
-      chat.joinAdminToAllGroupChats($app, String(e.record.id));
+      chat.joinStaffUserToAllGroupChats($app, String(e.record.id));
     }
   } catch (_) {
     /* never block role change on chat join */
@@ -87,8 +88,9 @@ onRecordAfterCreateSuccess((e) => {
   try {
     const chat = require(`${__hooks}/lib/kvartiraChat.js`);
     chat.joinUserToSchoolWideChats($app, String(e.record.id));
-    if (e.record.getString('role') === 'admin') {
-      chat.joinAdminToAllGroupChats($app, String(e.record.id));
+    const role = e.record.getString('role');
+    if (role === 'admin' || role === 'teacher') {
+      chat.joinStaffUserToAllGroupChats($app, String(e.record.id));
     }
   } catch (_) {
     /* never block registration on chat join */

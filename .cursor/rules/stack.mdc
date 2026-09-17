@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.186 Student events badge tab-seen · 2026-09-17
+Версия: 1.188 Chat members role filter icons · 2026-09-17
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -145,7 +145,7 @@ kvartira/
 │   │       ├── validation.ts    # attachment + message server-side validation rules
 │   │       ├── attachments.ts   # file size formatting, type detection
 │   │       ├── schoolWide.ts    # ensureSchoolWideMembership
-│   │       ├── adminGroups.ts   # ensureAdminGroupMembership (admin ↔ all groups)
+│   │       ├── adminGroups.ts   # ensureStaffGroupMembership (admin|teacher ↔ all groups)
 │   │       ├── realtime.ts      # ChatRealtimeService — mock emitter | PB subscriptions
 │   │       ├── realtimePocketbase.ts
 │   │       └── realtimeMappers.ts
@@ -249,7 +249,7 @@ kvartira/
 | `src/hooks/useDeleteMessage.ts` | Soft-delete optimistic |
 | `src/hooks/useDeleteConversation.ts` | Concurrent-safe conversation delete + tombstones |
 | `src/hooks/useMarkPassiveNotificationsOnLeave.ts` | Leave `/notifications` → mark passive as read (urgent keep) |
-| `src/test/chat.test.ts` | 99 tests: access, send, edit, delete, reply, search, group, school-wide, admin↔groups, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch, forward, delete tombstones, scroll helpers, personal picker filter, protect admin remove, promote→join groups |
+| `src/test/chat.test.ts` | access, send, edit, delete, reply, search, group, school-wide, admin↔groups, teachers auto-join, mute, pin, list bump/sort, attachments, realtime, IDOR, addMembers batch, forward, delete tombstones, scroll helpers, personal picker filter, protect admin/teacher remove, promote→join groups |
 
 ---
 
@@ -478,7 +478,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 | `warmAppCache.test.ts` | persist filter, conversation warm select, shell + messages prefetch (5 tests) |
 
-**Итого:** 744 passed (49 files); booking cancel past-slot flake вне scope.
+**Итого:** 749 passed (49 files); booking cancel past-slot flake вне scope.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -642,6 +642,8 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Protect admin from group remove | ✅ 2026-09-17, см. §184 |
 | Admin promote → auto-join all groups | ✅ 2026-09-17, см. §185 |
 | Student events badge tab-seen | ✅ 2026-09-17, см. §186 |
+| Staff group chats (teachers + role UI) | ✅ 2026-09-17, см. §187 |
+| Chat members role filter icons | ✅ 2026-09-17, см. §188 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1454,8 +1456,8 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 | Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **746** (49 files); booking cancel flake вне scope; §186 student events badge |
-| Graphify | 2940 nodes, 3276 edges, 452 communities |
+| Тесты | **749** (49 files); booking cancel flake вне scope; §188 member filter |
+| Graphify | 2952 nodes, 3293 edges, 452 communities |
 
 ### Фазы (кратко)
 
@@ -1477,7 +1479,63 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2940 nodes, 3276 edges, 452 communities (post-§186).
+**Graphify stats:** 2952 nodes, 3293 edges, 452 communities (post-§188).
+
+---
+
+## 188. Chat members — role filter icons (2026-09-17)
+
+**Scope:** в настройках группового чата — иконки фильтра ученики/преподаватели под строкой поиска; exclusive toggle; soft role tint idle → stronger active.
+
+**Graphify:** `ConversationSettings()` → `roleFilter` (`student`|`teacher`|null) → `visibleMembers`.
+
+### UI (✅)
+
+- Под поиском: `Users` (ученики) / `GraduationCap` (преподаватели), `min-h-11` touch target.
+- Только один фильтр за раз; повторный клик снимает.
+- Idle: `*-muted/45` + soft border; active: полный muted + `ring-2` цвета роли (`info` / `brand`).
+- Счётчик «N из M» при фильтре или поиске; админы только в режиме «все».
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2952 nodes, 3293 edges, 452 communities.
+
+---
+
+## 187. Staff group chats — teachers + role UI (2026-09-17)
+
+**Scope:** все преподаватели автоматически в групповых чатах; удалить преподавателя может только school admin; роль в настройках чата — Badge как в ленте; списки пользователей — admin → teacher → student, A→Z по имени.
+
+**Graphify:** `ensureStaffGroupMembership()` / `withStaffInParticipants()` → mock/PB create + heal; `canRemoveMember()`; `sortUsersByRoleAndName()` → ConversationSettings / AdminUsers / EventParticipants / StudentPicker.
+
+### Domain + API (✅)
+
+- `adminGroups.ts`: `listStaffUserIds`, `withStaffInParticipants`, `ensureStaffGroupMembership` (alias `ensureAdminGroupMembership`).
+- Create group (mock + PB): merge всех `admin` + `teacher`.
+- Heal: `getConversations` / access для `admin|teacher`.
+- `canRemoveMember`: teacher → только `user.role === 'admin'`; admin по-прежнему нельзя удалить.
+
+### PocketBase (✅)
+
+- `joinStaffToGroupConversation` / `joinStaffUserToAllGroupChats` (aliases на старые имена).
+- Hooks: create conversation → staff join; user create/update role `admin|teacher` → join all groups.
+
+### UI (✅)
+
+- `ConversationSettings`: `Badge` + `getRoleBadgeVariant`; участники через `sortUsersByRoleAndName`.
+- `AdminUsersPage`, `EventParticipantsSheet`, `StudentPickerList`, assignment group members — тот же порядок.
+
+### Tests
+
+`chat` teachers auto-add + remove protect; `adminUsers` sort; adapter staff hooks → suite **749**. typecheck ✅.
+
+### Deploy
+
+Выложить `pb_hooks` (`kvartiraChat.js`, `chat.pb.js`, `users.pb.js`) + фронт; **перезапуск PocketBase**.
+
+**Graphify stats:** 2949 nodes, 3290 edges, 452 communities.
 
 ---
 

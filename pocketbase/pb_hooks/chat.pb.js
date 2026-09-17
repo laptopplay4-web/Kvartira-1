@@ -51,9 +51,9 @@ onRecordUpdateRequest((e) => {
 onRecordAfterCreateSuccess((e) => {
   try {
     const chat = require(`${__hooks}/lib/kvartiraChat.js`);
-    chat.joinAdminsToGroupConversation($app, e.record);
+    chat.joinStaffToGroupConversation($app, e.record);
   } catch (_) {
-    /* never block create on admin join */
+    /* never block create on staff join */
   }
   e.next();
 }, 'conversations');

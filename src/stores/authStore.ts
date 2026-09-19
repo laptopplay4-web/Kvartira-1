@@ -174,7 +174,9 @@ export const useAuthStore = create<AuthState>()(
             const roleChanged =
               state.session?.user.role != null &&
               state.session.user.role !== merged.user.role;
-            if (roleChanged) void clearAppQueryCache();
+            const statusChanged =
+              state.session?.user.accountStatus !== merged.user.accountStatus;
+            if (roleChanged || statusChanged) void clearAppQueryCache();
             return { session: merged };
           });
 

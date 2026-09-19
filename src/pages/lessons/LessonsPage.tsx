@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, List, CalendarDays, History } from 'lucide-react';
+import { Plus, CalendarDays } from 'lucide-react';
 import { useCurrentUser } from '@/stores/authStore';
 import { api } from '@/services/api';
 import { actsAsTeacher, can } from '@/permissions';
-import type { LessonStatus } from '@/types';
+import { isYclientsLessonsEnabled } from '@/config/features';
 import { Button } from '@/components/ui/Button';
 import { LessonCard } from '@/components/ui/LessonCard';
 import { LessonCardSkeleton } from '@/components/ui/Skeleton';
@@ -14,30 +14,18 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { BookLessonLink } from '@/components/ui/BookLessonLink';
 import { LessonCalendar } from '@/components/calendar/LessonCalendar';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { cn } from '@/utils';
 
 type PageView = 'calendar' | 'list';
 
-type HistoryFilter = 'all' | 'completed' | 'cancelled' | 'rescheduled' | 'no_show';
-
-const HISTORY_FILTERS: { id: HistoryFilter; label: string; statuses: LessonStatus[] }[] = [
-  { id: 'all', label: 'Все', statuses: ['completed', 'cancelled', 'rescheduled', 'no_show'] },
-  { id: 'completed', label: 'Состоялись', statuses: ['completed'] },
-  { id: 'cancelled', label: 'Отменены', statuses: ['cancelled'] },
-  { id: 'rescheduled', label: 'Перенесены', statuses: ['rescheduled'] },
-  { id: 'no_show', label: 'Не состоялись', statuses: ['no_show'] },
+const VIEW_OPTIONS = [
+  { value: 'calendar' as const, label: 'Расписание' },
+  { value: 'list' as const, label: 'Визиты' },
 ];
-
-const HISTORY_SEGMENT_OPTIONS = HISTORY_FILTERS.map(({ id, label }) => ({
-  value: id,
-  label,
-}));
 
 export default function LessonsPage() {
   const user = useCurrentUser()!;
   const teacherView = actsAsTeacher(user.role);
   const [pageView, setPageView] = useState<PageView>('calendar');
-  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
 
   const { data: lessons, isLoading, error, refetch } = useQuery({
     queryKey: ['lessons', 'list', user.id, user.role],
@@ -68,27 +56,35 @@ export default function LessonsPage() {
     ?.filter((l) => !['cancelled', 'completed', 'no_show'].includes(l.status))
     .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
 
-  const todayLessons = upcoming?.filter((l) => l.date === new Date().toISOString().slice(0, 10));
-
-  const activeHistoryFilter = HISTORY_FILTERS.find((f) => f.id === historyFilter)!;
-  const past = lessons
-    ?.filter((l) => activeHistoryFilter.statuses.includes(l.status))
-    .sort((a, b) => `${b.date}${b.startTime}`.localeCompare(`${a.date}${a.startTime}`));
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayLessons = upcoming?.filter((l) => l.date === todayIso);
+  const laterUpcoming = upcoming?.filter((l) => l.date !== todayIso);
 
   const getDirectionName = (id: string) => directions?.find((d) => d.id === id)?.name ?? '';
   const getTeacher = (id: string) => teachers?.find((t) => t.id === id);
   const getStudent = (id: string) => students?.find((u) => u.id === id);
 
-  if (error) return <div className="page-container"><ErrorState onRetry={() => refetch()} /></div>;
+  if (error) {
+    return (
+      <div className="page-container">
+        <ErrorState onRetry={() => refetch()} />
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-h1">Занятия</h1>
-        <div className="flex items-center gap-2">
-          {can(user, 'availability:manage') && (
+      <header className="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-h1">Занятия</h1>
+          <p className="mt-0.5 text-body-sm text-text-secondary">Личный кабинет записей</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {can(user, 'availability:manage') && isYclientsLessonsEnabled() && (
             <Link to="/lessons/availability">
-              <Button variant="secondary" size="sm">График работы</Button>
+              <Button variant="secondary" size="sm">
+                График работы
+              </Button>
             </Link>
           )}
           {can(user, 'lessons:book') && (
@@ -100,61 +96,62 @@ export default function LessonsPage() {
         </div>
       </header>
 
-      <div className="mb-4 flex gap-2">
-        <button
-          type="button"
-          onClick={() => setPageView('calendar')}
-          className={cn(
-            'flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium focus-ring',
-            pageView === 'calendar' ? 'bg-brand-muted text-brand' : 'text-text-muted hover:bg-surface-elevated',
-          )}
-        >
-          <CalendarDays className="h-4 w-4" aria-hidden />
-          Календарь
-        </button>
-        <button
-          type="button"
-          onClick={() => setPageView('list')}
-          className={cn(
-            'flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium focus-ring',
-            pageView === 'list' ? 'bg-brand-muted text-brand' : 'text-text-muted hover:bg-surface-elevated',
-          )}
-        >
-          <List className="h-4 w-4" aria-hidden />
-          Список
-        </button>
-      </div>
+      <SegmentedControl
+        className="mb-5 w-full max-w-md"
+        aria-label="Вид занятий"
+        value={pageView}
+        options={VIEW_OPTIONS}
+        onChange={setPageView}
+      />
 
       {pageView === 'calendar' ? (
-        <LessonCalendar viewer={user} className="mb-8" />
+        <section className="mb-0 rounded-2xl border border-border-subtle bg-surface p-3 sm:p-4">
+          <LessonCalendar viewer={user} className="mb-0" />
+        </section>
       ) : (
-        <>
-          {(teacherView ? todayLessons : upcoming)?.length ? (
-            <section className="mb-8">
-              <h2 className="mb-3 text-label">
-                {teacherView ? 'Сегодня' : 'Предстоящие'}
-              </h2>
-              {isLoading ? (
-                <div className="space-y-3">
-                  <LessonCardSkeleton />
-                  <LessonCardSkeleton />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {(teacherView ? todayLessons : upcoming)?.map((lesson) => (
-                    <LessonCard
-                      key={lesson.id}
-                      lesson={lesson}
-                      directionName={getDirectionName(lesson.directionId)}
-                      teacher={getTeacher(lesson.teacherId)}
-                      student={getStudent(lesson.studentId)}
-                      showTeacher={!teacherView}
-                    />
-                  ))}
-                </div>
-              )}
+        <div className="space-y-8 motion-safe:animate-fade-in">
+          {isLoading ? (
+            <div className="space-y-3">
+              <LessonCardSkeleton />
+              <LessonCardSkeleton />
+            </div>
+          ) : todayLessons && todayLessons.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-label">Сегодня</h2>
+              <div className="space-y-3">
+                {todayLessons.map((lesson) => (
+                  <LessonCard
+                    key={lesson.id}
+                    lesson={lesson}
+                    directionName={getDirectionName(lesson.directionId)}
+                    teacher={getTeacher(lesson.teacherId)}
+                    student={getStudent(lesson.studentId)}
+                    showTeacher={!teacherView}
+                  />
+                ))}
+              </div>
             </section>
-          ) : !isLoading ? (
+          ) : null}
+
+          {!isLoading && laterUpcoming && laterUpcoming.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-label">Предстоящие визиты</h2>
+              <div className="space-y-3">
+                {laterUpcoming.map((lesson) => (
+                  <LessonCard
+                    key={lesson.id}
+                    lesson={lesson}
+                    directionName={getDirectionName(lesson.directionId)}
+                    teacher={getTeacher(lesson.teacherId)}
+                    student={getStudent(lesson.studentId)}
+                    showTeacher={!teacherView}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {!isLoading && (!upcoming || upcoming.length === 0) ? (
             <EmptyState
               icon={CalendarDays}
               title="Пока нет предстоящих занятий"
@@ -166,63 +163,8 @@ export default function LessonsPage() {
               }
             />
           ) : null}
-
-          <section className="mb-8">
-            <h2 className="mb-3 text-label">Ближайшее расписание</h2>
-            {isLoading ? (
-              <LessonCardSkeleton />
-            ) : upcoming && upcoming.length > 0 ? (
-              <div className="space-y-3">
-                {upcoming.slice(0, 5).map((lesson) => (
-                  <LessonCard
-                    key={lesson.id}
-                    lesson={lesson}
-                    directionName={getDirectionName(lesson.directionId)}
-                    teacher={getTeacher(lesson.teacherId)}
-                    student={getStudent(lesson.studentId)}
-                    showTeacher={!teacherView}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </section>
-        </>
+        </div>
       )}
-
-      <section>
-        <h2 className="mb-3 text-label">История</h2>
-        <SegmentedControl
-          className="mb-4 w-max max-w-full"
-          aria-label="Фильтр истории занятий"
-          size="sm"
-          value={historyFilter}
-          options={HISTORY_SEGMENT_OPTIONS}
-          onChange={setHistoryFilter}
-        />
-        {isLoading ? (
-          <LessonCardSkeleton />
-        ) : past && past.length > 0 ? (
-          <div className="space-y-3 opacity-90">
-            {past.map((lesson) => (
-              <LessonCard
-                key={lesson.id}
-                lesson={lesson}
-                directionName={getDirectionName(lesson.directionId)}
-                teacher={getTeacher(lesson.teacherId)}
-                student={getStudent(lesson.studentId)}
-                showTeacher={!teacherView}
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            icon={History}
-            title="Нет занятий"
-            description="В этой категории истории занятий пока нет."
-            className="py-8"
-          />
-        )}
-      </section>
     </div>
   );
 }

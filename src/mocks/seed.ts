@@ -56,6 +56,7 @@ export const users: User[] = [
     lastName: 'Смирнова',
     bio: 'Учусь вокалу',
     directionIds: studentDirections['user-student'],
+    accountStatus: 'active',
   },
   {
     id: 'user-teacher-1',
@@ -65,6 +66,7 @@ export const users: User[] = [
     lastName: 'Волкова',
     bio: 'Преподаватель вокала, 12 лет опыта',
     directionIds: teacherDirections['user-teacher-1'],
+    accountStatus: 'active',
   },
   {
     id: 'user-teacher-2',
@@ -74,6 +76,7 @@ export const users: User[] = [
     lastName: 'Козлов',
     bio: 'Пианист, джаз и классика',
     directionIds: teacherDirections['user-teacher-2'],
+    accountStatus: 'active',
   },
   {
     id: 'user-admin',
@@ -82,6 +85,7 @@ export const users: User[] = [
     firstName: 'Мария',
     lastName: 'Иванова',
     bio: 'Администратор школы',
+    accountStatus: 'active',
   },
   {
     id: 'user-student-2',
@@ -90,6 +94,7 @@ export const users: User[] = [
     firstName: 'Игорь',
     lastName: 'Петров',
     directionIds: studentDirections['user-student-2'],
+    accountStatus: 'active',
   },
 ];
 

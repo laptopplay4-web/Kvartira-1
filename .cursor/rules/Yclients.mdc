@@ -1,0 +1,2207 @@
+Требования к Frontend-плагину
+Категория
+
+Требование
+
+Язык разработки
+
+TypeScript / JavaScript (ES6+)
+
+Фреймворки
+
+Vanilla JS/TS (рекомендуется), React 18+, Vue 3+
+
+Node.js
+
+≥ 18 (LTS 20 рекомендовано)
+
+npm
+
+≥ 9 (используется в CI, yarn/pnpm не поддерживаются)
+
+Сборщик
+
+Vite ≥ 5.0 (через @yclients-configs/vite)
+
+Формат сборки
+
+ES Modules ("type": "module"), target: "esnext"
+
+Формат contract.json
+
+Файл обязательный. Должен содержать поля:
+plugin-slug — уникальный идентификатор плагина,
+version — версия плагина (semver),
+packages — описание пакетов с application (erp или widget) и areas (список зон отображения).
+
+Подробнее в статье.
+
+Артефакты сборки
+
+dist/<plugin>/, manifest.json
+
+Package manager
+
+npm только; все зависимости в package.json
+
+Линтер и форматирование
+
+ESLint ≥ 8, Prettier ≥ 3, TS ≥ 5, TypeScript ESLint
+
+Выходная директория
+
+/dist/<plugin> (должна создаваться при npm run build)
+
+Версионирование
+
+SemVer (например 1.0.1, 1.1.0)
+
+Структура репозитория плагина
+Этот документ описывает структуру репозитория плагина для YCLIENTS.
+
+Общая структура
+Корневой директорией репозитория является директория с названием плагина. В зависимости от типа плагина, корневая директория может содержать:
+
+Только директорию frontend/ (для плагинов, работающих только на стороне клиента).
+Только директорию backend/ (для плагинов, работающих только на стороне сервера).
+Обе директории frontend/ и backend/ (для плагинов, требующих работу как на клиенте, так и на сервере).
+Пример структуры для плагина с фронтендом:
+
+plugin-name/              # Корневая директория плагина
+├── frontend/             # Директория фронтенд части плагина
+│   ├── apps/             # Приложения плагина
+│   ├── docs/             # Документация проекта
+│   ├── dist/             # Собранные артефакты
+│   ├── node_modules/     # Зависимости npm
+│   ├── packages/         # Локальные пакеты
+│   ├── tools/            # Инструменты разработки
+│   ├── .eslintrc.js      # Конфигурация ESLint
+│   ├── .gitignore        # Игнорируемые git файлы
+│   ├── .prettierrc       # Конфигурация Prettier
+│   ├── contract.json     # Контракт плагина
+│   ├── package.json      # Зависимости и скрипты npm
+│   ├── package-lock.json # Фиксированные версии зависимостей
+│   └── README.md         # Основная документация
+└── backend/              # Директория бэкенд части плагина (если требуется)
+    └── ...               # Структура бэкенд части
+Описание директорий и файлов
+Директории
+apps/
+Основная директория с приложениями плагина. Каждое приложение представляет собой отдельный пакет плагина, который может быть встроен в различные части системы YCLIENTS. Каждое приложение имеет свою собственную структуру:
+
+package.json — зависимости и конфигурация приложения.
+src/ — исходный код приложения.
+index.html — точка входа для приложения.
+tsconfig.json — конфигурация TypeScript для приложения.
+vite.config.mts — конфигурация сборки Vite.
+Примеры приложений:
+
+color-picker-erp-settings — настройки плагина в ERP.
+color-picker-erp-timetable — интеграция с расписанием в ERP.
+color-picker-widget-timetable — интеграция с расписанием в виджетах.
+docs/
+Содержит всю документацию проекта, включая:
+
+Описание процесса CI/CD.
+Руководства по разработке.
+API документацию.
+Документацию по развертыванию.
+dist/
+Директория для собранных артефактов плагина. Содержит оптимизированные и минифицированные файлы, готовые к публикации.
+
+packages/
+Содержит локальные пакеты, используемые в проекте. Каждый пакет может иметь свою собственную конфигурацию и зависимости.
+
+Доступные пакеты:
+
+api/ — HTTP клиент и API утилиты.
+utils/ — общие утилиты и системы событий.
+tools/
+Содержит инструменты и скрипты для разработки, сборки и тестирования плагина.
+
+Доступные инструменты:
+
+vite/ — конфигурация сборки Vite.
+typescript/ — конфигурация TypeScript.
+Конфигурационные файлы
+.eslintrc.js
+Конфигурация ESLint для статического анализа кода. Определяет правила линтинга и форматирования.
+
+.prettierrc
+Конфигурация Prettier для автоматического форматирования кода. Обеспечивает единообразный стиль кода.
+
+contract.json
+Определяет контракт плагина, который заполняется разработчиком плагина. Контракт содержит список пакетов (packages), которые представляют собой отдельные приложения плагина, и метаданные плагина.
+
+Структура контракта:
+
+packages — объект, содержащий конфигурацию для каждого пакета плагина.
+package-name — уникальное имя пакета, соответствующее директории в apps/
+application — тип приложения, в которое встраивается пакет:
+"erp" — для встраивания в ERP систему YCLIENTS.
+"widget" — для встраивания в виджеты YCLIENTS.
+areas — список зон интеграции в интерфейсе (массив строк):
+["root"] — основная область приложения.
+["plugin-settings"] — область настроек плагина.
+["erp-visit-modal-client-details"] — область деталей клиента в модальном окне посещения ERP.
+plugin-slug — уникальный идентификатор плагина в системе YCLIENTS.
+Пример реального контракта:
+
+{
+  "packages": {
+    "color-picker-erp-settings": {
+      "application": "erp",
+      "areas": ["plugin-settings"]
+    },
+    "color-picker-erp-timetable": {
+      "application": "erp",
+      "areas": ["root"]
+    },
+    "widget-masters-promo": {
+      "application": "widget",
+      "areas": ["root"]
+    },
+    "client-loyalty-card": {
+      "application": "erp",
+      "areas": ["erp-visit-modal-client-details"]
+    },
+    "timetable-record-client-name": {
+      "application": "erp",
+      "areas": ["erp-timetable-controls", "erp-timetable-record-client-name"]
+    }
+  },
+  "plugin-slug": "color-picker-slug"
+}
+Важные замечания:
+
+Каждый пакет в packages должен соответствовать директории в apps/
+Имена пакетов должны быть уникальными в рамках плагина.
+Типы приложений (application) определяют, где будет работать пакет.
+Зоны (areas) определяют одну или несколько точек интеграции в интерфейсе YCLIENTS для каждого пакета.
+plugin-slug должен быть уникальным среди всех плагинов в системе.
+Контракт является обязательным документом для публикации плагина.
+package.json
+Основной файл конфигурации npm, содержащий:
+
+Зависимости проекта.
+Скрипты для разработки и сборки.
+Метаданные проекта.
+Версионирование.
+Структура приложения в apps/
+Каждое приложение в директории apps/ имеет следующую структуру:
+
+app-name/
+├── src/
+│   ├── components/       # Vue компоненты
+│   ├── types/           # TypeScript типы
+│   ├── app.vue          # Корневой компонент приложения
+│   ├── host.ts          # Точка входа для хоста
+│   ├── index.ts         # Основная точка входа
+│   └── plugin.ts        # Конфигурация плагина
+├── index.html           # HTML шаблон
+├── package.json         # Зависимости приложения
+├── tsconfig.json        # Конфигурация TypeScript
+└── vite.config.mts      # Конфигурация сборки
+Правила работы с репозиторием
+Структура кода
+Соблюдать модульную структуру.
+Следовать принципам чистой архитектуры.
+Использовать типизацию TypeScript.
+Поддерживать документацию в актуальном состоянии.
+Разделять код на frontend и backend части в соответствующих директориях.
+Создавать только необходимые директории (frontend и/или backend) в зависимости от типа плагина.
+Каждое приложение в apps/ должно быть самодостаточным.
+Версионирование
+Следовать семантическому версионированию.
+Обновлять версию в package.json
+Создавать теги для релизов.
+Зависимости
+Фиксировать версии зависимостей в package-lock.json
+Регулярно обновлять зависимости.
+Проверять совместимость при обновлении.
+Документация
+Поддерживать актуальность README.md.
+Документировать все значимые изменения.
+Следовать стандартам документации.
+Сборка и тестирование
+Использовать скрипты из package.json
+Следовать процессу CI/CD.
+Поддерживать тестовое покрытие.
+Рекомендации по разработке
+Начало работы
+npm install        # Установка зависимостей
+npm run dev       # Запуск в режиме разработки
+npm run build     # Сборка проекта
+npm run test      # Запуск тестов
+Добавление новых зависимостей
+npm install <package> --save        # Для production зависимостей
+npm install <package> --save-dev    # Для development зависимостей
+Создание нового приложения
+Создать новую директорию в apps/
+Добавить конфигурацию в contract.json
+Настроить package.json, tsconfig.json и vite.config.mts
+Создать базовую структуру src/
+Обновление документации
+Обновлять соответствующие файлы в docs/
+Следовать формату Markdown.
+Проверять корректность ссылок.
+Работа с TypeScript
+Использовать строгую типизацию.
+Следовать рекомендациям из tsconfig.json
+Документировать типы и интерфейсы.
+Безопасность
+Конфиденциальные данные
+Не хранить секреты в репозитории.
+Использовать переменные окружения.
+Следовать политике безопасности.
+Зависимости
+Регулярно проверять уязвимости.
+Использовать только проверенные пакеты.
+Следить за обновлениями безопасности.
+
+Установка зависимостей
+Требования
+Node.js версии 18.0.0 или выше.
+npm (входит в состав Node.js).
+TypeScript 5.0.0 или выше.
+Структура монорепозитория
+Монорепозиторий организован следующим образом:
+
+frontend/ — корневая директория проекта.
+apps/* — директория с плагинами.
+packages/* — общие пакеты.
+tools/* — инструменты для разработки.
+docs/ — документация проекта.
+Установка
+1. Клонирование репозитория
+git clone <repository-url>
+cd <plugin-directory>
+2. Установка зависимостей
+В корневой директории проекта (frontend/) выполните:
+
+npm install
+Эта команда установит все зависимости для:
+
+Корневого проекта.
+Всех плагинов в директории apps/
+Всех пакетов в директории packages/
+Всех инструментов в директории tools/
+3. Проверка установки
+После установки можно проверить, что все работает корректно:
+
+# Проверка линтера
+npm run lint
+
+# Проверка типов TypeScript
+npm run typecheck
+
+# Запуск тестов
+npm run test
+
+# Запуск сборки
+npm run build
+Работа с зависимостями
+1. Добавление новых зависимостей
+Для добавления зависимости в конкретный плагин:
+cd frontend/apps/<plugin-name>
+npm install <package-name>
+Для добавления общей зависимости в корневой проект:
+cd frontend
+npm install <package-name>
+2. Обновление зависимостей
+Для обновления всех зависимостей в монорепозитории:
+
+cd frontend
+npm update
+3. Очистка
+Если возникли проблемы с зависимостями, можно выполнить полную очистку:
+
+cd frontend
+npm run clean
+npm install
+Скрипты
+В корневом package.json доступны следующие команды:
+
+npm run build — сборка всех пакетов и плагинов.
+npm run dev — запуск режима разработки.
+npm run lint — проверка кода линтером.
+npm run typecheck — проверка типов TypeScript.
+npm run test — запуск тестов.
+npm run format — форматирование кода с помощью Prettier.
+npm run clean — очистка всех node_modules.
+Инструменты разработки
+Проект использует следующие инструменты разработки:
+
+TypeScript 5.0.0+ — для типизации.
+ESLint 8.0.0+ — для линтинга.
+Prettier 3.0.0+ — для форматирования кода.
+TypeScript ESLint — для проверки TypeScript кода.
+Примечания
+Все пакеты в директории packages/, плагины в apps/ и инструменты в tools/ являются частью единого workspace.
+При установке новых зависимостей убедитесь, что они совместимы с версией Node.js >= 18.0.0.
+Для разработки рекомендуется использовать последнюю LTS версию Node.js.
+Все команды в корневом package.json автоматически применяются ко всем workspace через флаг --workspaces
+
+Работа с монорепозиторием и Workspaces
+Что такое Workspaces в npm
+Флаг --workspaces в npm используется для работы с монорепозиториями (monorepos) и позволяет выполнять команды npm одновременно во всех рабочих пространствах (workspaces), определенных в корневом package.json.
+
+Структура проекта
+В проекте определены рабочие пространства через поле "workspaces" в корневом package.json:
+
+"workspaces": [
+    "apps/*",
+    "packages/*"
+]
+Это означает, что проект содержит несколько пакетов в директориях:
+
+apps/ — директория для приложений плагина.
+packages/ — директория для общих пакетов.
+Использование Workspaces
+Выполнение команд
+Когда вы используете флаг --workspaces в команде npm, например:
+
+"build": "npm run build --workspaces"
+Эта команда будет выполнена для всех пакетов в рабочих пространствах. То есть, если у вас есть несколько пакетов в директориях apps/ и packages/, команда npm run build будет запущена для каждого из них.
+
+Флаг --if-present
+В проекте также используется флаг --if-present, например:
+
+"dev": "npm run dev --workspaces --if-present"
+Этот флаг означает, что команда будет выполнена только для тех пакетов, где определена соответствующая скрипт-команда. Если в каком-то пакете нет команды dev, npm пропустит его без ошибки.
+
+Преимущества использования Workspaces
+Использование --workspaces позволяет:
+
+Управлять всеми пакетами в монорепозитории из одной точки.
+Упростить разработку и поддержку проекта.
+Обеспечить согласованность версий зависимостей между пакетами.
+Ускорить установку зависимостей за счет общего node_modules.
+Доступные команды
+В корневом package.json определены следующие команды для работы с workspaces:
+
+npm run build — сборка всех пакетов и плагинов (использует Vite для сборки).
+npm run dev — запуск режима разработки с помощью Vite.
+npm run lint — проверка кода линтером (ESLint) во всех пакетах.
+npm run typecheck — проверка типов TypeScript во всех пакетах.
+npm run test — запуск модульных тестов (Vitest) во всех пакетах.
+npm run format — форматирование кода с помощью Prettier.
+npm run clean — очистка всех node_modules и dist директорий.
+Все команды используют флаг --workspaces --if-present, что означает:
+
+Команды выполняются для всех пакетов в workspaces.
+Если пакет не имеет определенной команды, он пропускается без ошибки.
+Требования к окружению
+Node.js >= 18.0.0.
+npm >= 9.0.0.
+Структура директорий
+frontend/
+├── apps/            # Приложения плагина (color-picker)
+├── packages/        # Общие пакеты (utils)
+└── tools/           # Инструменты разработки (typescript, vite)
+Обновление зависимостей
+Для обновления всех зависимостей в монорепозитории:
+
+cd frontend
+npm update
+Очистка и переустановка
+Если возникли проблемы с зависимостями:
+
+cd frontend
+npm run clean
+npm install
+
+Зоны встраивания плагинов
+В YCLIENTS все Frontend‑плагины (ERP‑ и виджет‑плагины) встраиваются в заранее определенные зоны интерфейса хост‑приложения с помощью простых HTML‑контейнеров и стандартизированных событий.
+
+Контейнер
+В коде хоста создается пустой HTML элемент:
+
+<div data-plugin-container="area-name"></div>
+где area-name — одна из предопределенных областей:
+
+Зоны встраивания виджета онлайн-записи
+Зоны встраивания ERP
+Инициализация
+Хост‑приложение сообщает о готовности контейнера и передает его идентификатор и начальные данные:
+
+document.dispatchEvent(new CustomEvent(
+  'host:area-name:ready',
+  {
+    detail: {
+      area: 'area-name',
+      containerId: 'area-name|container-id',
+      payload: { /* данные для плагина */ }
+    }
+  }
+));
+Типы плагинов
+Инъекционный плагин — вставляет собственный UI в контейнер хоста («инъекция»).
+Конфигурационный плагин — не рисует ничего сам, но передает хосту конфигурацию, реагируя на host:…:ready.
+События от плагина
+plugin:container-id:ready — плагин отправляет настройки или подтверждение корректного монтирования.
+plugin:container-id:shutdown — плагин сообщает об ошибке или невозможности выполнить задачу.
+Обновление данных
+Когда хост обновляет контекст (например, новые параметры), он шлет:
+
+document.dispatchEvent(new CustomEvent(
+  'host:area-name:update',
+  { detail: { /* свежие данные */ } }
+));
+Плагин на это событие реагирует и пересчитывает свое состояние/UI.
+
+Хост‑плагин взаимодействие
+Хост‑приложение                                                 Плагин
+     |                                                             |
+     | 1. Создание контейнера                                      |
+     |    <div data-plugin-container="area-name">                  |
+     |------------------------------------------------------------>|
+     |                                                             |
+     | 2. Инициализация                                            |
+     |    host:area-name:ready{area, containerId, payload}         |
+     |------------------------------------------------------------>|
+     |                                                             |
+ alt Плагин‑инъекция                                               |
+     |                                                             |
+     |    3a. Инъекция UI                                          |
+     |       (найти контейнер и вставить приложение)               |
+     |       plugin:container-id:ready{area, containerId, payload} |
+     |<------------------------------------------------------------|
+ else Плагин‑конфигурация                                          |
+     |                                                             |
+     |    3b. Конфигурация                                         |
+     |       plugin:container-id:ready{area, containerId, payload} |
+     |<------------------------------------------------------------|
+ end                                                               |
+     | 4. Обновление                                               |
+     |    host:area-name:update{area, containerId, payload}        |
+     |------------------------------------------------------------>|
+     |                                                             |
+     | 5. Ошибка                                                   | 
+     |    plugin:container-id:shutdown{area, containerId, payload} |
+     |<------------------------------------------------------------|
+Создание — хост содержит HTML‑элемент с аттрибутом data-plugin-container.
+Инициализация — хост отправляет host:{area}:ready.
+Инъекция UI — плагин вставляет html разметку в контейнер и отправляем событие plugin:{containerId}:ready.
+Конфигурация — плагин отправляет событие plugin:{containerId}:ready с конфигурацией в поле payload.
+Обновление — при изменении данных хост отправляет событие host:{area}:update.
+Ошибка — в случае сбоя отправляется событие plugin:{containerId}:shutdown
+
+Структура и настройка contract.json
+Описание
+Файл contract.json является конфигурационным файлом, который определяет структуру и настройки плагина для YCLIENTS. Он находится в директории frontend/ и является обязательным для корректной работы плагина.
+
+Структура файла
+packages
+Объект, который определяет различные пакеты (модули) плагина. Каждый пакет имеет уникальный идентификатор и содержит следующие параметры:
+
+Параметры пакета
+application (string) — определяет, в каком приложении YCLIENTS будет использоваться пакет:
+erp — для основного приложения YCLIENTS.
+widget — для виджета.
+areas (string[]) — определяет список мест в приложении, где будут отображаться пакеты плагина:
+plugin-settings — настройки плагина.
+erp-visit-modal-client-details — детали клиента в модальном окне посещения ERP.
+plugin-slug
+Тип: string.
+Описание: Уникальный идентификатор плагина в системе YCLIENTS.
+Пример: "color-picker-slug".
+version
+Тип: string.
+Описание: Версия плагина в формате semver (semantic versioning).
+Пример: "1.0.0".
+Пример конфигурации
+{
+  "packages": {
+    "color-picker-erp-settings": {
+      "application": "erp",
+      "areas": ["plugin-settings"]
+    },
+    "color-picker-erp-timetable": {
+      "application": "erp",
+      "areas": ["erp-timetable-controls", "erp-timetable-record-client-name"]
+    },
+    "color-picker-widget": {
+      "application": "widget",
+      "areas": ["staff_info_comments"]
+    }
+  },
+  "plugin-slug": "color-picker-slug"
+}
+Важные замечания
+При внесении изменений в файл необходимо соблюдать правильный формат JSON.
+Все идентификаторы пакетов должны быть уникальными в рамках системы YCLIENTS.
+Версия плагина должна соответствовать формату semver.
+Изменение plugin-slug может привести к тому, что система будет воспринимать плагин как новый.
+Использование
+Этот файл используется системой YCLIENTS для:
+
+Определения мест отображения функциональности плагина.
+Идентификации плагина в системе.
+Управления версиями плагина.
+Интеграции плагина с различными частями системы YCLIENTS.
+
+Коммуникация между хост-приложением и плагином
+Основные понятия
+Что такое хост-приложение?
+Хост-приложение - это основное веб-приложение, которое предоставляет платформу для работы плагинов. В контексте YCLIENTS это может быть:
+
+ERP-система - административная панель для управления бизнесом
+Виджет-система - публичная часть сайта, доступная клиентам
+Другие веб-приложения - любые системы, поддерживающие архитектуру плагинов
+Хост-приложение отвечает за:
+
+Загрузку и инициализацию плагинов
+Предоставление API и данных для плагинов
+Управление жизненным циклом плагинов
+Обеспечение безопасности и изоляции
+Что такое плагины?
+Плагины - это независимые модули, которые расширяют функциональность хост-приложения. В нашем случае это:
+
+Пример: Плагин color-picker добавляет возможность настроить уникальную цветовую схему для журнала записи в ЕРП и цветов в виджете онлайн-записи. Он состоит из трех компонент:
+
+color-picker-erp-settings - приложение плагина для страницы настроек цветовой схемы ERP и виджета
+color-picker-erp-timetable - приложение плагина загружающееся на странице журнала записи и применяющее настройки цветов в нем
+color-picker-widget - приложение плагина загружающееся в виджете и применяющий настройки цветов в нем
+Плагины:
+
+Встраиваются в хост-приложение как обычные JavaScript скрипты
+Имеют собственный жизненный цикл
+Могут взаимодействовать с хостом через стандартизированный API
+Могут быть загружены/выгружены динамически
+Архитектура взаимодействия
+┌─────────────────────┐    События    ┌─────────────────┐
+│                     │◄─────────────►│                 │
+│   Хост-приложение   │               │     Плагин      │
+│                     │               │                 │
+│  • Загружает        │               │  • Выполняет    │
+│  • Инициализирует   │               │  • Отправляет   │
+│  • Управляет        │               │  • Обрабатывает │
+└─────────────────────┘               └─────────────────┘
+Обзор
+Система коммуникации между хост-приложением и плагинами построена на основе стандартизированной архитектуры событий с использованием DocumentEventEmitter. Это обеспечивает надежную двустороннюю связь между компонентами системы.
+
+Архитектура коммуникации
+Основные компоненты
+DocumentEventEmitter - основной класс для работы с событиями документа
+EventEmitter - базовый класс для управления событиями
+Стандартизированные типы событий - типизированные интерфейсы для обмена данными
+Контекст плагина - система идентификации и контекста плагинов
+Принципы работы
+Система использует паттерн "Наблюдатель" (Observer) для реализации асинхронной коммуникации между хостом и плагинами. Все события отправляются на уровне document, что обеспечивает глобальную доступность и изоляцию между разными плагинами.
+
+Схема работы
+Хост-приложение                    Плагин
+     |                                |
+     | 1. Инициализация хоста         |
+     |                                |
+     | 2. host:${PLUGIN_AREA}:ready   |
+     |------------------------------->|
+     |                                | 3. Инициализация плагина
+     |                                |
+     |                                | 4. Создание приложения
+     |                                |
+     |                                | 5. plugin:${PLUGIN_AREA}:ready
+     |<-------------------------------|
+     |                                |
+     | 6. Готовность к взаимодействию |
+Эта архитектура обеспечивает надежную, типизированную и масштабируемую систему коммуникации между хост-приложением и плагинами.
+
+Система событий
+Формат именования событий
+События используют стандартизированный формат именования для избежания конфликтов:
+
+События от хоста к плагину: host:${PLUGIN_AREA}:${eventName}
+События от плагина к хосту: plugin:${PLUGIN_AREA}:${eventName}
+Где:
+
+PLUGIN_AREA - одна из зон встраивания плагина из массива areas в contract.json
+eventName - название конкретного события
+Важно: Если в areas указано несколько зон, события должны быть сгенерированы для каждой зоны отдельно. Например, если areas: ["root", "plugin-settings"], то события будут host:root:ready и host:plugin-settings:ready.
+
+Основные контракты системы
+Система коммуникации основана на универсальном контракте, который определяет структуру всех событий:
+
+TPluginEvent
+Универсальный контракт для всех событий в системе плагинов:
+
+type TPluginEvent<T> = {
+  area: string; // Идентификатор зоны, в которой произошло событие
+  containerId: string; // ID контейнера для монтирования плагина
+  payload: T; // Полезная нагрузка события
+};
+Важно: Частная реализация - это кастомный тип, который передается в дженерик базового контракта. Например:
+
+TPluginEvent<THostReadyPayload> - событие от хоста с полезной нагрузкой типа THostReadyPayload
+TPluginEvent<TPluginReadyPayload> - событие от плагина с полезной нагрузкой типа TPluginReadyPayload
+Текущие события
+События от хоста к плагину
+Событие	Описание	Контракт	Частная реализация
+host:${PLUGIN_AREA}:ready	Сигнализирует о готовности хоста к взаимодействию	TPluginEvent<T>	THostReadyPayload
+События от плагина к хосту
+Событие	Описание	Контракт	Частная реализация
+plugin:${PLUGIN_AREA}:ready	Подтверждает готовность плагина к работе	TPluginEvent<T>	TPluginReadyPayload
+Типы данных
+// === УНИВЕРСАЛЬНЫЙ КОНТРАКТ ===
+
+// Универсальный тип для всех событий в системе плагинов
+type TPluginEvent<T> = {
+  area: string; // Идентификатор зоны, в которой произошло событие
+  containerId: string; // ID контейнера для монтирования плагина
+  payload: T; // Полезная нагрузка события
+};
+
+// === ЧАСТНЫЕ РЕАЛИЗАЦИИ ===
+// (кастомные типы для передачи в дженерики базового контракта)
+
+// Данные от хоста при готовности
+type THostReadyPayload = {
+  iframeUrl: string; // URL для инициализации iframe плагина
+};
+
+// Данные о готовности плагина (payload события plugin:...:ready)
+type TPluginReadyPayload = {
+  id: string; // Идентификатор плагина
+};
+
+// === ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ ===
+
+// Полный тип события от хоста к плагину
+type THostReadyEvent = TPluginEvent<THostReadyPayload>;
+
+// Полный тип события от плагина к хосту
+type TPluginReadyEvent = TPluginEvent<TPluginReadyPayload>;
+Жизненный цикл коммуникации
+1. Инициализация хоста
+// Хост инициализирует систему событий
+document.addEventListener(PLUGIN_EVENT_NAMES.READY, (data) => {
+  console.log('[Host] Получено событие готовности плагина:', data);
+});
+
+// Отправка события готовности хоста
+document.dispatchEvent(
+  new CustomEvent(HOST_EVENT_NAMES.READY, {
+    detail: {
+      area: 'my-plugin-area',
+      containerId: 'plugin-container-id',
+      payload: {
+        iframeUrl: 'https://example.com/iframe-url',
+      },
+    },
+  }),
+);
+2. Инициализация плагина
+// Создание эмиттеров событий
+const hostEventEmitter = new DocumentEventEmitter<THostReadyEvent>();
+const pluginEventEmitter = new DocumentEventEmitter<TPluginReadyEvent>();
+
+// Подписка на событие готовности хоста
+hostEventEmitter.onDocument(HOST_EVENT_NAMES.READY, (event) => {
+  const { area, containerId, payload } = event.detail;
+
+  // Инициализация Vue приложения
+  const app = createApp(App, { iframeUrl: payload.iframeUrl });
+
+  // Настройка обработчика ошибок
+  app.config.errorHandler = (err) => {
+    console.error('[Plugin] Ошибка в Vue приложении:', err);
+  };
+
+  app.mount('#' + containerId);
+
+  // Отправка события готовности плагина
+  pluginEventEmitter.emit(PLUGIN_EVENT_NAMES.READY, {
+    area: 'my-plugin-area',
+    containerId: containerId,
+    payload: { id: 'color-picker-plugin' },
+  });
+});
+3. Обработка событий
+Система автоматически обрабатывает события на уровне document и передает их соответствующим обработчикам через DocumentEventEmitter.
+
+Утилиты для работы с событиями
+DocumentEventEmitter
+Примечание: Детальное описание класса DocumentEventEmitter и его методов доступно в отдельном документе.
+
+Основной класс для работы с событиями документа:
+
+class DocumentEventEmitter<T = unknown> implements IDocumentEventEmitter<T> {
+  // Отправка события на уровне document
+  emit(eventName: string, detail?: T): void;
+
+  // Подписка на событие документа
+  onDocument<T>(eventName: string, listener: CustomEventListener<T>): void;
+
+  // Отписка от события документа
+  offDocument<T>(eventName: string, listener: CustomEventListener<T>): void;
+}
+EventEmitter
+Примечание: Детальное описание класса EventEmitter и его методов доступно в отдельном документе.
+
+Базовый класс для управления событиями:
+
+class EventEmitter<T = unknown> {
+  // Подписка на событие
+  on(eventName: string, listener: CustomEventListener<T>): void;
+
+  // Отправка события
+  emit(eventName: string, detail?: T): void;
+
+  // Отписка от события
+  off(eventName: string, listener: CustomEventListener<T>): void;
+}
+getPluginContext
+Функция для получения контекста плагина с мемоизацией:
+
+// Получение контекста плагина
+const context = { id: 'color-picker-plugin' };
+// Возвращает: { id: "color-picker-plugin" }
+
+// Функция использует мемоизацию для оптимизации производительности
+// При первом вызове создает и сохраняет экземпляр контекста
+// При последующих вызовах возвращает сохраненный экземпляр
+Примеры использования
+Создание типов событий
+Для каждого нового события необходимо создать соответствующие типы:
+
+// types/events.ts
+import type { TPluginEvent } from '@yclients-plugins/utils';
+
+// Полезная нагрузка для события от хоста
+export type THostUpdatePayload = {
+  data: object;
+  timestamp: number;
+};
+
+// Событие от хоста к плагину
+export type THostUpdateEvent = TPluginEvent<THostUpdatePayload>;
+
+// Полезная нагрузка для события от плагина
+export type TPluginResponsePayload = {
+  success: boolean;
+  message: string;
+};
+
+// Событие от плагина к хосту
+export type TPluginResponseEvent = TPluginEvent<TPluginResponsePayload>;
+Создание нового события
+// В events.ts
+export const HOST_EVENT_NAMES = {
+  READY: `host:${PLUGIN_AREA}:ready`,
+  UPDATE: `host:${PLUGIN_AREA}:update`, // Новое событие
+} as const;
+
+export const PLUGIN_EVENT_NAMES = {
+  READY: `plugin:${PLUGIN_AREA}:ready`,
+  RESPONSE: `plugin:${PLUGIN_AREA}:response`, // Новое событие
+} as const;
+Обработка нового события
+// В плагине
+const handleHostUpdateEvent = (event: CustomEvent<THostUpdateEvent>) => {
+  const { area, containerId, payload } = event.detail;
+  // Обработка обновления
+
+  // Отправка ответа хосту
+  pluginEventEmitter.emit(PLUGIN_EVENT_NAMES.RESPONSE, {
+    area: 'my-plugin-area',
+    containerId: containerId,
+    payload: {
+      success: true,
+      message: 'Update processed successfully',
+    },
+  });
+};
+
+hostEventEmitter.onDocument(HOST_EVENT_NAMES.UPDATE, handleHostUpdateEvent);
+
+Список возможных событий
+В экосистеме YCLIENTS взаимодействие между основным приложением (хостом) и фронтенд-плагинами построено на событийной модели. Хост-приложение генерирует специализированные события, которые информируют плагины о текущем состоянии системы, изменениях данных и необходимости выполнить определенные действия.
+
+Плагины, в свою очередь, подписываются на эти события и могут реагировать на них, выполняя логику расширения функциональности, а также отправлять собственные события обратно хосту для передачи данных или запроса на выполнение действий.
+
+Данная статья подробно описывает ключевые события ERP, которые отправляет продукт.
+
+Реализованные события ERP
+Когда отправляется
+
+Пример события
+
+При открытии данных о клиенте в визите, в журнале записи.
+
+document.dispatchEvent(
+  new CustomEvent('host:erp-visit-modal-client-card-sidebar:ready', {
+    detail: {
+      area: 'erp-visit-modal-client-card-sidebar',
+      containerId: 'erp-visit-modal-client-card-sidebar',
+      payload: null,
+    },
+  }),
+);
+При нажатии на контрол продажи товаров в журнале записи.
+
+document.dispatchEvent(
+  new CustomEvent('host:erp-timetable-controls-goods-sale:ready', {
+    detail: {
+      area: 'erp-timetable-controls-goods-sale',
+      containerId: 'erp-timetable-controls-goods-sale',
+      payload: null,
+    },
+  }),
+);
+При открытии любой страницы ERP.
+
+document.dispatchEvent(
+  new CustomEvent('host:nav-menu-item:ready', {
+    detail: {
+      area: 'nav-menu-item',
+      containerId: 'nav-menu-item',
+      payload: null,
+    },
+  }),
+);
+При открытии данных о клиенте в визите, в журнале записи.
+
+document.dispatchEvent(
+  new CustomEvent('host:erp-visit-modal-client-card-info:ready', {
+    detail: {
+      area: 'erp-visit-modal-client-card-info',
+      containerId: 'erp-visit-modal-client-card-info',
+      payload: null,
+    },
+  }),
+);
+При открытии данных о клиенте в визите, в журнале записи.
+
+document.dispatchEvent(
+  new CustomEvent('host:erp-visit-modal-client-card-details:ready', {
+    detail: {
+      area: 'erp-visit-modal-client-details',
+      containerId: 'erp-visit-modal-client-details',
+      payload: null,
+    },
+  }),
+);
+При открытии журнала записи, после загрузки каждой записи в журнале.
+
+document.dispatchEvent(
+  new CustomEvent('host:erp-timetable-record-client-name:ready', {
+    detail: {
+      area: 'erp-timetable-record-client-name',
+      containerId: 'erp-timetable-record-client-name',
+      payload: {
+          clientName: 'Иван',
+          clientSurname: 'Иванов',
+          clientPatronymic: 'Иванович',
+      },
+    },
+  }),
+);
+События виджета онлайн-записи
+Когда отправляется
+
+Пример события
+
+При инициализации виджета.
+
+document.dispatchEvent(
+  new CustomEvent('host:root:ready', {
+    detail: {
+      area: 'root',
+      containerId: 'root',
+      payload: null,
+    },
+  }),
+);
+
+EventEmitter
+EventEmitter - это базовый класс для управления событиями, реализующий паттерн Наблюдатель (Observer).
+
+Основные возможности
+Подписки на события
+Отправки событий
+Управления обработчиками событий
+Типизации данных событий
+API Reference
+Методы
+on(eventName: string, listener: EventListener<T>): void
+Подписывает обработчик на указанное событие.
+
+emitter.on('event', (detail) => {
+  console.log(detail);
+});
+off(eventName: string, listener: EventListener<T>): void
+Отписывает обработчик от указанного события.
+
+const listener = (detail) => console.log(detail);
+emitter.on('event', listener);
+// ... использование ...
+emitter.off('event', listener);
+emit(eventName: string, detail?: T): void
+Вызывает событие с указанными данными.
+
+emitter.emit('event', { data: 'value' });
+Примеры использования
+Базовое использование
+import { EventEmitter } from '@yclients-plugins/utils';
+
+// Создание экземпляра с конкретным типом данных
+interface ColorEvent {
+  color: string;
+  alpha?: number;
+}
+
+const colorEmitter = new EventEmitter<ColorEvent>();
+
+// Подписка на событие
+colorEmitter.on('color-changed', (detail) => {
+  console.log('Color changed:', detail.color, 'Alpha:', detail.alpha);
+});
+
+// Вызов события
+colorEmitter.emit('color-changed', { color: 'red', alpha: 0.5 }); // OK
+colorEmitter.emit('color-changed', { color: 123 }); // Error: Type 'number' is not assignable to type 'string'
+
+// Отписка от события
+const listener = (detail: ColorEvent) => {
+  console.log('Color changed:', detail.color);
+};
+colorEmitter.on('color-changed', listener);
+colorEmitter.off('color-changed', listener);
+Расширенные примеры использования
+1. Использование с примитивными типами
+const numberEmitter = new EventEmitter<number>();
+
+numberEmitter.on('count', (detail) => {
+  console.log('Count:', detail);
+});
+
+numberEmitter.emit('count', 42); // OK
+numberEmitter.emit('count', '42'); // Error: Type 'string' is not assignable to type 'number'
+2. Использование с union типами
+type StatusEvent = 'success' | 'error' | 'loading';
+const statusEmitter = new EventEmitter<StatusEvent>();
+
+statusEmitter.on('status', (detail) => {
+  console.log('Status:', detail);
+});
+
+statusEmitter.emit('status', 'success'); // OK
+statusEmitter.emit('status', 'pending'); // Error: Type '"pending"' is not assignable to type 'StatusEvent'
+3. Использование глобального EventEmitter
+import { eventEmitter } from '@yclients-plugins/utils';
+
+// Подписка на глобальное событие
+eventEmitter.on('app:initialized', (detail) => {
+  console.log('Application initialized');
+});
+
+// Вызов глобального события
+eventEmitter.emit('app:initialized');
+4. Асинхронная обработка событий
+const asyncEmitter = new EventEmitter<{ id: number }>();
+
+// Асинхронный обработчик
+asyncEmitter.on('fetch-data', async (detail) => {
+  try {
+    const data = await fetchData(detail.id);
+    console.log('Data received:', data);
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  }
+});
+
+// Вызов события
+asyncEmitter.emit('fetch-data', { id: 1 });
+5. Работа с несколькими типами событий
+// Определение типов для разных событий
+interface UserEvent {
+  id: number;
+  name: string;
+}
+
+interface SystemEvent {
+  status: 'ready' | 'error';
+  message: string;
+}
+
+// Создание эмиттеров для разных типов событий
+const userEmitter = new EventEmitter<UserEvent>();
+const systemEmitter = new EventEmitter<SystemEvent>();
+
+// Подписка на разные события
+userEmitter.on('user:created', (detail) => {
+  console.log('User created:', detail.name);
+});
+
+systemEmitter.on('system:status', (detail) => {
+  console.log('System status:', detail.status);
+});
+
+// Вызов событий
+userEmitter.emit('user:created', { id: 1, name: 'John' });
+systemEmitter.emit('system:status', {
+  status: 'ready',
+  message: 'System initialized',
+});
+6. Обработка ошибок
+const errorEmitter = new EventEmitter<{ error: Error }>();
+
+// Подписка на события с обработкой ошибок
+errorEmitter.on('error', (detail) => {
+  try {
+    // Обработка события
+    if (detail.error) {
+      throw detail.error;
+    }
+  } catch (error) {
+    console.error('Error in event handler:', error);
+    // Дополнительная обработка ошибки
+  }
+});
+
+// Вызов события с ошибкой
+errorEmitter.emit('error', { error: new Error('Something went wrong') });
+Лучшие практики
+1. Управление памятью
+class Component {
+  private emitter = new EventEmitter<string>();
+  private listener: EventListener<string>;
+
+  constructor() {
+    // Сохраняем ссылку на обработчик для последующей отписки
+    this.listener = (detail) => this.handleEvent(detail);
+    this.emitter.on('event', this.listener);
+  }
+
+  private handleEvent(detail: string) {
+    console.log(detail);
+  }
+
+  destroy() {
+    // Важно отписаться от событий при уничтожении компонента
+    this.emitter.off('event', this.listener);
+  }
+}
+2. Именование событий
+// Хорошие примеры именования событий
+emitter.emit('user:created', { id: 1 });
+emitter.emit('order:status-changed', { status: 'processing' });
+emitter.emit('system:error', { code: 'E001' });
+
+// Плохие примеры (избегайте)
+emitter.emit('event1', { data: 'value' });
+emitter.emit('update', { id: 1 });
+3. Типизация данных
+// Используйте интерфейсы для сложных объектов
+interface OrderEvent {
+  id: number;
+  status: 'pending' | 'processing' | 'completed';
+  items: Array<{
+    id: number;
+    quantity: number;
+  }>;
+}
+
+const orderEmitter = new EventEmitter<OrderEvent>();
+
+// TypeScript будет проверять тип данных
+orderEmitter.emit('order:updated', {
+  id: 1,
+  status: 'processing',
+  items: [{ id: 1, quantity: 2 }],
+});
+Экспорты
+Основные экспорты
+import { EventEmitter } from '@yclients-plugins/utils';
+Глобальный синглтон
+import { eventEmitter } from '@yclients-plugins/utils';
+Типы
+import type { EventListener } from '@yclients-plugins/utils';
+
+DocumentEventEmitter
+Класс для работы с событиями документа. Реализует интерфейс IDocumentEventEmitter и добавляет обработку событий на уровне document.
+
+Основные возможности
+Подписка на события документа
+Отправка событий на уровне документа
+Типизированная работа с событиями
+Автоматическая очистка слушателей
+API Reference
+Методы
+onDocument(eventName, listener)
+Подписка на событие документа.
+
+onDocument<T>(eventName: string, listener: CustomEventListener<T>): void
+offDocument(eventName, listener)
+Отписка от события документа.
+
+offDocument<T>(eventName: string, listener: CustomEventListener<T>): void
+emit(eventName, detail)
+Отправка события на уровне документа.
+
+emit(eventName: string, detail?: T): void
+Примеры использования
+Базовое использование
+import { DocumentEventEmitter } from '@yclients-plugins/utils';
+
+const emitter = new DocumentEventEmitter<string>();
+
+// Подписка на событие
+emitter.onDocument('user-login', (event) => {
+  console.log('User logged in:', event.detail);
+});
+
+// Отправка события
+emitter.emit('user-login', 'john.doe@example.com');
+Использование с интерфейсами
+import { DocumentEventEmitter } from '@yclients-plugins/utils';
+
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+}
+
+const emitter = new DocumentEventEmitter<UserData>();
+
+// Подписка на событие
+emitter.onDocument('user-update', (event) => {
+  console.log('User updated:', event.detail.name);
+});
+
+// Отправка события
+emitter.emit('user-update', {
+  id: 1,
+  name: 'John Doe',
+  email: 'john@example.com',
+});
+Использование в плагинах
+import { DocumentEventEmitter } from '@yclients-plugins/utils';
+
+interface PluginEvent {
+  type: 'ready' | 'update';
+  payload: any;
+}
+
+class MyPlugin {
+  private eventEmitter = new DocumentEventEmitter<PluginEvent>();
+
+  init() {
+    // Подписка на события хоста
+    this.eventEmitter.onDocument('host-ready', (event) => {
+      console.log('Host is ready:', event.detail);
+    });
+
+    // Отправка события готовности плагина
+    this.eventEmitter.emit('plugin-ready', {
+      type: 'ready',
+      payload: { status: 'initialized' },
+    });
+  }
+}
+Использование с универсальным типом TPluginEvent
+import { DocumentEventEmitter, TPluginEvent } from '@yclients-plugins/utils';
+
+interface UserEvent {
+  id: number;
+  name: string;
+}
+
+const emitter = new DocumentEventEmitter<TPluginEvent<UserEvent>>();
+
+// Подписка на событие
+emitter.onDocument('user:created', (event) => {
+  console.log('User created:', event.detail.payload.name);
+  console.log('Container ID:', event.detail.containerId);
+  console.log('Area:', event.detail.area);
+});
+
+// Отправка события
+emitter.emit('user:created', {
+  area: 'my-plugin-area',
+  containerId: 'container-123',
+  payload: {
+    id: 1,
+    name: 'John Doe',
+  },
+});
+Использование глобального DocumentEventEmitter
+import { documentEventEmitter } from '@yclients-plugins/utils';
+
+// Подписка на глобальное событие документа
+documentEventEmitter.onDocument('app:initialized', (event) => {
+  console.log('Application initialized:', event.detail);
+});
+
+// Вызов глобального события документа
+documentEventEmitter.emit('app:initialized', { version: '1.0.0' });
+Экспорты
+Основные экспорты
+import { DocumentEventEmitter } from '@yclients-plugins/utils';
+Глобальный синглтон
+import { documentEventEmitter } from '@yclients-plugins/utils';
+Типы
+import type { CustomEventListener } from '@yclients-plugins/utils';
+
+Сборка пакета плагина
+Этот документ описывает процесс сборки пакета плагина.
+
+Обзор
+Плагин собирается с использованием Vite в качестве инструмента сборки. Процесс сборки настроен для:
+
+Генерации библиотеки в формате ES модулей.
+Создания source maps для отладки.
+Генерации файла манифеста со списком всех собранных ресурсов.
+Размещения всех артефактов сборки в директории dist/[название-плагина]
+Требования
+Перед сборкой плагина убедитесь, что у вас установлены:
+
+Node.js (рекомендуется версия 18 или выше)
+Все зависимости установлены через npm install в корневой директории
+Конфигурация сборки
+Конфигурация сборки находится в файле frontend/packages/[название-плагина]/vite.config.mts. Основные настройки сборки включают:
+
+Настройки вывода
+Директория для сборки: dist/[название-плагина]
+Имя библиотеки: определяется в конфигурации.
+Формат вывода: только ES модули.
+Source maps: включены.
+Минификация: отключена (для лучшей отладки).
+Настройки алиасов
+Алиас @ указывает на корневую директорию frontend.
+Артефакты сборки
+Процесс сборки генерирует:
+
+[название-плагина].[hash].js — основной бандл библиотеки.
+[название-плагина].[hash].js.map — файл source map.
+manifest.json — файл манифеста со списком всех собранных ресурсов.
+Команды сборки
+Для сборки плагина выполните следующую команду из корневой директории:
+
+npm run build
+Или для сборки конкретного пакета:
+
+npm run build --workspace=[название-пространства]/[название-плагина]
+Результаты сборки
+После успешной сборки в директории frontend/dist/[название-плагина] вы найдете следующие файлы:
+
+[название-плагина].[hash].js — основной бандл библиотеки.
+[название-плагина].[hash].js.map — source map для отладки.
+manifest.json — содержит метаданные о сборке:
+{
+  "name": "[название-плагина]",
+  "files": [
+    {
+      "name": "[название-плагина].js",
+      "path": "/dist/[название-плагина]/[название-плагина].js"
+    },
+    {
+      "name": "[название-плагина].js.map",
+      "path": "/dist/[название-плагина]/[название-плагина].js.map"
+    }
+  ]
+}
+Разработка
+Во время разработки вы можете использовать следующие команды:
+
+npm run dev — запуск сервера разработки.
+npm run build --watch — сборка в режиме наблюдения (пересборка при изменении файлов).
+Устранение неполадок
+Распространенные проблемы при сборке и их решения:
+
+1. Ошибка сборки из-за ненайденных модулей
+Убедитесь, что все зависимости установлены.
+Проверьте, что алиас @ правильно разрешается.
+Проверьте правильность всех путей импорта.
+2. Не генерируются source maps
+Проверьте, что в конфигурации Vite установлено sourcemap: true
+Убедитесь, что процесс сборки завершается без ошибок.
+3. Не генерируется манифест
+Проверьте, что плагин манифеста включен в плагины Vite.
+Убедитесь, что у процесса сборки есть права на запись в директорию dist.
+
+Пакет конфигураций сборки Vite
+Пакет предоставляет предварительно настроенные конфигурации Vite для проектов YCLIENTS.
+
+Требования
+Node.js: >= 16.
+Vite: >= 5.0.0.
+Для Vue конфигурации: Vue >= 3.0.0.
+Связанные пакеты
+@vitejs/plugin-vue — плагин для Vue 3.
+@vitejs/plugin-vue-jsx — плагин для Vue JSX.
+vite — основной пакет Vite.
+Установка
+npm install --save-dev @yclients-configs/vite
+Быстрый старт
+Простой проект
+// vite.config.ts
+import { defineBaseConfig } from '@yclients-configs/vite';
+
+export default defineBaseConfig();
+Vue проект
+// vite.config.ts
+import {
+  defineBaseConfig,
+  defineVueConfig,
+  createConfig,
+} from '@yclients-configs/vite';
+
+export default await createConfig(
+  defineBaseConfig(),
+  defineVueConfig({
+    vueOptions: {
+      // Настройки Vue плагина
+    },
+  }),
+);
+Доступные конфигурации
+Пакет предоставляет следующие конфигурации и утилиты:
+
+Экспорт
+
+Описание
+
+defineBaseConfig
+
+Базовая конфигурация с настройками по умолчанию.
+
+defineVueConfig
+
+Конфигурация для Vue.js проектов.
+
+createConfig
+
+Утилита для объединения конфигураций.
+
+@yclients-configs/vite/presets
+
+Пресеты для специфических случаев.
+
+Базовая конфигурация
+Базовая конфигурация включает в себя стандартные настройки для проектов YCLIENTS:
+
+Оптимизация сборки.
+Настройки сервера разработки.
+Поддержка source maps.
+Автоматическая очистка выходной директории.
+Использование
+// vite.config.ts
+import { defineBaseConfig } from '@yclients-configs/vite';
+
+export default defineBaseConfig({
+  // Опциональные настройки Vite
+  root: process.cwd(), // Корневая директория проекта (по умолчанию: process.cwd())
+  base: './', // Базовый публичный путь (по умолчанию: './')
+  build: {
+    outDir: 'dist', // Директория для сборки (по умолчанию: 'dist')
+    target: 'esnext', // Целевая версия ES (по умолчанию: 'esnext')
+    sourcemap: true, // Source maps (по умолчанию: true)
+    minify: false, // Минификация (по умолчанию: false)
+    emptyOutDir: true, // Очистка выходной директории (по умолчанию: true)
+  },
+  server: {
+    port: 3000, // Порт сервера разработки (по умолчанию: 3000)
+    strictPort: true, // Строгий порт (по умолчанию: true)
+    host: true, // Хост (по умолчанию: true)
+  },
+  plugins: [], // Дополнительные плагины Vite
+});
+Настройки по умолчанию
+const defaultConfig = {
+  root: process.cwd(),
+  base: './',
+  build: {
+    outDir: 'dist',
+    target: 'esnext',
+    emptyOutDir: true,
+    sourcemap: true,
+    minify: false,
+  },
+  server: {
+    port: 3000,
+    strictPort: true,
+    host: true,
+  },
+};
+Vue конфигурация
+Vue конфигурация расширяет базовую конфигурацию, добавляя поддержку Vue.js:
+
+Поддержка Vue 3.
+Поддержка JSX/TSX с настраиваемыми опциями.
+Все настройки базовой конфигурации.
+Автоматическая настройка внешних зависимостей.
+Использование Vue конфигурации
+// vite.config.ts
+import {
+  defineBaseConfig,
+  defineVueConfig,
+  createConfig,
+} from '@yclients-configs/vite';
+
+export default await createConfig(
+  defineBaseConfig(),
+  defineVueConfig({
+    // Опции для Vue плагина
+    vueOptions: {
+      template: {
+        compilerOptions: {
+          // Настройки компилятора Vue
+        },
+      },
+    },
+    // Опции для JSX плагина
+    jsxOptions: {
+      // Настройки @vitejs/plugin-vue-jsx
+      optimize: true,
+    },
+  }),
+);
+Типизация Vue конфигурации
+import type { Options as VueOptions } from '@vitejs/plugin-vue';
+import type { Options as JsxOptions } from '@vitejs/plugin-vue-jsx';
+
+interface VueConfigOptions {
+  vueOptions?: VueOptions;
+  jsxOptions?: JsxOptions;
+}
+Пресеты
+definePluginConfig
+Пресет для создания конфигурации плагинов с предустановленными настройками:
+
+Настройка библиотеки с форматом ES.
+Автоматическое добавление manifestPlugin.
+Настройка имен файлов с хэшами для кэширования.
+Настройка алиасов для утилит YCLIENTS.
+Пресет принимает только параметры типа PluginPresetOptions и не позволяет переопределять настройки сборки.
+
+Использование пресета
+// vite.config.ts
+import { definePluginConfig } from '@yclients-configs/vite/presets';
+
+export default definePluginConfig({
+  pluginName: 'my-plugin',
+});
+Опции пресета
+interface PluginPresetOptions {
+  /**
+   * Название плагина, используемое для именования выходных файлов
+   * и идентификации в системе сборки
+   */
+  pluginName: string;
+}
+Утилиты
+createConfig
+Утилита для объединения нескольких конфигураций Vite в одну. Поддерживает как синхронные, так и асинхронные конфигурации. Возвращает Promise, поэтому требует использования await.
+
+Синхронное использование
+import { createConfig, defineBaseConfig } from '@yclients-configs/vite';
+
+export default await createConfig(
+  defineBaseConfig(),
+  // Дополнительные конфигурации
+  {
+    server: {
+      port: 3000,
+    },
+  },
+  {
+    build: {
+      rollupOptions: {
+        external: ['lodash'],
+      },
+    },
+  },
+);
+Асинхронное использование
+import { createConfig, defineBaseConfig } from '@yclients-configs/vite';
+
+export default await createConfig(
+  defineBaseConfig(),
+  // Асинхронные конфигурации
+  async () => {
+    const env = await loadEnv();
+    return {
+      define: {
+        __APP_ENV__: JSON.stringify(env),
+      },
+    };
+  },
+  async () => {
+    const pkg = await import('../package.json');
+    return {
+      define: {
+        __APP_VERSION__: JSON.stringify(pkg.version),
+      },
+    };
+  },
+);
+Примеры использования
+Пример 1: Простое веб-приложение
+// vite.config.ts
+import { defineBaseConfig } from '@yclients-configs/vite';
+
+export default defineBaseConfig({
+  resolve: {
+    alias: {
+      '@': './src',
+      '@components': './src/components',
+    },
+  },
+  build: {
+    outDir: 'build',
+    sourcemap: true,
+  },
+});
+Пример 2: Vue компонент библиотека
+// vite.config.ts
+import {
+  defineBaseConfig,
+  defineVueConfig,
+  createConfig,
+} from '@yclients-configs/vite';
+
+export default await createConfig(
+  defineBaseConfig({
+    build: {
+      outDir: 'build',
+      sourcemap: true,
+    },
+  }),
+  defineVueConfig({
+    vueOptions: {
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith('wc-'),
+        },
+      },
+    },
+  }),
+);
+Пример 3: Плагин с манифестом
+// vite.config.ts
+import { definePluginConfig } from '@yclients-configs/vite/presets';
+
+export default definePluginConfig({
+  pluginName: 'color-picker',
+});
+Пример 4: Сложная конфигурация с условиями
+// vite.config.ts
+import {
+  createConfig,
+  defineBaseConfig,
+  defineVueConfig,
+} from '@yclients-configs/vite';
+
+export default await createConfig(
+  defineBaseConfig(),
+  defineVueConfig(),
+  // Условная конфигурация для разработки
+  process.env.NODE_ENV === 'development' && {
+    server: {
+      port: 3001,
+      open: true,
+    },
+  },
+  // Условная конфигурация для продакшена
+  process.env.NODE_ENV === 'production' && {
+    build: {
+      minify: 'terser',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['vue', 'vue-router'],
+          },
+        },
+      },
+    },
+  },
+);
+
+Скрипт валидации артефактов сборки
+Скрипт для валидации артефактов сборки плагина перед их использованием или деплоем.
+
+Проблема
+После сборки плагина необходимо убедиться, что все артефакты сборки присутствуют, корректно структурированы и соответствуют ожидаемому формату. Это критично для:
+
+Предотвращения ошибок на этапе деплоя
+Раннего обнаружения проблем со сборкой
+Гарантии целостности артефактов
+Решение
+Скрипт автоматически проверяет:
+
+Наличие директории dist/
+Наличие и валидность общего dist/contract.json
+Соответствие директорий пакетов записям в contract.json
+Наличие и валидность manifest.json в каждом пакете
+Существование файлов, указанных в manifest.json, и соответствие их типов расширениям
+Структура артефактов
+dist/
+├── contract.json                    # Общий контракт для всех пакетов
+└── widget-masters-promo/            # Директория пакета
+    ├── manifest.json                # Манифест пакета
+    ├── widget-masters-promo.xxx.js  # JS файлы
+    └── widget-masters-promo.xxx.css # CSS файлы
+Использование
+Через npm-скрипт (рекомендуется)
+npm run validate-build-artifacts
+Напрямую
+node scripts/build-artifacts/validate-build-artifacts.js
+Скрипт должен запускаться из корня проекта (portfolio-plugin/frontend).
+
+Что проверяется
+1. Проверка структуры директории
+Наличие директории dist/
+Что dist/ является директорией
+Наличие файла dist/contract.json
+Что contract.json является файлом и доступен для чтения
+2. Валидация contract.json
+Файл существует и доступен для чтения
+Валидный JSON
+Содержит обязательное поле packages с непустым объектом
+Содержит обязательное поле plugin-slug (непустая строка)
+Структура каждого пакета:
+Поле application (строка)
+Поле areas (непустой массив строк)
+3. Валидация директорий пакетов
+Все пакеты из contract.json имеют соответствующие директории в dist/
+Каждая директория пакета действительно является директорией
+Проверка лишних директорий (предупреждение, не ошибка)
+4. Валидация manifest.json в каждом пакете
+Файл manifest.json существует в каждом пакете
+Файл доступен для чтения
+Валидный JSON
+Содержит ключ с именем пакета
+Значение ключа — массив файлов
+Валидация структуры каждого файла в массиве:
+Поле name (непустая строка)
+Поле type (строка: script или stylesheet)
+5. Валидация файлов из manifest.json
+Все файлы из manifest.json существуют в директории пакета
+Каждый файл действительно является файлом (не директорией)
+Расширения файлов соответствуют их типам:
+.js для типа script
+.css для типа stylesheet
+Выходные коды
+0 - валидация прошла успешно
+1 - обнаружены ошибки валидации
+Примеры использования
+Интеграция в CI/CD
+# После сборки
+npm run build
+npm run validate-build-artifacts
+Локальная проверка
+# Проверить артефакты после сборки
+npm run build && npm run validate-build-artifacts
+
+Скрипт для пересоздания package-lock.json на Linux
+Скрипт для пересоздания package-lock.json на Linux платформе через Docker.
+
+Проблема
+Ранее при генерации package-lock.json на macOS или Windows отсутствовали Linux-специфичные optional dependencies (например, @rollup/rollup-linux-x64-gnu), которые необходимы для успешной сборки в CI на Linux. Это приводило к ошибке:
+
+Error: Cannot find module @rollup/rollup-linux-x64-gnu
+Важное замечание: npm 10.x
+npm версии 10.x и выше автоматически включает все платформо-специфичные optional dependencies при создании package-lock.json, независимо от платформы (macOS, Windows, Linux).
+
+Проверено на npm 10.9.0: при пересоздании package-lock.json на macOS все Linux optional dependencies автоматически включаются в lockfile.
+
+Когда использовать скрипт
+Скрипт все еще полезен в следующих случаях:
+
+Если используется npm версии ниже 10.x
+Для гарантии совместимости и воспроизводимости сборки
+Для проверки, что все optional dependencies корректно включены
+Для явного создания lockfile в Linux-окружении, идентичном CI
+Решение
+Скрипт использует Docker контейнер с Linux/AMD64 для генерации package-lock.json, гарантируя включение всех необходимых optional dependencies для Linux платформы.
+
+Требования
+Docker установлен и запущен
+Доступ к Docker Hub (для загрузки публичного образа node:20-bookworm)
+Использование
+Через npm-скрипт (рекомендуется)
+npm run regenerate-lockfile
+Напрямую
+./scripts/lockfile/regenerate-lockfile.sh
+Что делает скрипт
+Запускает Docker контейнер с Node.js 20 на Linux/AMD64
+Удаляет существующий package-lock.json
+Очищает все node_modules (корень и workspaces)
+Устанавливает зависимости в правильном порядке:
+Сначала packages/utils
+Затем корень проекта
+Проверяет наличие Linux-специфичных optional dependencies
+После выполнения
+Проверьте изменения: git diff package-lock.json
+Закоммитьте изменения: git add package-lock.json && git commit -m 'chore: Пересоздан package-lock.json на Linux платформе'
+Отправьте в репозиторий и убедитесь, что CI проходит успешно
+
+Плагинизация и кастомизация виджета онлайн-записи
+Виджет онлайн‑записи YCLIENTS — это гибкий интерфейс, который используется для взаимодействия клиента с сервисом: создание записей и управление ими, просмотр информации об услугах и сотрудниках, расписание и другая информация.
+
+Многие компании хотели бы возможность расширить функциональность дополнительными возможностями и интеграциями, а так же адаптировать визуальное оформление виджета под свои фирменные цвета.
+
+Плагинизация решает обе эти задачи: она позволяет не только добавлять собственные элементы и логику, но и настраивать визуальное оформление виджета под конкретные требования — кастомизировать его.
+
+Что такое плагинизация?
+Добавление функциональности
+Вы можете встраивать в виджет новые блоки, кнопки, информационные карточки и даже сложные логические сценарии (например, автозаполнение полей, интеграции с внешними сервисами).
+Плагин взаимодействует с виджетом через API: слушает события открытия страницы, размещает свои элементы, реагирует на действия пользователя, чтобы реализовать бизнес-логику плагина.
+
+Что такое кастомизация?
+Визуальное оформление «под себя»
+Иногда достаточно не добавлять новую функциональность, а просто «перекрасить» виджет в фирменные цвета компании или изменить дизайн под ваш сайт. Для этого предусмотрен специальный вызов: вы передаете карту цветовых токенов, и виджет автоматически подстраивает фон, текст, кнопки и акценты под ваши настройки.
+
+Тестирование плагина виджета
+Для тестирования плагина нужно:
+
+Собрать js код, сохранить js-файл себе в файловую систему для дальнейшего использования.
+В виджете онлайн-записи вызвать следующий метод:
+window.devPlugins.openPluginLoader()
+Откроется модальное окно, где можно загрузить свою сборку плагина в виджета. Сразу после загрузки будет вызван ивент "host:root:ready" для инициализации плагина.
+
+af633baf-63dd-11f0-901d-fa163e2ff576
+Режим работы виджета без взаимодействия с API
+Для тестирования предпочтительно не использовать реальные виджеты, а использовать "mock" режим, который использует заранее подготовленные данные.
+
+Для включения данного режима использует query-параметр "mocked" со значением "true" - &mocked=true
+
+Параметр можно использовать в любом виджете, но результат будет один и тот же.
+
+Зоны встраивания плагинов виджета
+В YCLIENTS плагины встраиваются в заранее определенные зоны интерфейса хост‑приложения. Для этого используются простые HTML‑контейнеры и события.
+
+В данной статье приведены зоны, в которые плагин может встроиться в виджет онлайн-записи.
+
+containerType
+
+Стратегия монтирования
+
+Название
+
+Скриншот
+
+staff_info_comments
+
+append
+
+Место под информацией о мастере на странице информации о мастере
+
+
+record_type_prepend
+
+prepand
+
+Элемент перед списоком типов записей (индвидуальная/групповая)
+
+
+record_type_last
+
+append
+
+Замыкающий элемент списка типов записей (индвидуальная/групповая)
+
+
+menu_prepend
+
+prepand
+
+Элемент перед меню индивидуальной записи
+
+
+menu_last
+
+append
+
+Замыкающий элемент меню индивидуальной записи
+
+
+master_select_prepend
+
+prepand
+
+Элемент перед блоком выбора мастера
+
+
+services_select_prepend
+
+prepand
+
+Элемент перед блоком выбора услуг
+
+
+activity_select_prepend
+
+prepand
+
+Элемент перед блоком выбора групповой записи
+
+
+service_tag
+
+append
+
+Элемент на уровне тегов услуг
+
+
+master_tag
+
+append
+
+Элемент на уровне тегов мастеров
+
+Плагин кастомизации
+Что делает
+Меняет цветовую схему виджета онлайн‑записи, перекрашивая токены под ваш бренд.
+
+
+Принцип работы
+1. Старт работы плагина
+Запуск плагина происходит через функцию initializePlugin.
+
+export function initializePlugin() {
+  LoggerUtil.info('Инициализация ThemeCustomizer');
+  hostEventEmitter.onDocument(HOST_EVENT_NAMES.READY, handleHostReadyEvent);
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', cleanup);
+  }
+}
+LoggerUtil — утилита для логирования. Добавлена для примера.
+
+При старте плагин подписывается на событие HOST_EVENT_NAMES.READY, которое будет отправлено виджетом онлайн записи, когда он будет готов для работы с плагинами.
+
+2. Обработчик handleHostReadyEvent
+В нем вызываем нашу логику смены цветов:
+
+function handleHostReadyEvent(event: CustomEvent<THostReadyEvent>): void {
+  LoggerUtil.info('Host ready:', event);
+  ThemeService.applyCustomColors();
+}
+3. Сервис ThemeService
+export class ThemeService {
+  static applyCustomColors() {
+    if (!WidgetApiUtil.isMethodAvailable('setColorTokens')) {
+      LoggerUtil.error('Метод setColorTokens недоступен');
+      return;
+    }
+
+    const tokens = {
+      color_bg: '#141414',
+      color_white: '#FAFAFA',
+      color_text_black: '#2d9649'
+    };
+
+    window.widgetApi.setColorTokens(tokens);
+    LoggerUtil.info('Цветовые токены применены:', tokens);
+  }
+}
+WidgetApiUtil — обертка для проверки доступности API‑методов.
+
+Тестовый плагин виджета (masters-promo)
+Репозиторий
+https://github.com/yclients/example-plugin-frontend/tree/main/apps/masters-promo
+Что делает
+Добавляет ссылки на портфолио на странице информации о мастере.
+
+ec434bf5-63e5-11f0-901d-fa163e2ff576
+Принцип работы
+Старт работы плагина
+Запуск плагина происходит через функцию initializePlugin
+(репозиторий)
+
+export function initializePlugin() {
+  LoggerUtil.info('Инициализация плагина');
+  // Подписываемся на событие готовности хоста
+  hostEventEmitter.onDocument(HOST_EVENT_NAMES.READY, handleHostReadyEvent);
+  // Добавляем обработчик для очистки при закрытии страницы
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', cleanup);
+  }
+}
+LoggerUtil — утилита для логирования. Добавлена для примера.
+
+При старте плагин подписывается на событие HOST_EVENT_NAMES.READY, которое будет отправлено виджетом онлайн записи, когда он будет готов для работы с плагинами.
+
+handleHostReadyEvent
+/**
+* Обработчик события готовности хоста
+*/
+function handleHostReadyEvent(event: CustomEvent<THostReadyEvent>): void {
+    LoggerUtil.info('Получено событие готовности хоста:', event);
+    MastersService.addSlotsForMasterPortfolios();
+}
+В handleHostReadyEvent прописываем основную логику работу плагина. В данной ситуации один вызов addSlotsForMasterPortfolios.
+
+MastersService
+(репозиторий)
+
+export class MastersService {
+  static addSlotsForMasterPortfolios() {
+    if (!WidgetApiUtil.isMethodAvailable('addSlotInfo')) {
+      LoggerUtil.error('Метод addSlotInfo недоступен');
+      return;
+    }
+    for (const masterPortfolio of MASTER_PORTFOLIO_DATA) {
+      const slotId = window.widgetApi.addSlotInfo({
+        containerType: EWApiSlotContainerType.masterInfoAfterInformation,
+        containerOptions: { masterId: masterPortfolio.masterId },
+        componentType: EWApiSlotComponentType.link,
+        componentOptions: {
+          linkLabel: 'Портфолио',
+          linkType: EWApiLinkType.ghost,
+          url: masterPortfolio.charmDirectLink,
+        },
+      });
+      LoggerUtil.info(`Добавлен слот для мастера ${masterPortfolio.masterId}: ${slotId}`);
+    }
+  }
+}
+WidgetApiUtil — обертка на Widget API. Добавлена для примера.
+MASTER_PORTFOLIO_DATA — конфигурация ссылок для мастеров (ссылка).
+
+Основа логики плагина — общение с widgetApi виджета онлайн записи.
+
+Зоны встраивания плагинов ERP
+Доступные зоны встраивания
+⏳ — Реализация запланирована, но не реализована на текущий момент. Описание приводится для понимания будущего направления.
+
+container_id
+
+Стратегия монтирования
+
+Зона
+
+Скриншот
+
+erp-visit-modal-client-card-sidebar
+
+append
+
+Правая боковая панель клиента в визите
+
+
+erp-visit-modal-client-card-info
+
+append
+
+Левая боковая панель клиента в визите
+
+
+erp-visit-modal-client-details
+
+append
+
+Центральная часть данных клиента в визите
+
+
+⏳erp-timetable-controls-goods-sale
+
+append
+
+⏳ Контрол продажи товаров в журнале записи
+
+
+⏳nav-menu-item
+
+append
+
+⏳Основное боковое меню ERP (по примеру ЕГИСЗ)
+
+
+erp-timetable-record-client-name
+
+replace
+
+Имя клиента в записях, в журнале записи
+
+
+Тестирование плагина ERP
+Для проверки работы вашего плагина без публикации в продакшн используется встроенный тестовый интерфейс ERP. Он доступен через глобальный объект window.ms.ErpPluginTesting.
+
+Подготовка
+Сборка артефактов. Убедитесь, что у вас есть готовые файлы плагина JS/CSS.
+Размещение. Выгрузите эти файлы на публичный URL.
+Шаги тестирования
+Откройте страницу ERP, где должна появиться точка монтирования вашего плагина.
+Откройте DevTools → Console.
+(опционально) Включите подробные логи плагина:
+window.ms.ErpPluginTesting.enableLogs(true);
+Инициализируйте плагин, передав ему параметры:
+window.ms.ErpPluginTesting.initialize({
+  slug: 'your-plugin-slug',              // Уникальный идентификатор плагина
+  area: 'erp-visit-modal-client-details',// Зона интеграции
+  script: 'https://cdn.example.com/plugin.js',
+  stylesheet: 'https://cdn.example.com/plugin.css',
+  payload: { } // Данные для отправки плагину
+});
+(опционально) Посмотреть список всех загруженных плагинов:
+window.ms.ErpPluginTesting.list();
+Пример конфигурации
+window.ms.ErpPluginTesting.initialize({
+  slug: 'client-loyalty-card-erp',
+  area: 'erp-visit-modal-client-details',
+  script: 'https://example.com/path/to/plugin.js',
+  stylesheet: 'https://example.com/path/to/plugin.css',
+  payload: null
+});
+
+Размещение JS/CSS файлов плагина для тестирования
+Чтобы ERP‑система могла подгрузить и запустить ваш плагин прямо из браузерной консоли, собранные статические файлы (JS и CSS) должны быть доступны по публичным URL. Эти же ссылки вы передаёте в window.ms.ErpPluginTesting.initialize() для мгновенного тестирования без деплоя в продакшн.
+
+Способы публикации
+1. CDN‑сервисы
+Сервисы доставки контента, которые обеспечивают быстрый доступ к файлам.
+
+2. Статический хостинг
+Сервисы для размещения статических файлов. Обычно предоставляют простой drag-and-drop интерфейс.
+
+3. Облачные хранилища
+Объектные хранилища в облаке с возможностью настройки публичного доступа к файлам.
+
+4. Git‑репозитории
+Многие Git-сервисы предоставляют возможность размещения статических файлов и получения прямых ссылок на них.
+
+Организация файловой структуры
+При размещении плагина на внешнем ресурсе требуется загружать папку со сборкой полностью, без изменения внутренней структуры файлов. Это обеспечивает корректное разрешение относительных путей к статическим ресурсам (CSS, JS, изображения).
+
+├── client-loyalty-card-erp
+│   ├── client-loyalty-card-erp.CWc5iTlS.js // Основной js файл
+│   ├── client-loyalty-card-erp.CWc5iTlS.js.map
+│   ├── karty-loyalnosti.png
+│   ├── manifest.json
+│   └── style.CLXDwomd.css // Основной css файл              
+Проверка доступности файлов
+После размещения обязательно проверьте:
+
+Откройте ссылки в браузере — файлы должны загружаться.
+Убедитесь, что используется HTTPS.
+Проверьте, что файлы отдаются с правильными MIME-типами.
+Убедитесь, что CORS-заголовки настроены корректно.
+Интеграция в тестирование
+Подставьте свои публичные ссылки в вызов инициализации:
+
+window.ms.ErpPluginTesting.initialize({
+  slug: 'my-plugin',
+  area: 'my-area',
+  script: 'https://example.com/path/to/plugin.js',
+  stylesheet: 'https://example.com/path/to/plugin.css',
+  payload: {}
+})
+
+Плагин отображения имени клиента (timetable-record-client-name)
+Репозиторий
+https://github.com/yclients/example-plugin-frontend/tree/main/apps/timetable-record-client-name
+
+Что делает
+Плагин отображает полное имя клиента (фамилия, имя, отчество) в расписании записей. Плагин получает персональные данные клиента от хоста и форматирует их в читаемый вид для отображения в пользовательском интерфейсе.
+
+Пример работы: Клеперов Евгений Викторович вместо сокращенного «Евгений К.».
+
+
+*Рис. 1. Полное ФИО клиента в таблице записи
+
+Принцип работы
+Старт работы плагина
+Запуск плагина происходит через функцию initializePlugin
+(репозиторий)
+
+export function initializePlugin() {
+  // Обработчик события готовности хоста
+  const handleHostReadyEvent = (event: CustomEvent<THostReadyEvent>): void => {
+    console.log('[Plugin] Получено событие готовности хоста:', event);
+    const { containerId, payload } = event.detail;
+
+    const container = document.querySelector(
+      `[data-plugin-container="${containerId}"]`,
+    );
+
+    // Формируем полное имя клиента с помощью сервиса
+    const fullName = ClientNameService.formatFullName(payload);
+    container.replaceChildren(fullName);
+
+    // Отправляем событие о готовности плагина
+    pluginEventEmitter.emit(PLUGIN_EVENT_NAMES.READY);
+  };
+
+  // Подписываемся на событие готовности хоста
+  hostEventEmitter.onDocument(HOST_EVENT_NAMES.READY, handleHostReadyEvent);
+}
+При старте плагин подписывается на событие HOST_EVENT_NAMES.READY, которое будет отправлено хостом, когда он будет готов для работы с плагинами.
+
+handleHostReadyEvent
+Обработчик события готовности хоста выполняет следующие действия:
+
+Получает данные о клиенте (имя, фамилия, отчество) из payload события.
+Находит контейнер для отображения по containerId.
+Форматирует полное имя клиента с помощью ClientNameService.
+Заменяет содержимое контейнера на отформатированное имя.
+Отправляет событие о готовности плагина.
+ClientNameService
+(репозиторий)
+
+export class ClientNameService {
+  /**
+   * Создает читаемое представление клиента для отображения в пользовательском интерфейсе.
+   *
+   * @param personalData - Персональные данные клиента.
+   * @returns Готовое к отображению полное имя клиента.
+   */
+  static formatFullName({
+    clientSurname,
+    clientName,
+    clientPatronymic,
+  }: THostReadyPayload): string {
+    return [clientSurname, clientName, clientPatronymic]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(' ');
+  }
+}
+Сервис принимает персональные данные клиента и возвращает отформатированную строку с полным именем. Метод:
+
+Удаляет лишние пробелы из каждой части имени.
+Фильтрует пустые значения.
+Объединяет части имени через пробел.
+Примеры:
+
+["Иванов", "Иван", "Иванович"] → "Иванов Иван Иванович"
+["Петров", "", "Сергеевич"] → "Петров Сергеевич"
+[" Сидоров ", "Алексей", null] → "Сидоров Алексей"
+Типы событий
+(репозиторий)
+
+Плагин использует систему событий для коммуникации с хостом:
+
+THostReadyEvent — событие готовности хоста, содержит данные клиента.
+TPluginReadyEvent — событие готовности плагина, отправляется после инициализации.
+Структура данных клиента:
+
+export type THostReadyPayload = {
+  clientName: string; // Имя клиента
+  clientSurname: string; // Фамилия клиента
+  clientPatronymic: string; // Отчество клиента
+};
+Зависимости
+Плагин использует следующие основные зависимости:
+
+@yclients-plugins/utils — утилиты для работы с событиями.
+@yclients-configs/vite — конфигурация сборки.
+Сборка и разработка
+># Установка зависимостей
+npm install
+
+# Запуск в режиме разработки
+npm run dev
+
+# Сборка для продакшена
+npm run build
+
+# Проверка типов
+npm run typecheck
+
+# Линтинг
+npm run lint
+Требования
+Node.js 18+.
+npm 8+.

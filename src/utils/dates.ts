@@ -8,6 +8,14 @@ export function compareIsoDates(a: string | undefined, b: string | undefined): n
   return (a ?? '').localeCompare(b ?? '');
 }
 
+/** Keep `YYYY-MM-DD` from PB/YC date or datetime strings. */
+export function normalizeLessonDate(value: string | undefined | null): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  return match?.[1] ?? '';
+}
+
 /** Normalize `HH:mm` / `H:mm` / `HH:mm:ss` → `HH:mm`. Empty if unparseable. */
 export function normalizeClockTime(value: string | undefined | null): string {
   if (!value) return '';

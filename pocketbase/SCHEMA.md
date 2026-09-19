@@ -9,7 +9,7 @@ ROADMAP **1.2** · миграция `pb_migrations/1788148800_kvartira_schema.js
 
 | PB collection | TS type / domain | Ключевые поля |
 |---------------|------------------|---------------|
-| `users` *(auth)* | `User` | phone, role, firstName, lastName, avatarUrl (text, `pbfile:` ref), avatarOriginalUrl (text), bio, directionIds (json, student learning / teacher teaching) |
+| `users` *(auth)* | `User` | phone, role, firstName, lastName, avatarUrl (text, `pbfile:` ref), avatarOriginalUrl (text), bio, directionIds (json), **accountStatus** (`pending`\|`active`, self-reg → pending) |
 | `directions` | `Direction` | name, description, icon — admin CRUD (`admin:directions`) |
 | `teacher_availability` | `TeacherAvailability` | teacher, schedule (json), exceptions, planningPeriod (json) |
 | `lessons` | `Lesson` | student, teacher, direction, date, startTime, status |
@@ -89,7 +89,7 @@ Content-Type: application/json
 
 Hook `onRecordAuthWithPasswordRequest` подставляет запись по полю `phone`, если поиск по email не нашёл пользователя.
 
-**Регистрация:** `POST /api/collections/users/records` с `phone`, `password`, `passwordConfirm`, `firstName`, `lastName` — hook выставляет `role=student` и email `{digits}@kvartira.local`.
+**Регистрация:** `POST /api/collections/users/records` с `phone`, `password`, `passwordConfirm`, `firstName`, `lastName` — hook выставляет `role=student`, `accountStatus=pending` и email `{digits}@kvartira.local`. Admin одобряет → `active` (`/admin/registrations`).
 
 **Смена роли (admin):** `UsersApi.updateUserRole` — только `student` ↔ `teacher`. Hook `assertUserUpdate` блокирует self-service и смену роли администратора.
 

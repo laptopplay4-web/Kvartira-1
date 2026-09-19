@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { Sheet } from '@/components/ui/Sheet';
+import { VideoPlayer } from '@/components/ui/VideoPlayer';
 import {
   ASSIGNMENT_CONTENT_ACCEPT,
   ASSIGNMENT_CONTENT_LABELS,
   MAX_CONTENT_BLOCKS_PER_ASSIGNMENT,
 } from '@/services/assignments/constants';
+import { displayAttachmentFilename } from '@/services/chat/attachments';
 
 export interface PendingContentBlock {
   id: string;
@@ -224,28 +226,27 @@ export function AssignmentContentEditor({
                 {(block.type === 'image' || block.type === 'video') &&
                   (block.previewUrl ||
                     (block.url && !block.url.startsWith('pbfile:'))) && (
-                  <div className="overflow-hidden rounded-lg bg-surface-elevated">
+                  <div className="overflow-hidden rounded-xl">
                     {block.type === 'image' ? (
                       <img
                         src={block.previewUrl || block.url}
                         alt={block.filename ?? 'Фото'}
-                        className="max-h-48 w-full object-contain"
+                        className="max-h-[min(55vh,26rem)] w-full object-cover"
                       />
                     ) : (
-                      <video
-                        controls
-                        src={block.previewUrl || block.url}
-                        className="max-h-48 w-full"
-                      >
-                        <track kind="captions" />
-                      </video>
+                      <VideoPlayer
+                        src={block.previewUrl || block.url!}
+                        mimeType={block.mimeType}
+                        className="aspect-video w-full max-h-[min(55vh,26rem)]"
+                        aria-label={block.filename ?? 'Видео'}
+                      />
                     )}
                   </div>
                 )}
                 {block.filename ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="min-w-0 flex-1 truncate text-sm text-text-secondary">
-                      {block.filename}
+                      {displayAttachmentFilename(block.filename) || block.filename}
                     </p>
                     <Button
                       type="button"

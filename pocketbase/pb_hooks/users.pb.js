@@ -95,6 +95,38 @@ onRecordAfterCreateSuccess((e) => {
   } catch (_) {
     /* never block registration on chat join */
   }
+
+  try {
+    if (e.record.getString('accountStatus') === 'pending') {
+      const notifications = require(`${__hooks}/lib/kvartiraNotifications.js`);
+      const firstName = e.record.getString('firstName') || '';
+      const lastName = e.record.getString('lastName') || '';
+      const role = e.record.getString('role') || 'student';
+      const name = `${firstName} ${lastName}`.trim() || 'Пользователь';
+      const roleLabel = role === 'teacher' ? 'преподаватель' : 'ученик';
+      const body = `${name} (${roleLabel}) ожидает подтверждения.`;
+      /** @type {Record[]} */
+      let admins = [];
+      try {
+        admins = $app.findRecordsByFilter('users', 'role = "admin"', '-id', 100, 0) || [];
+      } catch (_) {
+        admins = [];
+      }
+      for (const admin of admins) {
+        notifications.createNotificationForUser(
+          $app,
+          String(admin.id),
+          'system',
+          'Новая заявка на регистрацию',
+          body,
+          '/admin/registrations',
+          true,
+        );
+      }
+    }
+  } catch (_) {
+    /* never block registration on admin notify */
+  }
   e.next();
 }, 'users');
 

@@ -247,6 +247,17 @@ describe('PocketBase schema (ROADMAP 1.2)', () => {
     expect(source).toContain('terms_of_service');
   });
 
+  it('accountStatus migration adds pending|active and admin delete rule', () => {
+    const source = readFileSync(
+      resolve(ROOT, 'pocketbase/pb_migrations/1792500000_kvartira_account_status.js'),
+      'utf8',
+    );
+    expect(source).toContain('accountStatus');
+    expect(source).toContain("'pending'");
+    expect(source).toContain("'active'");
+    expect(source).toContain('role != "admin"');
+  });
+
   it('avatar purpose select fix migration sets full purpose values list', () => {
     const source = readFileSync(
       resolve(ROOT, 'pocketbase/pb_migrations/1789795200_kvartira_avatar_purpose_select.js'),

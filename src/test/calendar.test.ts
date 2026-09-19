@@ -3,6 +3,8 @@ import { parseISO } from 'date-fns';
 import { format, nextMonday } from 'date-fns';
 import {
   getCalendarDateRange,
+  getCalendarFetchRange,
+  filterLessonsByDateRange,
   shiftCalendarAnchor,
 } from '@/utils/calendarRanges';
 import {
@@ -33,6 +35,32 @@ describe('calendar date ranges', () => {
     const range = getCalendarDateRange('month', anchor);
     expect(range.from).toBe('2026-08-01');
     expect(range.to).toBe('2026-08-31');
+  });
+
+  it('day/week fetch expands to enclosing month(s)', () => {
+    expect(getCalendarFetchRange('day', anchor)).toEqual({
+      from: '2026-08-01',
+      to: '2026-08-31',
+    });
+    expect(getCalendarFetchRange('week', anchor)).toEqual({
+      from: '2026-08-01',
+      to: '2026-09-30',
+    });
+    expect(getCalendarFetchRange('month', anchor)).toEqual({
+      from: '2026-08-01',
+      to: '2026-08-31',
+    });
+  });
+
+  it('filterLessonsByDateRange keeps inclusive bounds', () => {
+    const lessons = [
+      { id: 'a', date: '2026-09-19' },
+      { id: 'b', date: '2026-09-20T12:00:00' },
+      { id: 'c', date: '2026-09-21' },
+    ];
+    expect(filterLessonsByDateRange(lessons, '2026-09-20', '2026-09-20').map((l) => l.id)).toEqual([
+      'b',
+    ]);
   });
 
   it('shiftCalendarAnchor moves by day/week/month', () => {
@@ -72,6 +100,14 @@ describe('calendar helpers', () => {
 
   it('groups and sorts lessons by date/time', () => {
     const grouped = groupLessonsByDate(lessons);
+    expect(grouped.get('2026-09-01')?.map((l) => l.startTime)).toEqual(['10:00', '14:00']);
+  });
+
+  it('normalizes datetime-like lesson.date keys when grouping', () => {
+    const grouped = groupLessonsByDate([
+      { ...lessons[0]!, date: '2026-09-01T14:00:00' },
+      { ...lessons[1]!, date: '2026-09-01 10:00:00' },
+    ]);
     expect(grouped.get('2026-09-01')?.map((l) => l.startTime)).toEqual(['10:00', '14:00']);
   });
 

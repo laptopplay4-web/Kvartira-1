@@ -1,9 +1,16 @@
 import { cn } from '@/utils';
-import { formatFileSize, isVoiceAttachment } from '@/services/chat/attachments';
+import {
+  displayAttachmentFilename,
+  formatFileSize,
+  isVoiceAttachment,
+} from '@/services/chat/attachments';
 import { downloadFromUrl } from '@/utils/files';
 import type { MessageAttachment } from '@/types';
-import { Download, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { AudioPlayer, type AudioPlayerHandle } from '@/components/ui/AudioPlayer';
+import { VoiceMessagePlayer } from '@/components/ui/VoiceMessagePlayer';
+import { VideoPlayer } from '@/components/ui/VideoPlayer';
+import { MediaImageGrid } from '@/components/ui/MediaImageGrid';
 import { useChatVoicePlayback } from './ChatVoicePlayback';
 import { useRef } from 'react';
 
@@ -11,93 +18,86 @@ interface AttachmentListProps {
   attachments: MessageAttachment[];
   isOwn?: boolean;
   onImageClick?: (attachment: MessageAttachment, index: number) => void;
+  /** Flush media to bubble edges (chat). */
+  flush?: boolean;
 }
 
-export function AttachmentList({ attachments, isOwn, onImageClick }: AttachmentListProps) {
+export function AttachmentList({
+  attachments,
+  isOwn,
+  onImageClick,
+  flush = true,
+}: AttachmentListProps) {
   if (!attachments.length) return null;
 
   const images = attachments.filter((a) => a.type === 'image');
   const others = attachments.filter((a) => a.type !== 'image');
 
   return (
-    <div className="mt-2 min-w-0 max-w-full space-y-2">
+    <div className={cn('min-w-0 max-w-full', flush ? 'space-y-0.5' : 'mt-2 space-y-2')}>
       {images.length > 0 && (
-        <div className={cn('grid max-w-full gap-1', images.length > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
-          {images.map((att, i) => (
-            <button
-              key={att.id}
-              type="button"
-              onClick={() => onImageClick?.(att, i)}
-              className="overflow-hidden rounded-lg focus-ring"
-              aria-label="Открыть фото"
-            >
-              {att.url ? (
-                <img src={att.url} alt="" className="max-h-48 max-w-full w-full object-cover" loading="lazy" />
-              ) : (
-                <div className="flex h-24 items-center justify-center bg-surface">
-                  <span className="text-caption text-text-muted">Фото</span>
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
+        <MediaImageGrid
+          images={images.map((a) => ({
+            id: a.id,
+            url: a.url,
+            alt: displayAttachmentFilename(a.filename) || 'Фото',
+          }))}
+          size="chat"
+          onImageClick={(_, i) => {
+            const att = images[i];
+            if (att) onImageClick?.(att, i);
+          }}
+        />
       )}
       {others.map((att) => (
-        <AttachmentItem key={att.id} attachment={att} isOwn={isOwn} />
+        <AttachmentItem key={att.id} attachment={att} isOwn={isOwn} flush={flush} />
       ))}
     </div>
   );
 }
 
-function AttachmentItem({ attachment, isOwn }: { attachment: MessageAttachment; isOwn?: boolean }) {
+function AttachmentItem({
+  attachment,
+  isOwn,
+  flush,
+}: {
+  attachment: MessageAttachment;
+  isOwn?: boolean;
+  flush?: boolean;
+}) {
   if (attachment.type === 'audio' && attachment.url) {
     if (isVoiceAttachment(attachment)) {
       return <ChatVoiceAttachment attachment={attachment} isOwn={isOwn} />;
     }
     return (
-      <AudioPlayer
-        src={attachment.url}
-        title={attachment.filename}
-        downloadUrl={attachment.url}
-        downloadFilename={attachment.filename}
-        variant="compact"
-        isOwn={isOwn}
-        showVolume={false}
-        showSpeed={false}
-      />
+      <div className={cn(flush ? 'px-2 py-1.5' : undefined)}>
+        <AudioPlayer
+          src={attachment.url}
+          mimeType={attachment.mimeType}
+          title={displayAttachmentFilename(attachment.filename) || undefined}
+          isOwn={isOwn}
+          showVolume={false}
+          showSpeed={false}
+          bare
+        />
+      </div>
     );
   }
 
   if (attachment.type === 'video' && attachment.url) {
     return (
-      <div className="relative min-w-0 max-w-full overflow-hidden rounded-lg">
-        <video
+      <div className="relative min-w-0 max-w-full overflow-hidden">
+        <VideoPlayer
           src={attachment.url}
-          controls
-          playsInline
-          preload="metadata"
-          className="max-h-64 w-full rounded-lg bg-black object-contain"
+          mimeType={attachment.mimeType}
+          className="aspect-video w-full max-h-[min(55vh,26rem)]"
           aria-label="Видео"
-        >
-          <track kind="captions" />
-        </video>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            void downloadFromUrl(attachment.url!, attachment.filename || 'video.mp4').catch(() => {
-              /* keep in-app */
-            });
-          }}
-          className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/75 focus-ring"
-          aria-label="Скачать видео"
-        >
-          <Download className="h-4 w-4" aria-hidden />
-        </button>
+        />
       </div>
     );
   }
+
+  const label = displayAttachmentFilename(attachment.filename) || 'Файл';
 
   return (
     <button
@@ -107,13 +107,14 @@ function AttachmentItem({ attachment, isOwn }: { attachment: MessageAttachment; 
         void downloadFromUrl(attachment.url, attachment.filename);
       }}
       className={cn(
-        'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-surface focus-ring',
-        isOwn ? 'border-brand-contrast/20' : 'border-border-subtle',
+        'flex w-full items-center gap-3 px-3 py-2 text-left transition-colors focus-ring',
+        flush ? 'hover:bg-black/10' : 'rounded-lg border hover:bg-surface',
+        !flush && (isOwn ? 'border-brand-contrast/20' : 'border-border-subtle'),
       )}
     >
       <FileText className="h-5 w-5 shrink-0 opacity-70" aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{attachment.filename}</p>
+        <p className="truncate text-sm font-medium">{label}</p>
         <p className="text-caption opacity-70">{formatFileSize(attachment.size)}</p>
       </div>
     </button>
@@ -133,12 +134,11 @@ function ChatVoiceAttachment({
   if (!attachment.url) return null;
 
   return (
-    <AudioPlayer
+    <VoiceMessagePlayer
       src={attachment.url}
-      variant="compact"
+      mimeType={attachment.mimeType}
+      seed={attachment.id}
       isOwn={isOwn}
-      showVolume={false}
-      showSpeed={false}
       playbackRate={ctx?.speed}
       playerRef={(handle) => {
         handleRef.current = handle;

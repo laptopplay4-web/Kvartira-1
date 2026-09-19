@@ -15,6 +15,7 @@ import { useAvatarMutations } from '@/hooks/useAvatarMutations';
 import { getRoleLabel, can, actsAsTeacher } from '@/permissions';
 import { api } from '@/services/api';
 import { countOpenSupportTickets } from '@/services/support/adminInbox';
+import { countPendingRegistrations } from '@/services/users/accountStatus';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -32,7 +33,16 @@ export default function ProfilePage() {
     queryFn: () => api.support.getTickets({ requesterId: user.id, status: 'open' }),
     enabled: showAdminSupport,
   });
-  const adminBadge = countOpenSupportTickets(openTickets);
+
+  const showPendingRegistrations = can(user, 'admin:users');
+  const { data: allUsers } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => api.users.getAllUsers(user.id),
+    enabled: showPendingRegistrations,
+  });
+
+  const adminBadge =
+    countOpenSupportTickets(openTickets) + countPendingRegistrations(allUsers);
 
   const menuItems: {
     to: string;

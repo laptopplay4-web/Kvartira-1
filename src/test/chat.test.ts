@@ -1550,7 +1550,9 @@ describe('attachments', () => {
 
   it('hides filename captions under media in display text', async () => {
     const { getMessageDisplayText } = await import('@/services/chat/messages');
-    const { getAttachmentsPreviewLabel } = await import('@/services/chat/attachments');
+    const { getAttachmentsPreviewLabel, displayAttachmentFilename } = await import(
+      '@/services/chat/attachments'
+    );
     const photo = {
       id: 'm1',
       conversationId: 'c1',
@@ -1578,6 +1580,47 @@ describe('attachments', () => {
         text: 'смотри',
       }),
     ).toBe('смотри');
+    expect(displayAttachmentFilename('lesson.mp3')).toBe('lesson');
+    expect(displayAttachmentFilename('cover.JPEG')).toBe('cover');
+    expect(
+      getMessageDisplayText({
+        ...photo,
+        text: 'result_обложка',
+      }),
+    ).toBe('');
+  });
+
+  it('lists downloadable media attachments for long-press menu', async () => {
+    const { getDownloadableAttachments } = await import('@/services/chat/attachments');
+    expect(
+      getDownloadableAttachments([
+        {
+          id: 'a1',
+          type: 'image',
+          filename: 'a.jpg',
+          mimeType: 'image/jpeg',
+          size: 1,
+          url: 'https://cdn/a.jpg',
+        },
+        {
+          id: 'a2',
+          type: 'audio',
+          filename: 'b.mp3',
+          mimeType: 'audio/mpeg',
+          size: 1,
+          url: 'pbfile:x',
+        },
+        {
+          id: 'a3',
+          type: 'video',
+          filename: 'c.mp4',
+          mimeType: 'video/mp4',
+          size: 1,
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({ id: 'a1' }),
+    ]);
   });
 });
 

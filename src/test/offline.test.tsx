@@ -5,16 +5,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BookLessonLink } from '@/components/ui/BookLessonLink';
 import type { User } from '@/types';
 
-const mockGetTeacherAvailability = vi.fn();
-const mockUpdateTeacherAvailability = vi.fn();
+const mockGetSchedule = vi.fn();
+const mockUpdateSchedule = vi.fn();
 
-vi.mock('@/services/api', () => ({
-  api: {
-    availability: {
-      getTeacherAvailability: (...args: unknown[]) => mockGetTeacherAvailability(...args),
-      updateTeacherAvailability: (...args: unknown[]) => mockUpdateTeacherAvailability(...args),
-    },
-  },
+vi.mock('@/config/features', () => ({
+  isYclientsLessonsEnabled: () => true,
+  YCLIENTS_LESSONS_SOURCE: 'yclients',
+}));
+
+vi.mock('@/services/api/yclientsClient', () => ({
+  getYclientsApi: () => ({
+    getSchedule: (...args: unknown[]) => mockGetSchedule(...args),
+    updateSchedule: (...args: unknown[]) => mockUpdateSchedule(...args),
+  }),
 }));
 
 const teacherUser: User = {
@@ -79,13 +82,19 @@ describe('BookLessonLink', () => {
   });
 });
 
-describe('AvailabilityPage save offline', () => {
+describe('AvailabilityPage save offline (YCLIENTS)', () => {
   beforeEach(() => {
-    mockGetTeacherAvailability.mockResolvedValue({
-      teacherId: 'teacher-1',
-      slotIntervalMinutes: 30,
-      defaultLessonDurationMinutes: 60,
-      schedule: [{ dayOfWeek: 1, ranges: [{ start: '10:00', end: '18:00' }] }],
+    mockGetSchedule.mockResolvedValue({
+      staffId: 42,
+      from: '2026-09-19',
+      to: '2026-11-14',
+      items: [
+        {
+          date: '2026-09-21',
+          slots: [{ from: '10:00', to: '18:00' }],
+          isWorking: true,
+        },
+      ],
     });
   });
 
@@ -94,11 +103,13 @@ describe('AvailabilityPage save offline', () => {
     renderAvailabilityPage();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Сохранить изменения' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
     });
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Нет подключения к интернету. Проверьте соединение и попробуйте снова.',
-    );
+    expect(
+      screen.getByText(
+        'Нет подключения к интернету. Проверьте соединение и попробуйте снова.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('enables save button when online', async () => {
@@ -106,7 +117,7 @@ describe('AvailabilityPage save offline', () => {
     renderAvailabilityPage();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Сохранить изменения' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Сохранить' })).not.toBeDisabled();
     });
   });
 });

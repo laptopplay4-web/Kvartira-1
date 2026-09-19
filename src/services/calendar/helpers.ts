@@ -1,20 +1,23 @@
 import { actsAsTeacher } from '@/permissions';
 import type { Lesson, TeacherAvailability, TimeRange, User } from '@/types';
-import { isSlotInPast } from '@/utils/dates';
+import { isSlotInPast, normalizeLessonDate } from '@/utils/dates';
 import { formatUserName } from '@/utils';
 
 export function sortLessonsByTime(lessons: Lesson[]): Lesson[] {
-  return [...lessons].sort((a, b) =>
-    `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`),
-  );
+  return [...lessons].sort((a, b) => {
+    const da = normalizeLessonDate(a.date) || a.date;
+    const db = normalizeLessonDate(b.date) || b.date;
+    return `${da}${a.startTime}`.localeCompare(`${db}${b.startTime}`);
+  });
 }
 
 export function groupLessonsByDate(lessons: Lesson[]): Map<string, Lesson[]> {
   const map = new Map<string, Lesson[]>();
   for (const lesson of sortLessonsByTime(lessons)) {
-    const list = map.get(lesson.date) ?? [];
+    const key = normalizeLessonDate(lesson.date) || lesson.date;
+    const list = map.get(key) ?? [];
     list.push(lesson);
-    map.set(lesson.date, list);
+    map.set(key, list);
   }
   return map;
 }

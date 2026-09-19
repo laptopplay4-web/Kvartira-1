@@ -7,6 +7,19 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
+/**
+ * Display name without extension (`song.mp3` → `song`).
+ * Keeps full name if there is no extension or the stem would be empty (`.gitignore`).
+ */
+export function displayAttachmentFilename(filename: string | undefined | null): string {
+  const raw = (filename ?? '').trim();
+  if (!raw) return '';
+  const lastDot = raw.lastIndexOf('.');
+  if (lastDot <= 0) return raw;
+  const stem = raw.slice(0, lastDot).trim();
+  return stem || raw;
+}
+
 /** Voice note: explicit kind, or legacy `voice-*` filenames from recorder. */
 export function isVoiceAttachment(attachment: MessageAttachment): boolean {
   if (attachment.kind === 'voice') return true;
@@ -28,8 +41,10 @@ export function getAttachmentPreviewLabel(attachment: MessageAttachment): string
   if (attachment.type === 'image') return 'Фото';
   if (attachment.type === 'video') return 'Видео';
   if (isVoiceAttachment(attachment)) return 'Голосовое';
-  if (attachment.type === 'audio') return attachment.filename || 'Аудио';
-  return attachment.filename || 'Файл';
+  if (attachment.type === 'audio') {
+    return displayAttachmentFilename(attachment.filename) || 'Аудио';
+  }
+  return displayAttachmentFilename(attachment.filename) || 'Файл';
 }
 
 export function getAttachmentsPreviewLabel(attachments: MessageAttachment[] | undefined): string {
@@ -49,7 +64,24 @@ export function isSyntheticMediaCaption(
   const trimmed = text.trim();
   if (!trimmed || !attachments?.length) return false;
   if (MEDIA_CAPTION_PLACEHOLDERS.has(trimmed)) return true;
-  return attachments.some((a) => a.filename === trimmed);
+  return attachments.some((a) => {
+    if (a.filename === trimmed) return true;
+    const stem = displayAttachmentFilename(a.filename);
+    return !!stem && stem === trimmed;
+  });
+}
+
+/** Attachments that can be saved locally (have a resolvable URL). */
+export function getDownloadableAttachments(
+  attachments: MessageAttachment[] | undefined,
+): MessageAttachment[] {
+  if (!attachments?.length) return [];
+  return attachments.filter(
+    (a) =>
+      !!a.url &&
+      !a.url.startsWith('pbfile:') &&
+      (a.type === 'image' || a.type === 'video' || a.type === 'audio' || a.type === 'file'),
+  );
 }
 
 export function createAttachmentFromFile(file: File, id: string): MessageAttachment | null {

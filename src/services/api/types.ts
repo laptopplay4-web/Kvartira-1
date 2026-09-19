@@ -383,6 +383,10 @@ export interface UsersApi {
   getAllUsers(requesterId: string): Promise<User[]>;
   updateProfile(requesterId: string, data: UpdateProfileInput): Promise<User>;
   updateUserRole(requesterId: string, userId: string, role: Extract<UserRole, 'student' | 'teacher'>): Promise<User>;
+  /** Admin: pending → active; notifies the user. */
+  approveUser(requesterId: string, userId: string): Promise<User>;
+  /** Admin: delete pending registration (phone free for re-register). */
+  rejectUser(requesterId: string, userId: string): Promise<void>;
   uploadAvatar(requesterId: string, input: UploadAvatarInput): Promise<User>;
   removeAvatar(requesterId: string): Promise<User>;
   /** Self-service erasure (152-ФЗ, ст. 21). Irreversible. */

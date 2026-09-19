@@ -120,6 +120,8 @@ export function buildSchoolContactsPayload(input: {
   socialLinks: SchoolSocialLinks;
   directionsVideo?: SchoolDirectionsVideo;
   registrationInvite?: RegistrationInviteSecret | null;
+  /** Preserve YCLIENTS admin mappings inside contacts JSON. */
+  yclientsMappings?: unknown;
 }): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     phone: input.contacts.phone,
@@ -134,6 +136,9 @@ export function buildSchoolContactsPayload(input: {
       token: input.registrationInvite.token,
       rotatedAt: input.registrationInvite.rotatedAt,
     };
+  }
+  if (input.yclientsMappings != null) {
+    payload.yclientsMappings = input.yclientsMappings;
   }
   return payload;
 }

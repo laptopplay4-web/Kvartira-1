@@ -1,13 +1,19 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { Minus, Plus, Users } from 'lucide-react';
 import { api } from '@/services/api';
 import { ApiError } from '@/services/api/types';
 import { getRoleLabel, getRoleBadgeVariant } from '@/permissions';
 import { canToggleUserStaffRole } from '@/services/users/access';
+import {
+  filterPendingRegistrations,
+  isAccountPending,
+} from '@/services/users/accountStatus';
 import { useCurrentUser } from '@/stores/authStore';
 import { useOnlineStatus, OFFLINE_NETWORK_MESSAGE } from '@/hooks/useOnlineStatus';
 import { PromoteToTeacherModal } from '@/components/admin/PromoteToTeacherModal';
+import { PendingRegistrationCard } from '@/components/admin/PendingRegistrationCard';
 import { roleDemoteButtonClassName, rolePromoteButtonClassName } from '@/components/admin/roleActionButtons';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -55,7 +61,9 @@ export default function AdminUsersPage() {
 
   if (error) return <div className="page-container"><ErrorState onRetry={() => refetch()} /></div>;
 
-  const sorted = sortUsersByRoleAndName(users ?? []);
+  const pending = sortUsersByRoleAndName(filterPendingRegistrations(users));
+  const activeUsers = (users ?? []).filter((u) => !isAccountPending(u));
+  const sorted = sortUsersByRoleAndName(activeUsers);
   const grouped = {
     admin: sorted.filter((u) => u.role === 'admin'),
     teacher: sorted.filter((u) => u.role === 'teacher'),
@@ -146,34 +154,60 @@ export default function AdminUsersPage() {
           className="py-8"
         />
       ) : (
-        SECTION_ORDER.map((role) => (
-          <section key={role} className="mb-8">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-label">
-                {getRoleLabel(role)} ({grouped[role].length})
-              </h2>
-              {role === 'teacher' && (
-                <IconButton
-                  label="Добавить преподавателя"
-                  className={rolePromoteButtonClassName}
-                  disabled={!isOnline || grouped.student.length === 0}
-                  onClick={() => setPromoteModalOpen(true)}
+        <>
+          {pending.length > 0 && (
+            <section className="mb-8">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-label">Ожидают подтверждения ({pending.length})</h2>
+                <Link
+                  to="/admin/registrations"
+                  className="text-body-sm font-medium text-brand hover:underline"
                 >
-                  <Plus className="h-5 w-5" aria-hidden />
-                </IconButton>
-              )}
-            </div>
-            <div className="space-y-2">
-              {grouped[role].length > 0 ? (
-                grouped[role].map((user) => renderUserCard(user, role))
-              ) : (
-                <Card className="py-4">
-                  <p className="text-body-sm text-text-muted">Пока никого нет</p>
-                </Card>
-              )}
-            </div>
-          </section>
-        ))
+                  Все заявки
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {pending.map((user) => (
+                  <PendingRegistrationCard
+                    key={user.id}
+                    user={user}
+                    currentUser={currentUser}
+                    compact
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {SECTION_ORDER.map((role) => (
+            <section key={role} className="mb-8">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-label">
+                  {getRoleLabel(role)} ({grouped[role].length})
+                </h2>
+                {role === 'teacher' && (
+                  <IconButton
+                    label="Добавить преподавателя"
+                    className={rolePromoteButtonClassName}
+                    disabled={!isOnline || grouped.student.length === 0}
+                    onClick={() => setPromoteModalOpen(true)}
+                  >
+                    <Plus className="h-5 w-5" aria-hidden />
+                  </IconButton>
+                )}
+              </div>
+              <div className="space-y-2">
+                {grouped[role].length > 0 ? (
+                  grouped[role].map((user) => renderUserCard(user, role))
+                ) : (
+                  <Card className="py-4">
+                    <p className="text-body-sm text-text-muted">Пока никого нет</p>
+                  </Card>
+                )}
+              </div>
+            </section>
+          ))}
+        </>
       )}
 
       <PromoteToTeacherModal

@@ -315,6 +315,52 @@
     @apply bg-black/50 backdrop-blur-md backdrop-saturate-100;
   }
 
+  /**
+   * Video.js audio (AudioSkin): hide controls per AudioPlayer flags.
+   * data-hide-* is set as empty string when active (attribute present).
+   * Layout is elapsed | slider | remaining — we keep only elapsed (пройденное время).
+   */
+  .kv-audio-skin[data-hide-volume] .media-mute-button,
+  .kv-audio-skin[data-hide-volume] .media-volume-popover {
+    display: none !important;
+  }
+
+  .kv-audio-skin[data-hide-speed] .media-playback-rate-button,
+  .kv-audio-skin[data-hide-speed] .audio-settings-menu-popup {
+    display: none !important;
+  }
+
+  .kv-audio-skin[data-hide-volume][data-hide-speed] .audio-controls-end {
+    display: none !important;
+  }
+
+  .kv-audio-skin[data-hide-seek] .media-seek-button {
+    display: none !important;
+  }
+
+  /* Elapsed-only: hide remaining/duration toggle (looks like total length and stays put) */
+  .kv-audio-skin[data-elapsed-only] .audio-time-remaining-value {
+    display: none !important;
+  }
+
+  .kv-audio-skin .media-time-value {
+    font-variant-numeric: tabular-nums;
+    min-inline-size: 3ch;
+    pointer-events: none; /* no toggle away from elapsed */
+  }
+
+  /* Bare (chat MP3/voice): no surface fill behind controls */
+  .kv-audio-player.bg-transparent .kv-audio-skin.audio-skin {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .kv-audio-skin.audio-skin {
+    /* Fit chat/ДЗ cards — skin chrome inherits brand tokens via inline style */
+    width: 100%;
+    min-width: 0;
+  }
+
   .glass-menu-item {
     @apply rounded-xl transition-colors hover:bg-white/10 outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
   }

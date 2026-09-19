@@ -99,12 +99,9 @@ export default function HomePage() {
     refetchOnWindowFocus: true,
   });
 
-  const upcomingLessons = lessons
+  const nextLesson = lessons
     ?.filter((l) => isUpcomingLesson(l.status))
-    .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
-
-  const upcoming = upcomingLessons?.slice(0, 3);
-  const nextLesson = upcomingLessons?.[0];
+    .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))?.[0];
   const nextEvent = useMemo(
     () => (events ? getNextUpcomingEvent(events) : undefined),
     [events],
@@ -201,46 +198,6 @@ export default function HomePage() {
       {showAssignmentsBlock && (
         <HomeAssignmentsBlock studentId={user.id} requesterId={user.id} />
       )}
-
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-label uppercase tracking-wide">Предстоящие занятия</h2>
-          <Link to="/lessons" className="text-sm text-brand hover:underline">
-            Все
-          </Link>
-        </div>
-        {lessonsError ? null : lessonsLoading ? (
-          <div className="space-y-3">
-            <LessonCardSkeleton />
-            <LessonCardSkeleton />
-          </div>
-        ) : upcoming && upcoming.length > 1 ? (
-          <div className="space-y-3">
-            {upcoming.slice(1).map((lesson) => (
-              <LessonCard
-                key={lesson.id}
-                lesson={lesson}
-                directionName={getDirectionName(lesson.directionId)}
-                teacher={showTeacherInCard ? getTeacher(lesson.teacherId) : undefined}
-                student={showStudentInCard ? getStudent(lesson.studentId) : undefined}
-                showTeacher={showTeacherInCard}
-              />
-            ))}
-          </div>
-        ) : !nextLesson ? (
-          <EmptyState
-            icon={CalendarDays}
-            title="Пока нет предстоящих занятий"
-            description="Запишитесь на удобное время"
-            className="py-8"
-            action={
-              showBookCta ? (
-                <BookLessonLink size="sm">Найти занятие</BookLessonLink>
-              ) : undefined
-            }
-          />
-        ) : null}
-      </section>
     </div>
   );
 }

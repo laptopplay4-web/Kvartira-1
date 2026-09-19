@@ -102,9 +102,9 @@ const COLLECTION_RULES = {
     viewRule: USER_DIRECTORY_ACCESS,
     createRule: PUBLIC,
     updateRule: `${ADMIN} || id = @request.auth.id`,
-    // Self-service erasure (152-ФЗ, ст. 21). Admins delete through the PB Admin
-    // UI as superusers; nobody can delete somebody else through the API.
-    deleteRule: 'id = @request.auth.id',
+    // Self-service erasure OR admin rejecting a pending (non-admin) registration.
+    deleteRule:
+      'id = @request.auth.id || (@request.auth.role = "admin" && role != "admin" && id != @request.auth.id)',
   },
   directions: {
     listRule: PUBLIC,

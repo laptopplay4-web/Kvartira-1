@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Квартира — Stack & Architecture
 
-Версия: 1.188 Chat members role filter icons · 2026-09-17
+Версия: 1.202 Calendar day/week/month UX · 2026-09-19
 
 > Источники: `PROJECT_SPEC.md`, `DESIGN_SYSTEM.md`, `DEVELOPMENT_RULES.md`, **`ROADMAP.md`**.
 > Индекс кодовой базы: `graphify-out/` (`graphify update .`, global CLI).
@@ -28,6 +28,7 @@ alwaysApply: true
 | Формы | React Hook Form + Zod | — |
 | Даты | date-fns | 4.x |
 | Иконки | lucide-react | — |
+| Видео / аудио | `@videojs/react` (v10 RC) VideoSkin + AudioSkin | 10.x |
 | PWA | vite-plugin-pwa + Workbox | — |
 | Тесты | Vitest + Testing Library | — |
 | Линт | ESLint + Prettier | — |
@@ -57,7 +58,7 @@ Types + Mocks (src/types/*, src/mocks/seed.ts)
 - RBAC: `can(user, permission)` в `src/permissions/index.ts`.
 - Слоты: `calculateAvailableSlots()` в `src/services/slots/calculateSlots.ts` (перерывы, занятость, прошедшее время).
 - Доступ к занятиям: `canViewLesson` / `canRescheduleLesson` / `canCancelLesson` в `src/services/lessons/access.ts`.
-- Доступность преподавателя: `validateTeacherAvailability()` + `AvailabilityApi` в mock; UI `/lessons/availability` (redirect с `/profile/availability`).
+- Доступность преподавателя: при `VITE_LESSONS_SOURCE=yclients` — `/lessons/availability` ↔ YCLIENTS schedule API (SoT); без YC экран скрыт.
 - Double-booking: `withBookingLock` + `slotsConflict` в mock API.
 - Календарь: единый `LessonCalendar` (day/week/month) → `getLessons({ from, to, requesterId })`; слоты только в booking через `calculateAvailableSlots`.
 - Чат: `ChatPage` (messenger layout) → `ChatApi` → `canAccessConversation` / IDOR в mock; unread через `ConversationMember.lastReadAt`; optimistic send через TanStack Query.
@@ -92,6 +93,7 @@ kvartira/
 │   │   ├── ui/                  # design system
 │   │   ├── chat/                # ConversationList, MessageList, MessageComposer, …
 │   │   ├── calendar/            # LessonCalendar, Day/Week/Month views
+│   │   ├── lessons/             # LessonVisitHero, LessonVisitActions
 │   │   ├── availability/        # AvailabilityMonthCalendar, AvailabilityIntervalModal
 │   │   └── legal/               # CookieConsent*, ConsentCheckbox, PendingConsentModal, CMS modals
 │   ├── hooks/
@@ -224,6 +226,8 @@ kvartira/
 | `src/components/ui/BackLink.tsx` | Единая кнопка «назад» + shared outline classes (`surface-elevated` + border) |
 | `src/services/lessons/access.ts` | IDOR-safe access helpers для занятий |
 | `src/components/ui/LessonStatusBadge.tsx` | Единый badge статуса (текст + цвет + иконка) |
+| `src/components/ui/VideoPlayer.tsx` | Video.js v10 React wrapper (skin + ru i18n) — чат/ДЗ/школа/support |
+| `src/components/ui/AudioPlayer.tsx` | Video.js v10 audio (`AudioSkin`, elapsed clock) — чат/ДЗ/support; hide volume/speed/seek flags |
 | `src/utils/dates.ts` | Централизованные дата/время + `formatChatListTime`, `formatChatDateSeparator` |
 | `src/services/events/helpers.ts` | Ближайшее мероприятие: filter past + sort by date/time (`getNextUpcomingEvent`) |
 | `src/components/ui/LessonCard.tsx` | Карточка занятия; `personLabel` для admin overview |
@@ -461,7 +465,8 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `pwa.test.tsx` | helpers, banner, usePwaInstall, portrait orientation lock + manifest (12 tests) |
 | `notificationPreferences.test.ts` | preferences, leave-read, chronological sort, event inbox hide (17 tests) |
 | `profile.test.ts` | profile validation, update name, avatar upload/remove, crop helpers, mime infer, displayable src guard (19 tests) |
-| `audioPlayer.test.tsx` | formatAudioDuration, speed cycle, seek ratio, AudioPlayer UI (10 tests) |
+| `audioPlayer.test.tsx` | helpers + Video.js AudioPlayer + VK VoiceMessagePlayer / waveform (19 tests) |
+| `mediaImageGrid.test.ts` | VK photo grid layout helper (1 test) |
 | `adminUsers.test.ts` | canChangeUserRole student↔teacher, mock updateUserRole, IDOR, notification, phone privacy sanitize (8 tests) |
 | `directions.test.ts` | admin CRUD, register directionIds, teacher urgent setup, profile multi-select (9 tests) |
 | `pocketbaseSchema.test.ts` | PB migration file + SCHEMA.md + user cascade delete + avatar fields + role lock hook + session fingerprint + assignment staff write + events count/image + pushEnabled bool (25 tests) |
@@ -477,8 +482,9 @@ services/chat/{access,messages,validation,realtime,helpers}
 | `registrationInvite.test.ts` | invite helpers, mock gate, rotate, PB hook wiring (12 tests) |
 | `imageContrast.test.ts` | luminanceFromRgb, detectImageTextContrast fallback (4 tests) |
 | `warmAppCache.test.ts` | persist filter, conversation warm select, shell + messages prefetch (5 tests) |
+| `videoPlayer.test.tsx` | Video.js wrapper: native `<video>` + source mime infer (2 tests) |
 
-**Итого:** 749 passed (49 files); booking cancel past-slot flake вне scope.
+**Итого:** 783 passed (53 files); booking cancel past-slot flake вне scope; §202 calendar UX.
 
 Команды: `npm run typecheck`, `lint`, `test`, `build`.
 
@@ -613,7 +619,7 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Student new-event badge on Events tab | ✅ 2026-09-12, см. §142 |
 | Events join/leave badges + roster highlight | ✅ 2026-09-12, см. §144 |
 | Events leave notify stash (PB −N fix) | ✅ 2026-09-12, см. §145 |
-| Chat media UX (actions clamp, voice/MP3, video, lightbox) | ✅ 2026-09-12, см. §146 |
+| Chat media UX (actions clamp, voice/MP3, video, lightbox) | ✅ 2026-09-12, см. §146; video → Video.js §190 |
 | Popup scroll (no bar, no horizontal) | ✅ 2026-09-12, см. §147 |
 | Push toggle fix (prefs + SW hang + PB bool) | ✅ 2026-09-12, см. §148 |
 | Portrait orientation lock (PWA) | ✅ 2026-09-12, см. §149 |
@@ -644,6 +650,18 @@ services/chat/{access,messages,validation,realtime,helpers}
 | Student events badge tab-seen | ✅ 2026-09-17, см. §186 |
 | Staff group chats (teachers + role UI) | ✅ 2026-09-17, см. §187 |
 | Chat members role filter icons | ✅ 2026-09-17, см. §188 |
+| Chat members filter «Все» | ✅ 2026-09-19, см. §189 |
+| Video.js progressive player (app-wide) | ✅ 2026-09-19, см. §190 (YouTube bottom bar) |
+| Video.js audio player (app-wide) | ✅ 2026-09-19, см. §191 |
+| VK media flush (chat/ДЗ/support) | ✅ 2026-09-19, см. §193 |
+| Media download UX (chat menu / ДЗ header) | ✅ 2026-09-19, см. §194 |
+| Audio elapsed clock (play progress) | ✅ 2026-09-19, см. §195 |
+| Admin account approval (pending gate) | ✅ 2026-09-19, см. §197 |
+| Chat VK-style voice waveform | ✅ 2026-09-19, см. §198 |
+| YC-style lessons UI (native) | ✅ 2026-09-19, см. §199 |
+| Home/Lessons nav trim (upcoming + history) | ✅ 2026-09-19, см. §200 |
+| YC teacher schedule sync (bidirectional) | ✅ 2026-09-19, см. §201 |
+| Calendar day/week/month UX (nav + lists) | ✅ 2026-09-19, см. §202 |
 | Production auth + backend | ⏳ фазы 3.4–6 |
 
 ---
@@ -1453,11 +1471,11 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 |------|----------|
 | MVP + этап 2 (mock) | ✅ |
 | Текущая фаза | **6** — Deploy; параллельно Figma Q&A (§126) |
-| Следующий шаг | Laptop: следующий элемент из Figma → уточнения по одному → план → «можно внедрять»; или Deploy |
+| Следующий шаг | Deploy: YCLIENTS smoke (book/cancel + график); миграция accountStatus при необходимости |
 | Backend (решение) | **PocketBase** |
 | Production auth + backend | ⏳ фазы 3.4–6 |
-| Тесты | **749** (49 files); booking cancel flake вне scope; §188 member filter |
-| Graphify | 2952 nodes, 3293 edges, 452 communities |
+| Тесты | **783** (53 files); booking cancel flake вне scope; §202 calendar UX |
+| Graphify | 3166 nodes, 3568 edges, 481 communities |
 
 ### Фазы (кратко)
 
@@ -1479,7 +1497,365 @@ Mobile: admin tools через Home quick actions; BottomNav сохраняет�
 2. `graphify query "<тема>"`.
 3. Один пункт за сессию → тесты → `graphify update .` → обновить §42 + ROADMAP статусы.
 
-**Graphify stats:** 2952 nodes, 3293 edges, 452 communities (post-§188).
+**Graphify stats:** 3166 nodes, 3568 edges, 481 communities.
+
+---
+
+## 202. Calendar day/week/month UX (2026-09-19)
+
+**Scope:** убрать дубль «Сегодня» в day nav; дата между стрелками; фикс пустого дня (20-е); списки занятий под week/month.
+
+**Graphify:** `LessonCalendar()` → `CalendarNav` / `DayView` / `WeekView` / `MonthView` → `CalendarLessonList` → `normalizeLessonDate` / `yclientsRecordsRange`.
+
+### Behavior (✅)
+
+- `CalendarNav`: одна строка `← title →`; title = Сегодня / дата / диапазон недели / месяц; клик по title → к сегодня, если период не текущий.
+- Day: без второго заголовка даты; match занятий через `normalizeLessonDate`.
+- Week / Month: под сеткой хронологический список (`CalendarLessonList`), ближайшие → дальние.
+- Клик по дню: локальный `parseCalendarDate` (без UTC-сдвига).
+- **Fetch:** day/week запрашивают enclosing month(s) (`getCalendarFetchRange`) — узкий YC `start_date`/`end_date` часто пустой, месяц работал; `select` режет до view range; общий RQ cache day↔week↔month.
+- YC: `end_date` +1 день + client filter; date-only в `parseDatetime`; truncate `lesson.date`.
+
+### Deploy
+
+Только фронт (fetch range); `pb_hooks` parseDatetime — если ещё не выкладывали §202.
+
+### Tests
+
+`calendar` fetchRange + filter + datetime group; `yclients` date truncate; suite **783** (+ booking flake). typecheck ✅.
+
+**Graphify stats:** 3166 nodes, 3568 edges, 481 communities.
+
+---
+
+## 201. YC teacher schedule sync (2026-09-19)
+
+**Scope:** двусторонний график преподавателя через YCLIENTS (часы + перерывы + особые дни); UI списком Пн–Вс; экран только при `VITE_LESSONS_SOURCE=yclients`.
+
+**Graphify:** `AvailabilityYcPage()` → `getYclientsApi().getSchedule|updateSchedule` → BFF `/api/kvartira/yclients/schedule` → `getStaffSchedule` / `setStaffSchedule`.
+
+### Behavior (✅)
+
+- SoT = YCLIENTS: GET при открытии, PUT при сохранении; last-write-wins; горизонт 8 недель.
+- Только свой staff_id из `staffToUserId` (teacher|admin); без маппинга → EmptyState.
+- UI: список дней + перерывы + особые дни; brand-токены; offline guard.
+- Без YC: `/lessons/availability` → redirect `/lessons`; кнопка «График» только при YC.
+- Старый PB `teacher_availability` UI снят с экрана (API/mock остаются для non-YC booking path).
+
+### Deploy
+
+Выложить `pb_hooks` (`yclients.pb.js`, `kvartiraYclients.js`) + фронт; **перезапуск PocketBase**; teacher в `/admin/yclients` staff map; нужен `YCLIENTS_USER_TOKEN`.
+
+### Tests
+
+`yclients` schedule domain + BFF wiring; `offline` YC save; suite **780** (+ booking flake). typecheck ✅.
+
+**Graphify stats:** 3157 nodes, 3551 edges, 481 communities.
+
+---
+
+## 200. Home/Lessons nav trim (2026-09-19)
+
+**Scope:** убрать список «Предстоящие занятия» с Home; полностью убрать блок «История» с `/lessons`.
+
+**Graphify:** `HomePage()` → ближайшее занятие / мероприятие / ДЗ; `LessonsPage()` → SegmentedControl Расписание|Визиты (без HISTORY_FILTERS).
+
+### Behavior (✅)
+
+- `/home`: секция «Предстоящие занятия» и ссылка «Все» → `/lessons` удалены; остаётся «Ближайшее занятие».
+- `/lessons`: секция «История» + фильтры статусов (Все / Состоялись / …) удалены; календарь и вкладка «Визиты» без изменений.
+
+### Tests
+
+`home.test.tsx` — empty state ×1; admin home без «Предстоящие занятия». typecheck ✅. Suite **775**.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 3125 nodes, 3500 edges, 479 communities.
+
+---
+
+## 199. YC-style lessons UI (native) (2026-09-19)
+
+**Scope:** блок «Занятия» визуально как YCLIENTS (онлайн-запись / кабинет / расписание), наши brand-токены; без iframe-виджетов; API/BFF без изменений.
+
+**Graphify:** `LessonVisitHero()` / `LessonVisitActions()` → `LessonDetailPage()`; `BookLessonPage()`; `LessonCard()` → `LessonsPage()` / `CalendarLessonItem()`.
+
+### Behavior (✅)
+
+- Карточка `/lessons/:id`: hero «визит» (время крупно) + действия отмены/переноса. Без блока «Ещё» (материалы / чат / заметки убраны с экрана).
+- Запись `/lessons/book`: горизонтальные даты, крупная сетка слотов, confirm с time-hero, fade между шагами.
+- Список: SegmentedControl «Расписание | Визиты»; карточки time-first; календарь — accent rail + day timeline.
+- Перенос при YC по-прежнему скрыт через `canRescheduleLesson` (без ложных CTA).
+
+### Tests
+
+typecheck ✅; lessonDetail / calendar / home / nav ✅; booking cancel flake вне scope. Suite **775**.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 3128 nodes, 3503 edges, 479 communities.
+
+---
+
+## 198. Chat VK-style voice waveform (2026-09-19)
+
+**Scope:** голосовые в чате как в ВК — круглая play, waveform scrubber, длительность; токены brand; MP3/Video.js без изменений.
+
+**Graphify:** `VoiceMessagePlayer()` → `ChatVoiceAttachment()` → `waveform.ts` → `ChatVoicePlayback`.
+
+### Behavior (✅)
+
+- Domain: `generateWaveformHeights` (FNV + mulberry32, детерминировано по `attachment.id`); `playedBarCount` по progress.
+- UI: `VoiceMessagePlayer` — play/pause, pointer scrub + keyboard на волне, remaining при play / total на паузе.
+- Пузырь: own `bg-brand-muted` + border (не solid brand); other `bg-surface-elevated` — play/bars solid brand не сливаются.
+- Интеграция: exclusive play + speed bar через тот же `AudioPlayerHandle` / `ChatVoicePlayback`.
+- MP3 в чате и ДЗ — по-прежнему `AudioPlayer` (Video.js).
+
+### Tests
+
+`audioPlayer` waveform + VoiceMessagePlayer → **19** в файле; suite **775** (+ booking flake). typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 3120 nodes, 3497 edges, 477 communities.
+
+---
+
+## 197. Admin account approval (2026-09-19)
+
+**Scope:** саморегистрация по QR → `accountStatus: pending`; вход есть, UI только экран ожидания; admin одобряет / отклоняет (delete).
+
+**Graphify:** `PendingAccountScreen()` → `AppLayout`; `approveUser`/`rejectUser` → `/admin/registrations` · `AdminUsersPage`; PB `accountStatus` + hooks.
+
+### Behavior (✅)
+
+- Register (mock + PB guest create) → `pending`; notify admins (urgent, link `/admin/registrations`).
+- Gate в `AppLayout`: pending → полноэкран ожидания + logout; poll/`syncSession` без re-login.
+- Approve → `active` + notify user; reject → delete (телефон свободен); без текста причины.
+- Admin-only; действия admin (роль) → `active`.
+- Миграция: non-admin → `pending`; admin → `active`. Seed/demo → `active`.
+- UI: `/admin/registrations` + секция в `/admin/users`; бейджи Profile / hub / Заявки.
+
+### Deploy
+
+Миграция `1792500000_kvartira_account_status.js` + `pb_hooks` + фронт → **перезапуск PB** → admin одобряет существующих non-admin.
+
+### Tests
+
+`accountApproval` +6; schema/rbac/auth/adapter/routes → suite **770** (+ booking flake). typecheck ✅.
+
+**Graphify stats:** 3109 nodes, 3485 edges, 475 communities.
+
+---
+
+## 196. YCLIENTS lessons BFF (2026-09-19)
+
+**Scope:** SoT = YCLIENTS для индивид. записи / отмены / графика; без виджетов; гибридный маппинг; перенос и группы — вне v1.
+
+**Graphify:** `createYclientsLessonsApi()` → `pocketbaseYclientsApi` → `yclients.pb.js` → `kvartiraYclients.js`; `AdminYclientsPage()`.
+
+### Architecture (✅)
+
+- BFF routes `/api/kvartira/yclients/*` (status, mappings, staff, services, slots, records, book, cancel).
+- Secrets: `YCLIENTS_COMPANY_ID`, `YCLIENTS_PARTNER_TOKEN`, `YCLIENTS_USER_TOKEN` (PB env / docker-compose).
+- Client link by phone (find/create); soft conflict policy (PWA name/avatar vs YC).
+- Mapping in `school_settings.contacts.yclientsMappings`; admin UI `/admin/yclients`.
+- Flag `VITE_LESSONS_SOURCE=yclients` → `LessonsApi` via YC; `canRescheduleLesson` false; hide availability link.
+
+### Tests
+
+`yclients.test.ts` +9; routes `/admin/yclients`; suite **763**. typecheck ✅.
+
+### Deploy
+
+1. Env keys on PocketBase + restart.
+2. Admin → YCLIENTS связки.
+3. Frontend: `VITE_API_MODE=pocketbase` + `VITE_LESSONS_SOURCE=yclients`.
+
+**Next:** live smoke book/cancel на стенде; UX polish вкладки «Занятия»; группы later.
+
+**Graphify stats:** 3060 nodes, 3430 edges, 468 communities.
+
+---
+
+## 195. Audio elapsed clock (2026-09-19)
+
+**Scope:** при play таймлайн показывал длительность файла и «стоял»; нужен счётчик пройденного времени.
+
+**Graphify:** `AudioPlayer()` → `AudioSkin` → `Time.Value type=current` + `resyncVideoJsTimeStore()` → chat / ДЗ / support.
+
+### Root cause (✅)
+
+- MinimalAudioSkin: `current / duration` до слайдера — `duration` статичен (длина файла).
+- Video.js `timeFeature`: при залипшем store `seeking` игнорирует `timeupdate` → scrubber и elapsed не двигаются.
+
+### Fix (✅)
+
+- Skin: `MinimalAudioSkin` → `AudioSkin` (layout **elapsed | slider | remaining**).
+- CSS `data-elapsed-only`: скрыт remaining (выглядел как total); elapsed `tabular-nums`, без toggle.
+- `resyncVideoJsTimeStore`: `seeked` на play / playing / loadedmetadata / imperative play.
+- `src` на `<audio>` (+ optional `<source type>`).
+
+### Tests
+
+`audioPlayer` +1 (src + elapsed-only flags) → **14** в файле; suite **754**. typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2980 nodes, 3321 edges, 452 communities.
+
+---
+
+## 194. Media download UX (2026-09-19)
+
+**Scope:** в чате — имя без расширения; скачать только из long-press меню; в ДЗ — иконка скачать сверху справа над каждым медиа.
+
+**Graphify:** `displayAttachmentFilename()` / `getDownloadableAttachments()` → `AttachmentPreview` / `AttachmentList` / `MessageActions`; `MediaWithDownload` → `AssignmentContentView`.
+
+### Chat (✅)
+
+- `displayAttachmentFilename` — UI без `.mp3` / `.jpg` и т.п. (превью, MP3 title, PDF/doc label).
+- `isSyntheticMediaCaption` — скрывает и stem без расширения.
+- Overlay download с видео/аудио убран; `ImageViewer` по умолчанию без «Скачать».
+- `MessageActions`: пункт «Скачать» / «Скачать файлы» через `getDownloadableAttachments`.
+
+### Assignments (✅)
+
+- `MediaDownloadHeader` над фото / аудио / видео / PDF (не overlay на плеере).
+- `AudioPlayer` в ДЗ без встроенной кнопки download.
+
+### Tests
+
+`chat` displayFilename + downloadable filter +1; suite **753** (+ booking flake). typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2979 nodes, 3319 edges, 452 communities.
+
+## 193. VK media flush (2026-09-19)
+
+**Scope:** убрать цветной фон вокруг фото/видео/аудио; размеры плееров и сетка фото как в VK (1 = крупно, 2+ = плитка).
+
+**Graphify:** `MediaImageGrid()` → `AttachmentList` / `AssignmentContentView` / `SupportAttachmentList` → `MessageBubble` flush; `AudioPlayer bare`.
+
+### Chat (✅)
+
+- `MessageBubble`: media-only без `bg-brand` / surface; padding 0 вокруг media; meta overlay на фото/видео.
+- Text+media: цветной пузырь только у текста; вложения edge-to-edge.
+- `AttachmentList` + `MediaImageGrid`: single large / pair / triple (1+2) / 2-col; video `aspect-video` до ~26rem.
+- `AudioPlayer bare`: без border/fill в чате.
+
+### App-wide (✅)
+
+- ДЗ / support / school / admin preview — без `bg-surface` за медиа; VK sizes; фото-сетка в материалах ДЗ.
+
+### Tests
+
+`mediaImageGrid` +1; `audioPlayer` bare +1 → suite **752** (+ booking flake). typecheck ✅.
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2975 nodes, 3313 edges, 457 communities.
+
+## 191. Video.js audio player (2026-09-19)
+
+**Scope:** заменить кастомный `<audio>` UI на Video.js v10 React audio preset во всём приложении.
+
+**Graphify:** `AudioPlayer()` → `@videojs/react/audio` (`AudioPlayer` / `MinimalAudioSkin` / `Audio`) → chat / assignments / support.
+
+### Package (✅)
+
+- Тот же `@videojs/react` (уже в зависимостях) — preset `@videojs/react/audio`.
+- Wrapper: `src/components/ui/AudioPlayer.tsx` — `I18nProvider locale="ru"` + `MinimalAudioSkin` + progressive `<source>`.
+- Skin tokens: как VideoPlayer (`--media-accent-color` → brand); `color-scheme: light`.
+- CSS flags в `globals.css`: `data-hide-volume|speed|seek` для chat/ДЗ.
+
+### API preserved (✅)
+
+- `showVolume` / `showSpeed`, `variant` compact (hide seek), `isOwn`, title, download.
+- `AudioPlayerHandle` (play/pause/getElement) + `onPlayRequest` / `onPlayingChange` / `playbackRate` — ChatVoicePlayback exclusive + top speed bar.
+
+### Integration (✅)
+
+- Чат: `AttachmentList` voice/MP3.
+- ДЗ: `AssignmentContentView`.
+- Поддержка: `SupportAttachmentList`.
+
+### Tests
+
+`audioPlayer.test.tsx` 12 (helpers + Video.js); suite **750** passed (booking cancel flake вне scope). typecheck ✅.
+
+### Deploy
+
+Только фронт (тот же `@videojs/react` bundle).
+
+**Graphify stats:** 2965 nodes, 3306 edges, 449 communities.
+
+---
+
+## 190. Video.js player (2026-09-19)
+
+**Scope:** заменить нативные `<video controls>` на Video.js v10 React (`@videojs/react`) во всём приложении.
+
+**Graphify:** `VideoPlayer()` → `@videojs/react/video` (`VideoJsPlayer` / `VideoSkin` / `Video`) → chat / assignments / support / school / admin.
+
+### Package (✅)
+
+- `npm install @videojs/react` (10.0.0-rc.2) — официальный React preset.
+- Wrapper: `src/components/ui/VideoPlayer.tsx` — `I18nProvider locale="ru"` + default `VideoSkin` + progressive `<source>`.
+- Skin tokens: `--media-accent-color` → brand `#00796b`; font DM Sans; `object-fit: contain`.
+
+### Integration (✅)
+
+- Чат: `AttachmentList` (download слева сверху — не перекрывает controls).
+- ДЗ: `AssignmentContentView` + `AssignmentContentEditor` preview.
+- Поддержка: `SupportAttachmentList`.
+- Школа: `SchoolAboutContent` + `/admin/school` directions video.
+- Layout YouTube: единая нижняя панель — play · volume · timeline · … · PiP · Fullscreen (`VideoPlayer.css`); не top-right.
+- AudioPlayer → Video.js audio в §191.
+
+### Tests
+
+`videoPlayer.test.tsx` +2; nav school modal ✅; suite **750** passed (booking cancel flake вне scope). typecheck ✅.
+
+### Deploy
+
+Только фронт (`@videojs/react` в bundle).
+
+**Graphify stats:** 2965 nodes, 3306 edges, 449 communities.
+
+---
+
+## 189. Chat members — filter «Все» (2026-09-19)
+
+**Scope:** в настройках группового чата рядом с иконками ученик/преподаватель — явная иконка «Все».
+
+**Graphify:** `ConversationSettings()` → `MEMBER_FILTER_OPTIONS` (`all`|`student`|`teacher`) → `roleFilter` / `visibleMembers`.
+
+### UI (✅)
+
+- Под поиском: `UsersRound` (Все) · `Users` (ученики) · `GraduationCap` (преподаватели).
+- Exclusive select: всегда один активный; «Все» = `roleFilter === null` (включая админов).
+- Idle/active токены для `all` — нейтральный surface + ring; роли без изменений (§188).
+
+### Deploy
+
+Только фронт.
+
+**Graphify stats:** 2954 nodes, 3295 edges, 447 communities.
 
 ---
 

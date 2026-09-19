@@ -1,5 +1,8 @@
 export type UserRole = 'student' | 'teacher' | 'admin';
 
+/** Self-registration waits for admin; missing/legacy → treat as active. */
+export type AccountStatus = 'pending' | 'active';
+
 export interface User {
   id: string;
   phone: string;
@@ -11,6 +14,8 @@ export interface User {
   bio?: string;
   /** Направления обучения (ученик) или преподавания (teacher). */
   directionIds?: string[];
+  /** Self-reg → pending until admin approve; seed/admin actions → active. */
+  accountStatus?: AccountStatus;
 }
 
 export type LessonStatus =

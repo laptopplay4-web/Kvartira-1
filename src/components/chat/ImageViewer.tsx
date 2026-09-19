@@ -9,9 +9,17 @@ interface ImageViewerProps {
   initialIndex: number;
   open: boolean;
   onClose: () => void;
+  /** Chat: false (download via long-press menu). Assignments may enable. */
+  showDownload?: boolean;
 }
 
-export function ImageViewer({ images, initialIndex, open, onClose }: ImageViewerProps) {
+export function ImageViewer({
+  images,
+  initialIndex,
+  open,
+  onClose,
+  showDownload = false,
+}: ImageViewerProps) {
   const [index, setIndex] = useState(initialIndex);
   const [downloading, setDownloading] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -92,20 +100,22 @@ export function ImageViewer({ images, initialIndex, open, onClose }: ImageViewer
           {images.length > 1 ? `${index + 1} / ${images.length}` : null}
         </span>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDownload}
-            disabled={downloading}
-            aria-label="Скачать"
-            className="text-white"
-          >
-            {downloading ? (
-              <span className="h-5 w-5 animate-pulse rounded-full bg-white/30" aria-hidden />
-            ) : (
-              <Download className="h-5 w-5" />
-            )}
-          </Button>
+          {showDownload ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDownload}
+              disabled={downloading}
+              aria-label="Скачать"
+              className="text-white"
+            >
+              {downloading ? (
+                <span className="h-5 w-5 animate-pulse rounded-full bg-white/30" aria-hidden />
+              ) : (
+                <Download className="h-5 w-5" />
+              )}
+            </Button>
+          ) : null}
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Закрыть" className="text-white">
             <X className="h-5 w-5" />
           </Button>

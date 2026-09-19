@@ -88,7 +88,21 @@ import {
 import { validateUpdateProfileInput } from '@/services/profile/validation';
 import { validateAvatarUpload } from '@/services/profile/avatar';
 import { buildPersonalDataExport } from '@/services/profile/dataExport';
-import { getUserRoleChangeError } from '@/services/users/access';
+import {
+  getAccountApprovalError,
+  getAccountRejectError,
+  getUserRoleChangeError,
+} from '@/services/users/access';
+import {
+  ACCOUNT_APPROVED_NOTIFY_BODY,
+  ACCOUNT_APPROVED_NOTIFY_LINK,
+  ACCOUNT_APPROVED_NOTIFY_TITLE,
+  ACCOUNT_STATUS_ACTIVE,
+  ACCOUNT_STATUS_PENDING,
+  PENDING_REGISTRATION_NOTIFY_LINK,
+  PENDING_REGISTRATION_NOTIFY_TITLE,
+  pendingRegistrationNotifyBody,
+} from '@/services/users/accountStatus';
 import { sanitizeUserPhoneForViewer, sanitizeUsersPhoneForViewer, preserveOwnPhone } from '@/services/users/helpers';
 import { readPersistedLoginPhone, resolveOwnPhoneNumber } from '@/services/auth/ownPhone';
 import { canManageDirections } from '@/services/directions/access';
@@ -304,10 +318,23 @@ export const mockAuthApi: AuthApi = {
       firstName,
       lastName,
       directionIds: normalizeDirectionIds(directionIds),
+      accountStatus: ACCOUNT_STATUS_PENDING,
     };
     db.users.push(user);
     db.passwords.set(user.id, password);
     ensureSchoolWideMembership(db, user.id);
+    const notifyBody = pendingRegistrationNotifyBody(user);
+    for (const admin of db.users.filter((u) => u.role === 'admin')) {
+      tryPushNotification(
+        db,
+        admin.id,
+        'system',
+        PENDING_REGISTRATION_NOTIFY_TITLE,
+        notifyBody,
+        PENDING_REGISTRATION_NOTIFY_LINK,
+        true,
+      );
+    }
     const session: AuthSession = { user, token: uid('token') };
     db.sessions.set(session.token, session);
     recordAuthLogin(db, user.id, session.token, true);
@@ -397,7 +424,20 @@ export const mockAuthApi: AuthApi = {
   },
 
   async refreshSession() {
-    return null;
+    await delay(30);
+    const { useAuthStore } = await import('@/stores/authStore');
+    const current = useAuthStore.getState().session;
+    if (!current?.user?.id || !current.token) return null;
+    const user = db.users.find((u) => u.id === current.user.id);
+    if (!user) {
+      throw new ApiError('Сессия недействительна', 'UNAUTHORIZED', 401);
+    }
+    const session: AuthSession = {
+      token: current.token,
+      user: structuredClone(user),
+    };
+    db.sessions.set(current.token, session);
+    return session;
   },
 };
 
@@ -1173,6 +1213,7 @@ export const mockUsersApi: UsersApi = {
     }
 
     user.role = role;
+    user.accountStatus = ACCOUNT_STATUS_ACTIVE;
     if (role === 'teacher') {
       user.directionIds = [];
       tryPushNotification(
@@ -1195,6 +1236,40 @@ export const mockUsersApi: UsersApi = {
       '/profile',
     );
     return user;
+  },
+
+  async approveUser(requesterId, userId) {
+    await delay();
+    const requester = getUserById(requesterId);
+    const user = getUserById(userId);
+    const error = getAccountApprovalError(requester, user);
+    if (error) {
+      const forbidden = error === 'Нет доступа';
+      throw new ApiError(error, forbidden ? 'FORBIDDEN' : 'VALIDATION_ERROR', forbidden ? 403 : 400);
+    }
+    user.accountStatus = ACCOUNT_STATUS_ACTIVE;
+    syncUserInSessions(user);
+    tryPushNotification(
+      db,
+      user.id,
+      'system',
+      ACCOUNT_APPROVED_NOTIFY_TITLE,
+      ACCOUNT_APPROVED_NOTIFY_BODY,
+      ACCOUNT_APPROVED_NOTIFY_LINK,
+    );
+    return user;
+  },
+
+  async rejectUser(requesterId, userId) {
+    await delay();
+    const requester = getUserById(requesterId);
+    const user = getUserById(userId);
+    const error = getAccountRejectError(requester, user);
+    if (error) {
+      const forbidden = error === 'Нет доступа';
+      throw new ApiError(error, forbidden ? 'FORBIDDEN' : 'VALIDATION_ERROR', forbidden ? 403 : 400);
+    }
+    purgeUserFromMockDb(user.id);
   },
 
   async uploadAvatar(requesterId, input: UploadAvatarInput) {

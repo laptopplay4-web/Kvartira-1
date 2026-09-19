@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, parseISO, isToday } from 'date-fns';
+import { format, isToday, isSameWeek, isSameMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import type { User } from '@/types';
@@ -8,6 +8,7 @@ import { useCalendarLessons, type CalendarFilters } from '@/hooks/useCalendarLes
 import { calendarViewerRole } from '@/services/calendar/helpers';
 import {
   getCalendarDateRange,
+  parseCalendarDate,
   shiftCalendarAnchor,
   type CalendarViewMode,
 } from '@/utils/calendarRanges';
@@ -47,9 +48,15 @@ function getNavTitle(view: CalendarViewMode, anchor: Date): string {
   }
   if (view === 'week') {
     const { from, to } = getCalendarDateRange('week', anchor);
-    return `${format(parseISO(from), 'd MMM', { locale: ru })} – ${format(parseISO(to), 'd MMM yyyy', { locale: ru })}`;
+    return `${format(parseCalendarDate(from), 'd MMM', { locale: ru })} – ${format(parseCalendarDate(to), 'd MMM yyyy', { locale: ru })}`;
   }
   return format(anchor, 'LLLL yyyy', { locale: ru });
+}
+
+function isCurrentPeriod(view: CalendarViewMode, anchor: Date, now = new Date()): boolean {
+  if (view === 'day') return isToday(anchor);
+  if (view === 'week') return isSameWeek(anchor, now, { weekStartsOn: 1 });
+  return isSameMonth(anchor, now);
 }
 
 export function LessonCalendar({
@@ -113,7 +120,7 @@ export function LessonCalendar({
   }, [usersList]);
 
   const handleDayClick = (dateStr: string) => {
-    setAnchor(parseISO(dateStr));
+    setAnchor(parseCalendarDate(dateStr));
     setView('day');
   };
 
@@ -133,6 +140,7 @@ export function LessonCalendar({
         <CalendarViewSwitcher view={view} onChange={setView} />
         <CalendarNav
           title={getNavTitle(view, anchor)}
+          canJumpToToday={!isCurrentPeriod(view, anchor)}
           onPrev={() => setAnchor((a) => shiftCalendarAnchor(view, a, -1))}
           onNext={() => setAnchor((a) => shiftCalendarAnchor(view, a, 1))}
           onToday={() => setAnchor(new Date())}
@@ -167,7 +175,15 @@ export function LessonCalendar({
             />
           )}
           {view === 'month' && lessons && (
-            <MonthView anchor={anchor} lessons={lessons} onDayClick={handleDayClick} />
+            <MonthView
+              anchor={anchor}
+              lessons={lessons}
+              directions={directions}
+              teachers={teachers}
+              students={students}
+              viewer={calendarViewer}
+              onDayClick={handleDayClick}
+            />
           )}
         </>
       )}

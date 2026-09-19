@@ -97,5 +97,26 @@ onRecordCreateRequest((e) => {
     record.set('role', 'student');
   }
 
+  // Guest self-reg (QR) → always pending. Superuser/seed may set active explicitly.
+  let authCollection = '';
+  try {
+    authCollection = e.auth && e.auth.collection ? e.auth.collection().name : '';
+  } catch (_) {
+    authCollection = '';
+  }
+  if (!e.auth) {
+    record.set('accountStatus', 'pending');
+  } else if (authCollection === 'users') {
+    if (e.auth.getString('role') === 'admin') {
+      if (!record.getString('accountStatus')) {
+        record.set('accountStatus', 'active');
+      }
+    } else {
+      record.set('accountStatus', 'pending');
+    }
+  } else if (!record.getString('accountStatus')) {
+    record.set('accountStatus', 'active');
+  }
+
   e.next();
 }, 'users');

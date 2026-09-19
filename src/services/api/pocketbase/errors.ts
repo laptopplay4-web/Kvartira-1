@@ -22,6 +22,11 @@ const PB_MESSAGE_MAP: Record<string, { message: string; code: string }> = {
     message: 'Не удалось выполнить запрос. Если проблема повторяется — примените миграции PocketBase и перезапустите сервер.',
     code: 'SERVER_ERROR',
   },
+  "The requested resource wasn't found.": {
+    message:
+      'Маршрут не найден. Для YCLIENTS перезапустите PocketBase с актуальными pb_hooks (yclients.pb.js).',
+    code: 'NOT_FOUND',
+  },
   'Failed to delete record. Make sure that the record is not part of a required relation reference.': {
     message:
       'Не удалось удалить: есть связанные записи. Обновите приложение (cascade purge) или примените миграции PocketBase и перезапустите сервер.',
@@ -71,6 +76,14 @@ export function mapPocketBaseError(error: unknown): ApiError {
       return new ApiError('Неверный телефон или пароль', 'INVALID_CREDENTIALS', 401);
     }
     if (error.status === 404) {
+      const url = String((error as { url?: string }).url || error.originalError || '');
+      if (url.includes('yclients') || rawMessage.toLowerCase().includes('not found')) {
+        return new ApiError(
+          'Маршрут YCLIENTS не найден — перезапустите PocketBase с актуальными pb_hooks (yclients.pb.js).',
+          'NOT_FOUND',
+          404,
+        );
+      }
       return new ApiError('Не найдено', 'NOT_FOUND', 404);
     }
     if (error.status === 403) {

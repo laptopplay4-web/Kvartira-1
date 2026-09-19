@@ -29,21 +29,41 @@ import { useDeleteConversation } from '@/hooks/useDeleteConversation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
-import { Bell, BellOff, GraduationCap, LogOut, Pin, Search, Trash2, UserPlus, Users } from 'lucide-react';
+import {
+  Bell,
+  BellOff,
+  GraduationCap,
+  LogOut,
+  Pin,
+  Search,
+  Trash2,
+  UserPlus,
+  Users,
+  UsersRound,
+} from 'lucide-react';
 import { UserPreviewTrigger } from '@/components/users/UserPreviewTrigger';
 
-/** Idle = soft role tint; active = stronger fill + ring. */
-const ROLE_FILTER_IDLE: Record<'student' | 'teacher', string> = {
+type MemberRoleFilter = 'student' | 'teacher';
+type MemberListFilter = 'all' | MemberRoleFilter;
+
+/** Idle = soft tint; active = stronger fill + ring. */
+const MEMBER_FILTER_IDLE: Record<MemberListFilter, string> = {
+  all: 'bg-surface-elevated text-text-muted/80 border-border',
   student: 'bg-info-muted/45 text-info/80 border-info/25',
   teacher: 'bg-brand-muted/45 text-brand/80 border-brand/25',
 };
 
-const ROLE_FILTER_ACTIVE: Record<'student' | 'teacher', string> = {
+const MEMBER_FILTER_ACTIVE: Record<MemberListFilter, string> = {
+  all: 'bg-surface-elevated text-text-primary border-border ring-2 ring-text-muted/35',
   student: 'bg-info-muted text-info border-info/50 ring-2 ring-info/35',
   teacher: 'bg-brand-muted text-brand border-brand/50 ring-2 ring-brand/35',
 };
 
-type MemberRoleFilter = 'student' | 'teacher';
+const MEMBER_FILTER_OPTIONS = [
+  { id: 'all' as const, role: null, label: 'Все', Icon: UsersRound },
+  { id: 'student' as const, role: 'student' as const, label: 'Ученики', Icon: Users },
+  { id: 'teacher' as const, role: 'teacher' as const, label: 'Преподаватели', Icon: GraduationCap },
+] as const;
 
 interface ConversationSettingsProps {
   open: boolean;
@@ -433,8 +453,8 @@ export function ConversationSettings({
     return byRole.filter((x) => matched.has(x.user.id));
   }, [memberUsers, memberQuery, roleFilter]);
 
-  function toggleRoleFilter(role: MemberRoleFilter) {
-    setRoleFilter((prev) => (prev === role ? null : role));
+  function selectMemberFilter(role: MemberRoleFilter | null) {
+    setRoleFilter(role);
   }
 
   const memberIds = useMemo(() => {
@@ -509,24 +529,19 @@ export function ConversationSettings({
                     />
                   </div>
                   <div className="mb-2 flex gap-2" role="group" aria-label="Фильтр по роли">
-                    {(
-                      [
-                        { role: 'student' as const, label: 'Ученики', Icon: Users },
-                        { role: 'teacher' as const, label: 'Преподаватели', Icon: GraduationCap },
-                      ] as const
-                    ).map(({ role, label, Icon }) => {
+                    {MEMBER_FILTER_OPTIONS.map(({ id, role, label, Icon }) => {
                       const active = roleFilter === role;
                       return (
                         <button
-                          key={role}
+                          key={id}
                           type="button"
                           aria-pressed={active}
                           aria-label={label}
                           title={label}
-                          onClick={() => toggleRoleFilter(role)}
+                          onClick={() => selectMemberFilter(role)}
                           className={cn(
                             'inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border transition-[color,background-color,box-shadow] focus-ring',
-                            active ? ROLE_FILTER_ACTIVE[role] : ROLE_FILTER_IDLE[role],
+                            active ? MEMBER_FILTER_ACTIVE[id] : MEMBER_FILTER_IDLE[id],
                           )}
                         >
                           <Icon className="h-5 w-5" aria-hidden />

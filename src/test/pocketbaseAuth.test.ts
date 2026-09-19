@@ -24,6 +24,7 @@ describe('PocketBase auth hooks (ROADMAP 1.3)', () => {
     expect(source).toContain('findFirstRecordByData');
     expect(source).toContain("'phone'");
     expect(source).toContain('recordLoginAttempt');
+    expect(source).toContain("record.set('accountStatus', 'pending')");
   });
 
   it('kvartiraAuth.js normalizes +7 phone and writes login_history', () => {

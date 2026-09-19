@@ -1,6 +1,19 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, Copy, Flag, Forward, Pencil, Pin, Reply, SmilePlus, Trash2, UserRound, Users } from 'lucide-react';
+import {
+  ChevronLeft,
+  Copy,
+  Download,
+  Flag,
+  Forward,
+  Pencil,
+  Pin,
+  Reply,
+  SmilePlus,
+  Trash2,
+  UserRound,
+  Users,
+} from 'lucide-react';
 import { cn } from '@/utils';
 import type { Conversation, ConversationMember, Message, User } from '@/types';
 import {
@@ -10,8 +23,10 @@ import {
   canPinMessage,
   type DeleteMessageScope,
 } from '@/services/chat/messages';
+import { getDownloadableAttachments } from '@/services/chat/attachments';
 import { canReportMessage } from '@/services/support/reportMessage';
 import { QUICK_REACTION_EMOJIS } from '@/services/chat/constants';
+import { downloadFromUrl } from '@/utils/files';
 
 interface MessageActionsProps {
   message: Message;
@@ -123,6 +138,11 @@ export function MessageActions({
     canPinMessage(user, members, conversation.id) &&
     !message.deletedAt;
   const isPinned = !!conversation?.pinnedMessageIds?.includes(message.id);
+  const downloadable = useMemo(
+    () => (message.deletedAt ? [] : getDownloadableAttachments(message.attachments)),
+    [message.attachments, message.deletedAt],
+  );
+  const showDownload = downloadable.length > 0;
 
   const items = useMemo(() => {
     if (!open || message.messageType === 'system') return [];
@@ -170,6 +190,20 @@ export function MessageActions({
         icon: <Forward className="h-4 w-4" aria-hidden />,
         onSelect: () => onForward?.(),
         disabled: !onForward || !!message.deletedAt,
+      },
+      {
+        id: 'download',
+        label: downloadable.length > 1 ? 'Скачать файлы' : 'Скачать',
+        icon: <Download className="h-4 w-4" aria-hidden />,
+        onSelect: () => {
+          for (const att of downloadable) {
+            if (!att.url) continue;
+            void downloadFromUrl(att.url, att.filename).catch(() => {
+              /* keep in-app */
+            });
+          }
+        },
+        disabled: !showDownload,
       },
       {
         id: 'copy',
@@ -220,6 +254,7 @@ export function MessageActions({
     return list.filter((item) => !item.disabled);
   }, [
     deleteMenu,
+    downloadable,
     isPinned,
     message,
     onDelete,
@@ -232,6 +267,7 @@ export function MessageActions({
     showDeleteEntry,
     showDeleteForEveryone,
     showDeleteForMe,
+    showDownload,
     showEdit,
     showPin,
     showReport,

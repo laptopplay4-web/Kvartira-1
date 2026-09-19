@@ -15,6 +15,7 @@ import {
   resolveOwnReceiptStatus,
 } from '@/services/chat/messages';
 import { getReplyPreviewText } from '@/services/chat/helpers';
+import { isVoiceAttachment } from '@/services/chat/attachments';
 
 const LONG_PRESS_MS = 450;
 
@@ -94,6 +95,23 @@ export function MessageBubble({
     : message.status;
   const reactions = getMessageReactions(message);
   const hasText = !!displayText.trim();
+  /** Photo / video / MP3 flush; voice has its own soft bubble in VoiceMessagePlayer. */
+  const hasFlushMedia = !!message.attachments?.some(
+    (a) =>
+      a.type === 'image' ||
+      a.type === 'video' ||
+      (a.type === 'audio' && !isVoiceAttachment(a)),
+  );
+  const hasVoiceOnly =
+    !!message.attachments?.length &&
+    message.attachments.every((a) => a.type === 'audio' && isVoiceAttachment(a));
+  const hasVisualFlush = !!message.attachments?.some(
+    (a) => a.type === 'image' || a.type === 'video',
+  );
+  const hasAttachments = !!message.attachments?.length;
+  const mediaOnly = hasFlushMedia && !hasText && !message.replyToMessageId;
+  /** Voice-only: colored bubble on player; outer shell stays transparent (not solid brand). */
+  const voiceBubbleOnly = hasVoiceOnly && !hasText && !message.replyToMessageId;
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -153,9 +171,12 @@ export function MessageBubble({
       <div
         ref={bubbleRef}
         className={cn(
-          'relative flex w-full max-w-[min(78%,22rem)] min-w-0 flex-col gap-0.5',
-          isOwn ? 'items-end' : 'items-start',
-        )}
+            'relative flex w-full min-w-0 flex-col gap-0.5',
+            hasFlushMedia || voiceBubbleOnly
+              ? 'max-w-[min(85%,26rem)]'
+              : 'max-w-[min(78%,22rem)]',
+            isOwn ? 'items-end' : 'items-start',
+          )}
       >
         {!isOwn && showSender && (
           <span className="px-1">
@@ -216,14 +237,22 @@ export function MessageBubble({
             }
           }}
           className={cn(
-            'relative w-full max-w-full overflow-hidden px-3 py-2 text-body-sm shadow-sm cursor-pointer',
-            isOwn
-              ? 'rounded-2xl rounded-br-md bg-brand text-brand-contrast'
-              : 'rounded-2xl rounded-bl-md bg-surface-elevated text-text-primary',
+            'relative w-full max-w-full overflow-hidden text-body-sm cursor-pointer',
+            // Flush media (photo/video/MP3) + voice-only: no solid brand fill (voice paints soft bubble itself)
+            hasFlushMedia || mediaOnly || voiceBubbleOnly
+              ? cn(
+                  'bg-transparent p-0 text-text-primary',
+                  isOwn ? 'rounded-2xl rounded-br-md' : 'rounded-2xl rounded-bl-md',
+                )
+              : cn(
+                  'shadow-sm px-3 py-2',
+                  isOwn
+                    ? 'rounded-2xl rounded-br-md bg-brand text-brand-contrast'
+                    : 'rounded-2xl rounded-bl-md bg-surface-elevated text-text-primary',
+                ),
             // Accent selection — contrasts with both brand (own) and surface (other) bubbles
             actionsOpen && 'ring-2 ring-accent shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_28%,transparent)]',
             message.status === 'failed' && !actionsOpen && 'ring-1 ring-danger/40',
-            !hasText && message.attachments?.length ? 'px-1.5 pt-1.5 pb-1' : '',
           )}
           aria-label={`Сообщение от ${sender ? formatUserName(sender) : 'вас'}, ${time}`}
         >
@@ -239,41 +268,73 @@ export function MessageBubble({
           )}
 
           <div className="relative z-[1]">
-            {message.replyToMessageId && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (message.replyToMessageId) onReplyClick?.(message.replyToMessageId);
-                }}
+            {(message.replyToMessageId || hasText) && (
+              <div
                 className={cn(
-                  'mb-1.5 w-full rounded-lg border-l-2 px-2 py-1 text-left text-caption',
-                  isOwn ? 'border-brand-contrast/50 bg-black/10' : 'border-brand bg-surface',
+                  hasFlushMedia
+                    ? cn(
+                        'px-3 py-2 shadow-sm',
+                        isOwn
+                          ? 'bg-brand text-brand-contrast'
+                          : 'bg-surface-elevated text-text-primary',
+                        message.attachments?.length
+                          ? 'rounded-t-2xl'
+                          : isOwn
+                            ? 'rounded-2xl rounded-br-md'
+                            : 'rounded-2xl rounded-bl-md',
+                      )
+                    : hasAttachments
+                      ? 'px-3 pt-2 pb-1.5'
+                      : undefined,
                 )}
               >
-                <span className="font-medium">
-                  {replyToSender ? formatUserName(replyToSender) : 'Ответ'}
-                </span>
-                <p className="truncate opacity-80">{getReplyPreviewText(replyToMessage)}</p>
-              </button>
-            )}
+                {message.replyToMessageId && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (message.replyToMessageId) onReplyClick?.(message.replyToMessageId);
+                    }}
+                    className={cn(
+                      'mb-1.5 w-full rounded-lg border-l-2 px-2 py-1 text-left text-caption',
+                      isOwn ? 'border-brand-contrast/50 bg-black/10' : 'border-brand bg-surface',
+                    )}
+                  >
+                    <span className="font-medium">
+                      {replyToSender ? formatUserName(replyToSender) : 'Ответ'}
+                    </span>
+                    <p className="truncate opacity-80">{getReplyPreviewText(replyToMessage)}</p>
+                  </button>
+                )}
 
-            {hasText && (
-              <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{displayText}</p>
+                {hasText && (
+                  <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{displayText}</p>
+                )}
+              </div>
             )}
 
             {message.attachments && message.attachments.length > 0 && (
               <AttachmentList
                 attachments={message.attachments}
                 isOwn={isOwn}
+                flush
                 onImageClick={(_, i) => onImageClick?.(message, i)}
               />
             )}
 
             <div
               className={cn(
-                'mt-0.5 flex items-center justify-end gap-1 text-[10px] tabular-nums',
-                isOwn ? 'text-brand-contrast/75' : 'text-text-muted',
+                'flex items-center justify-end gap-1 text-[10px] tabular-nums',
+                mediaOnly && hasVisualFlush
+                  ? 'pointer-events-none absolute bottom-1.5 right-2 z-[2] rounded-md bg-black/45 px-1.5 py-0.5 text-white shadow-sm'
+                  : cn(
+                      'mt-0.5 px-3 pb-1.5',
+                      hasFlushMedia || mediaOnly || voiceBubbleOnly || !isOwn
+                        ? 'text-text-muted'
+                        : 'text-brand-contrast/75',
+                      !hasFlushMedia && !hasAttachments && 'px-0 pb-0',
+                      voiceBubbleOnly && 'px-1 pb-0.5',
+                    ),
               )}
             >
               {message.editedAt && <span className="opacity-70">изм.</span>}

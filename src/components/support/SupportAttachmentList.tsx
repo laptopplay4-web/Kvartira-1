@@ -4,6 +4,8 @@ import { detectAttachmentType } from '@/services/chat/validation';
 import type { MessageAttachment, SupportTicketAttachment } from '@/types';
 import { Card } from '@/components/ui/Card';
 import { AudioPlayer } from '@/components/ui/AudioPlayer';
+import { VideoPlayer } from '@/components/ui/VideoPlayer';
+import { MediaImageGrid } from '@/components/ui/MediaImageGrid';
 import { ImageViewer } from '@/components/chat/ImageViewer';
 import { downloadFromUrl } from '@/utils/files';
 
@@ -30,62 +32,64 @@ export function SupportAttachmentList({ attachments }: SupportAttachmentListProp
   const images = attachments
     .filter((a) => detectAttachmentType(a.mimeType, a.filename) === 'image')
     .map(toMessageAttachment);
+  const others = attachments.filter(
+    (a) => detectAttachmentType(a.mimeType, a.filename) !== 'image',
+  );
 
   return (
     <>
-      <ul className="mt-4 space-y-2" aria-label="Вложения">
-        {attachments.map((attachment) => {
-          const type = detectAttachmentType(attachment.mimeType, attachment.filename);
+      <div className="mt-4 space-y-3" aria-label="Вложения">
+        {images.length > 0 && (
+          <div className="overflow-hidden rounded-xl">
+            <MediaImageGrid
+              images={images.map((a) => ({ id: a.id, url: a.url, alt: a.filename }))}
+              size="page"
+              onImageClick={(_, i) => setViewerIndex(i)}
+            />
+          </div>
+        )}
+        <ul className="space-y-2">
+          {others.map((attachment) => {
+            const type = detectAttachmentType(attachment.mimeType, attachment.filename);
 
-          return (
-            <li key={attachment.id}>
-              {type === 'image' ? (
-                <button
-                  type="button"
-                  className="block max-w-full overflow-hidden rounded-lg border border-border-subtle focus-ring"
-                  aria-label={`Открыть ${attachment.filename}`}
-                  onClick={() => {
-                    const idx = images.findIndex((img) => img.id === attachment.id);
-                    setViewerIndex(idx >= 0 ? idx : 0);
-                  }}
-                >
-                  <img
+            return (
+              <li key={attachment.id}>
+                {type === 'audio' ? (
+                  <AudioPlayer
                     src={attachment.url}
-                    alt={attachment.filename}
-                    className="max-h-64 w-full object-contain"
+                    title={attachment.filename}
+                    downloadUrl={attachment.url}
+                    downloadFilename={attachment.filename}
+                    bare
                   />
-                </button>
-              ) : type === 'audio' ? (
-                <AudioPlayer
-                  src={attachment.url}
-                  title={attachment.filename}
-                  downloadUrl={attachment.url}
-                  downloadFilename={attachment.filename}
-                />
-              ) : type === 'video' ? (
-                <Card padding="sm">
-                  <video controls src={attachment.url} className="max-h-64 w-full rounded-lg">
-                    <track kind="captions" />
-                  </video>
-                </Card>
-              ) : (
-                <button
-                  type="button"
-                  className="w-full text-left focus-ring"
-                  onClick={() => {
-                    void downloadFromUrl(attachment.url, attachment.filename);
-                  }}
-                >
-                  <Card padding="sm" className="flex items-center gap-2 hover:border-brand/30">
-                    <FileText className="h-4 w-4 text-brand" aria-hidden />
-                    <span className="text-sm">{attachment.filename}</span>
-                  </Card>
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                ) : type === 'video' ? (
+                  <div className="overflow-hidden rounded-xl">
+                    <VideoPlayer
+                      src={attachment.url}
+                      mimeType={attachment.mimeType}
+                      className="aspect-video w-full max-h-[min(70vh,32rem)]"
+                      aria-label={attachment.filename}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="w-full text-left focus-ring"
+                    onClick={() => {
+                      void downloadFromUrl(attachment.url, attachment.filename);
+                    }}
+                  >
+                    <Card padding="sm" className="flex items-center gap-2 hover:border-brand/30">
+                      <FileText className="h-4 w-4 text-brand" aria-hidden />
+                      <span className="text-sm">{attachment.filename}</span>
+                    </Card>
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
       <ImageViewer
         images={images}
         initialIndex={viewerIndex ?? 0}

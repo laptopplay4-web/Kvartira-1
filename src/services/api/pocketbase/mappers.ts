@@ -49,6 +49,7 @@ import type {
   TeacherAvailability,
   User,
   UserRole,
+  AccountStatus,
   AvailabilityException,
 } from '@/types';
 import {
@@ -66,6 +67,7 @@ import {
   normalizeSchoolSocialLinks,
   parseSchoolDirectionsVideo,
 } from '@/services/school/helpers';
+import { resolveAccountStatus } from '@/services/users/accountStatus';
 
 export interface PbUserRecord extends RecordModel {
   phone: string;
@@ -76,6 +78,7 @@ export interface PbUserRecord extends RecordModel {
   avatarOriginalUrl?: string;
   bio?: string;
   directionIds?: string[];
+  accountStatus?: AccountStatus | string;
 }
 
 export interface MapUserRecordOptions {
@@ -132,6 +135,10 @@ export function mapUserRecord(
     role: r.role,
     firstName: r.firstName,
     lastName: r.lastName,
+    accountStatus: resolveAccountStatus({
+      role: r.role,
+      accountStatus: r.accountStatus === 'pending' || r.accountStatus === 'active' ? r.accountStatus : undefined,
+    }),
   };
 
   if (r.avatarUrl) user.avatarUrl = r.avatarUrl;
@@ -158,6 +165,7 @@ export function userToPbRecord(user: User, base?: Partial<RecordModel>): PbUserR
     avatarOriginalUrl: user.avatarOriginalUrl ?? '',
     bio: user.bio ?? '',
     directionIds: user.directionIds ?? [],
+    accountStatus: resolveAccountStatus(user),
   };
 }
 

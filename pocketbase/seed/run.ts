@@ -87,6 +87,7 @@ export async function runSeed(client: PbClient, options: SeedOptions = {}): Prom
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
+      accountStatus: user.accountStatus ?? (user.role === 'admin' ? 'active' : 'active'),
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
       ...(user.avatarOriginalUrl ? { avatarOriginalUrl: user.avatarOriginalUrl } : {}),
       ...(user.bio ? { bio: user.bio } : {}),

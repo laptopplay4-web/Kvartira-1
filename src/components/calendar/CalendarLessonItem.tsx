@@ -32,11 +32,17 @@ export function CalendarLessonItem({
       <Card
         interactive
         padding={compact ? 'sm' : 'md'}
-        className={cn(past && 'opacity-75')}
+        className={cn(
+          'relative overflow-hidden border-l-4 border-l-brand',
+          past && 'opacity-75',
+          compact && 'py-2',
+        )}
       >
         <div className="flex gap-3">
           <div className="shrink-0 text-right">
-            <p className="text-h3 tabular-nums">{lesson.startTime}</p>
+            <p className={cn('font-semibold tabular-nums', compact ? 'text-lg' : 'text-h3')}>
+              {lesson.startTime}
+            </p>
             {!compact && (
               <p className="text-caption tabular-nums text-text-muted">
                 {formatTimeRange(lesson.startTime, lesson.durationMinutes)}
@@ -51,9 +57,7 @@ export function CalendarLessonItem({
             <p className={cn('mt-1 truncate', compact ? 'text-body-sm font-medium' : 'text-h3')}>
               {counterparty}
             </p>
-            <p className="mt-0.5 text-caption text-text-secondary">
-              {lesson.durationMinutes} мин
-            </p>
+            <p className="mt-0.5 text-caption text-text-secondary">{lesson.durationMinutes} мин</p>
           </div>
         </div>
       </Card>

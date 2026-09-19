@@ -157,8 +157,9 @@ module.exports = {
  * @param {string} title
  * @param {string} body
  * @param {string} [link]
+ * @param {boolean} [urgent]
  */
-function createNotificationForUser(app, userId, type, title, body, link) {
+function createNotificationForUser(app, userId, type, title, body, link, urgent) {
   try {
     const col = app.findCollectionByNameOrId('notifications');
     const record = new Record(col);
@@ -169,6 +170,9 @@ function createNotificationForUser(app, userId, type, title, body, link) {
     // Do not set read=false — PB treats required/optional bool false as blank in JSVM.
     if (link) {
       record.set('link', link);
+    }
+    if (urgent === true) {
+      record.set('urgent', true);
     }
     app.save(record);
   } catch (_) {

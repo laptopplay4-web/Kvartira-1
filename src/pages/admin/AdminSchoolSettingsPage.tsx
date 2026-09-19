@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { VideoPlayer } from '@/components/ui/VideoPlayer';
 import {
   ALLOWED_DIRECTIONS_VIDEO_MIMES,
   EMPTY_SCHOOL_SOCIAL_LINKS,
@@ -222,13 +223,12 @@ export default function AdminSchoolSettingsPage() {
               />
               {directionsVideo ? (
                 <div className="space-y-2">
-                  <video
-                    controls
+                  <VideoPlayer
                     src={directionsVideo.url}
-                    className="max-h-56 w-full rounded-lg bg-black"
-                  >
-                    Ваш браузер не поддерживает видео.
-                  </video>
+                    mimeType={directionsVideo.mimeType}
+                    className="aspect-video w-full max-h-[min(55vh,26rem)]"
+                    aria-label={directionsVideo.filename}
+                  />
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="min-w-0 truncate text-body-sm text-text-secondary">
                       {directionsVideo.filename}

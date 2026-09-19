@@ -1,5 +1,6 @@
 import { Clock, ExternalLink, Mail, MapPin, Phone } from 'lucide-react';
 import type { PublicSchoolInfo } from '@/types';
+import { VideoPlayer } from '@/components/ui/VideoPlayer';
 import {
   EMPTY_SCHOOL_SOCIAL_LINKS,
   SCHOOL_SOCIAL_LINK_KEYS,
@@ -81,9 +82,12 @@ export function SchoolAboutContent({ school, hideHeader = false }: SchoolAboutCo
       {video?.url && (
         <div className="space-y-2 border-t border-border-subtle pt-4">
           <h4 className="text-label text-text-primary">Как добраться</h4>
-          <video controls src={video.url} className="max-h-64 w-full rounded-lg bg-black">
-            Ваш браузер не поддерживает видео.
-          </video>
+          <VideoPlayer
+            src={video.url}
+            mimeType={video.mimeType}
+            className="aspect-video w-full max-h-[min(70vh,32rem)]"
+            aria-label={video.filename ?? 'Как добраться'}
+          />
         </div>
       )}
     </div>

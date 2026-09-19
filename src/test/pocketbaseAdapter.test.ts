@@ -123,6 +123,7 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
       lastName: 'Иванова',
       avatarUrl: 'https://example.com/a.png',
       bio: 'bio',
+      accountStatus: 'active',
     });
   });
 
@@ -378,6 +379,8 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(client.auth.login).toBeTypeOf('function');
     expect(client.users.getAllUsers).toBeTypeOf('function');
     expect(client.users.updateUserRole).toBeTypeOf('function');
+    expect(client.users.approveUser).toBeTypeOf('function');
+    expect(client.users.rejectUser).toBeTypeOf('function');
     expect(client.lessons.getDirections).toBe(pocketbaseLessonsApi.getDirections);
     expect(client.lessons.createDirection).toBe(pocketbaseLessonsApi.createDirection);
     expect(client.lessons.updateDirection).toBe(pocketbaseLessonsApi.updateDirection);
@@ -1373,6 +1376,9 @@ describe('PocketBase adapter (ROADMAP 2.1–2.10)', () => {
     expect(filesApi).toContain('resolveConversationAvatars');
     expect(usersApi).toContain('resolveUsersAvatars');
     expect(usersApi).toContain('updateUserRole');
+    expect(usersApi).toContain('approveUser');
+    expect(usersApi).toContain('rejectUser');
+    expect(usersApi).toContain('getAccountApprovalError');
     expect(usersApi).toContain('getUserRoleChangeError');
     expect(groupsApi).toContain('resolveUsersAvatars');
     expect(lessonsApi).toContain('resolveUsersAvatars');

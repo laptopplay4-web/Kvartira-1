@@ -4,6 +4,7 @@ import { BottomNav, SidebarNav } from '@/components/ui/BottomNav';
 import { MobileHeader } from '@/components/ui/MobileHeader';
 import { TeacherDirectionsSetupModal } from '@/components/directions/TeacherDirectionsSetupModal';
 import { PendingConsentModal } from '@/components/legal/PendingConsentModal';
+import { PendingAccountScreen } from '@/components/auth/PendingAccountScreen';
 import { useAuthStore, useCurrentUser } from '@/stores/authStore';
 import { can, isKnownUserRole, type Permission } from '@/permissions';
 import { api } from '@/services/api';
@@ -17,6 +18,7 @@ import { countUnreadAssignments } from '@/services/assignments/unread';
 import { countUnreadEventParticipationsForNav } from '@/services/events/unread';
 import { countInboxUnreadNotifications } from '@/services/notifications/helpers';
 import { countOpenSupportTickets } from '@/services/support/adminInbox';
+import { countPendingRegistrations, isAccountPending } from '@/services/users/accountStatus';
 import { PwaInstallBanner } from '@/components/ui/PwaInstallBanner';
 
 export function AppLayout() {
@@ -34,7 +36,7 @@ export function AppLayout() {
   const { data: conversations } = useQuery({
     queryKey: ['conversations', user?.id],
     queryFn: () => api.chat.getConversations(user!.id),
-    enabled: !!user,
+    enabled: !!user && !isAccountPending(user),
   });
 
   const chatBadge = conversations?.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0) ?? 0;
@@ -42,13 +44,14 @@ export function AppLayout() {
   const { data: notifications, isFetched: notificationsFetched } = useQuery({
     queryKey: ['notifications', user?.id],
     queryFn: () => api.notifications.getNotifications(user!.id),
-    enabled: !!user,
+    enabled: !!user && !isAccountPending(user),
   });
 
   const notifBadge = countInboxUnreadNotifications(notifications ?? []);
 
   const showAssignments =
     !!user &&
+    !isAccountPending(user) &&
     (can(user, 'assignments:view-own') ||
       can(user, 'assignments:view-assigned') ||
       can(user, 'assignments:view-all'));
@@ -82,9 +85,20 @@ export function AppLayout() {
     enabled: showAdminSupportInbox,
   });
 
-  const profileBadge = showAdminSupportInbox
-    ? countOpenSupportTickets(openSupportTickets)
-    : 0;
+  const showPendingRegistrations = !!user && can(user, 'admin:users');
+  const { data: allUsers } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => api.users.getAllUsers(user!.id),
+    enabled: showPendingRegistrations,
+  });
+
+  const supportBadge = showAdminSupportInbox ? countOpenSupportTickets(openSupportTickets) : 0;
+  const pendingBadge = showPendingRegistrations ? countPendingRegistrations(allUsers) : 0;
+  const profileBadge = supportBadge + pendingBadge;
+
+  if (user && isAccountPending(user)) {
+    return <PendingAccountScreen />;
+  }
 
   return (
     <div className="flex min-h-dvh min-w-0 overflow-x-hidden">
@@ -115,7 +129,7 @@ export function AppLayout() {
             onInstall={promptInstall}
             onDismiss={dismissPrompt}
             installing={installing}
-          />
+            />
         )}
         {!hideBottomNav && (
           <BottomNav chatBadge={chatBadge} eventsBadge={eventsBadge} profileBadge={profileBadge} />

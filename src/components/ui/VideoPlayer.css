@@ -1,0 +1,106 @@
+/**
+ * YouTube-like control layout for Video.js default skin.
+ * Forces PiP / Fullscreen into the bottom bar (not top-right) at all widths.
+ * Selectors match skin @scope specificity so overrides win.
+ */
+
+.kv-video-player.media-skin[data-theme='default'][data-preset='video'] .video-controls-content {
+  inset-inline: calc(var(--media-spacing) * 1.5) !important;
+  bottom: calc(var(--media-spacing) * 1.5) !important;
+  top: auto !important;
+  z-index: 30;
+  border-radius: var(--media-controls-radius);
+  background-color: var(--media-popover);
+  color: var(--media-popover-foreground);
+  box-shadow:
+    0 0 0 1px var(--media-surface-border, var(--media-border)),
+    var(--media-shadow-surface);
+  backdrop-filter: var(--media-backdrop-filter-surface);
+  align-items: center;
+  gap: 1px;
+  padding: calc(var(--media-spacing) * 0.5) !important;
+  display: flex !important;
+  position: absolute !important;
+  text-shadow: none;
+}
+
+.kv-video-player.media-skin[data-theme='default'][data-preset='video']
+  .video-controls-content:not([data-visible]) {
+  pointer-events: none !important;
+  translate: 0 var(--media-hidden-offset) !important;
+  scale: var(--media-hidden-scale) var(--media-hidden-scale) !important;
+  opacity: 0 !important;
+  filter: none;
+}
+
+@media (pointer: fine) {
+  .kv-video-player.media-skin[data-theme='default'][data-preset='video']
+    .video-controls-content:not([data-visible]) {
+    filter: blur(var(--media-hidden-blur));
+  }
+}
+
+.kv-video-player.media-skin[data-theme='default'][data-preset='video'] .video-controls-content:after {
+  content: '';
+  z-index: 10;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: var(--media-shadow-surface-inset);
+  position: absolute;
+  inset: 0;
+}
+
+/* Flatten primary into the shared bottom bar */
+.kv-video-player.media-skin[data-theme='default'][data-preset='video'] .video-controls-primary {
+  display: contents !important;
+  position: static !important;
+  inset: auto !important;
+  background: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+  transform: none !important;
+  opacity: 1 !important;
+  scale: none !important;
+  translate: none !important;
+  filter: none !important;
+  pointer-events: auto !important;
+}
+
+.kv-video-player.media-skin[data-theme='default'][data-preset='video'] .video-controls-primary:after {
+  content: none !important;
+}
+
+/* PiP + Fullscreen at the end of the bottom bar (YouTube order) */
+.kv-video-player.media-skin[data-theme='default'][data-preset='video'] .video-controls-secondary {
+  display: contents !important;
+  position: static !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  background: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+  transform: none !important;
+  opacity: 1 !important;
+  scale: none !important;
+  translate: none !important;
+  filter: none !important;
+  pointer-events: auto !important;
+}
+
+.kv-video-player.media-skin[data-theme='default'][data-preset='video'] .video-controls-secondary:after {
+  content: none !important;
+}
+
+.kv-video-player.media-skin[data-theme='default'][data-preset='video'] .video-time-slider-group {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-inline: calc(var(--media-spacing) * 1.5);
+}
+
+.kv-video-player.media-skin[data-theme='default'][data-preset='video'] .video-controls-captions-button {
+  display: inline-flex !important;
+}

@@ -13,7 +13,13 @@ import {
 import { validateUpdateProfileInput } from '@/services/profile/validation';
 import { validateAvatarUpload } from '@/services/profile/avatar';
 import { buildPersonalDataExport } from '@/services/profile/dataExport';
-import { getUserRoleChangeError } from '@/services/users/access';
+import { getAccountApprovalError, getAccountRejectError, getUserRoleChangeError } from '@/services/users/access';
+import {
+  ACCOUNT_APPROVED_NOTIFY_BODY,
+  ACCOUNT_APPROVED_NOTIFY_LINK,
+  ACCOUNT_APPROVED_NOTIFY_TITLE,
+  ACCOUNT_STATUS_ACTIVE,
+} from '@/services/users/accountStatus';
 import { preserveOwnPhone, sanitizeUserPhoneForViewer, sanitizeUsersPhoneForViewer } from '@/services/users/helpers';
 import { readPersistedLoginPhone, resolveOwnPhoneNumber } from '@/services/auth/ownPhone';
 import { getRoleLabel } from '@/permissions';
@@ -182,7 +188,7 @@ export const pocketbaseUsersApi: UsersApi = {
         throw new ApiError(error, forbidden ? 'FORBIDDEN' : 'VALIDATION_ERROR', forbidden ? 403 : 400);
       }
 
-      const body: Record<string, unknown> = { role };
+      const body: Record<string, unknown> = { role, accountStatus: ACCOUNT_STATUS_ACTIVE };
       if (role === 'teacher') {
         body.directionIds = [];
       }
@@ -215,6 +221,74 @@ export const pocketbaseUsersApi: UsersApi = {
       }
 
       return user;
+    });
+  },
+
+  async approveUser(requesterId, userId) {
+    return withPbError(async () => {
+      const pb = getPocketBase();
+      let requester: User;
+      let target: User;
+      try {
+        requester = mapUserRecord(await pb.collection('users').getOne(requesterId));
+        target = mapUserRecord(await pb.collection('users').getOne(userId));
+      } catch (error) {
+        if (error instanceof ClientResponseError && error.status === 404) {
+          throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
+        }
+        throw error;
+      }
+
+      const error = getAccountApprovalError(requester, target);
+      if (error) {
+        const forbidden = error === 'Нет доступа';
+        throw new ApiError(error, forbidden ? 'FORBIDDEN' : 'VALIDATION_ERROR', forbidden ? 403 : 400);
+      }
+
+      const record = await pb.collection('users').update(userId, {
+        accountStatus: ACCOUNT_STATUS_ACTIVE,
+      });
+      const user = await resolveUserAvatars(mapUserRecord(record));
+
+      try {
+        await pb.collection('notifications').create({
+          user: userId,
+          type: 'system',
+          title: ACCOUNT_APPROVED_NOTIFY_TITLE,
+          body: ACCOUNT_APPROVED_NOTIFY_BODY,
+          link: ACCOUNT_APPROVED_NOTIFY_LINK,
+          read: false,
+        });
+      } catch {
+        /* notification is best-effort */
+      }
+
+      return user;
+    });
+  },
+
+  async rejectUser(requesterId, userId) {
+    return withPbError(async () => {
+      const pb = getPocketBase();
+      let requester: User;
+      let target: User;
+      try {
+        requester = mapUserRecord(await pb.collection('users').getOne(requesterId));
+        target = mapUserRecord(await pb.collection('users').getOne(userId));
+      } catch (error) {
+        if (error instanceof ClientResponseError && error.status === 404) {
+          throw new ApiError('Пользователь не найден', 'NOT_FOUND', 404);
+        }
+        throw error;
+      }
+
+      const error = getAccountRejectError(requester, target);
+      if (error) {
+        const forbidden = error === 'Нет доступа';
+        throw new ApiError(error, forbidden ? 'FORBIDDEN' : 'VALIDATION_ERROR', forbidden ? 403 : 400);
+      }
+
+      await pb.collection('users').delete(userId);
     });
   },
 

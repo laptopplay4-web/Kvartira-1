@@ -1,7 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import type { Lesson, LessonStatus, User } from '@/types';
-import { getCalendarDateRange, type CalendarViewMode } from '@/utils/calendarRanges';
+import {
+  filterLessonsByDateRange,
+  getCalendarDateRange,
+  getCalendarFetchRange,
+  type CalendarViewMode,
+} from '@/utils/calendarRanges';
 import { buildLessonFiltersForRole } from '@/services/calendar/helpers';
 
 export interface CalendarFilters {
@@ -28,13 +33,13 @@ export function calendarLessonsQueryKey(
   filters?: CalendarFilters,
   schoolWide = false,
 ) {
-  const { from, to } = getCalendarDateRange(view, anchorDate);
+  // Shared cache for day/week/month within the same fetch months (view filtered via select).
+  const { from, to } = getCalendarFetchRange(view, anchorDate);
   return [
     'lessons',
     'calendar',
     userId,
     role,
-    view,
     from,
     to,
     filters?.teacherId ?? '',
@@ -53,7 +58,8 @@ export function useCalendarLessons({
   schoolWide = false,
   enabled = true,
 }: UseCalendarLessonsParams) {
-  const { from, to } = getCalendarDateRange(view, anchorDate);
+  const fetchRange = getCalendarFetchRange(view, anchorDate);
+  const viewRange = getCalendarDateRange(view, anchorDate);
 
   return useQuery({
     queryKey: calendarLessonsQueryKey(userId, role, view, anchorDate, filters, schoolWide),
@@ -65,12 +71,13 @@ export function useCalendarLessons({
 
       return api.lessons.getLessons({
         ...roleFilters,
-        from,
-        to,
+        from: fetchRange.from,
+        to: fetchRange.to,
         directionId: filters?.directionId,
         status: filters?.status,
       });
     },
+    select: (lessons) => filterLessonsByDateRange(lessons, viewRange.from, viewRange.to),
     enabled,
   });
 }

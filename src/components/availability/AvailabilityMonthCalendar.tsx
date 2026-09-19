@@ -62,11 +62,13 @@ export function AvailabilityMonthCalendar({
   const offSet = new Set(offDates);
 
   const title = format(anchor, 'LLLL yyyy', { locale: ru });
+  const canJumpToToday = !isSameMonth(anchor, today);
 
   return (
     <div>
       <CalendarNav
         title={title}
+        canJumpToToday={canJumpToToday}
         onPrev={onPrevMonth}
         onNext={onNextMonth}
         onToday={onToday}

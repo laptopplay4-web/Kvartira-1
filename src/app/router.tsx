@@ -35,10 +35,12 @@ const NotificationsPage = lazy(() => import('@/pages/notifications/Notifications
 const AdminHubPage = lazy(() => import('@/pages/admin/AdminHubPage'));
 const AdminSchedulePage = lazy(() => import('@/pages/admin/AdminSchedulePage'));
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
+const AdminRegistrationsPage = lazy(() => import('@/pages/admin/AdminRegistrationsPage'));
 const AdminLegalPage = lazy(() => import('@/pages/admin/AdminLegalPage'));
 const AdminSchoolSettingsPage = lazy(() => import('@/pages/admin/AdminSchoolSettingsPage'));
 const AdminRegistrationQrPage = lazy(() => import('@/pages/admin/AdminRegistrationQrPage'));
 const AdminDirectionsPage = lazy(() => import('@/pages/admin/AdminDirectionsPage'));
+const AdminYclientsPage = lazy(() => import('@/pages/admin/AdminYclientsPage'));
 const AdminHelpPage = lazy(() => import('@/pages/admin/AdminHelpPage'));
 const LandingPage = lazy(() => import('@/pages/public/LandingPage'));
 const DirectionDetailPage = lazy(() => import('@/pages/public/DirectionDetailPage'));
@@ -124,7 +126,10 @@ export const appRoutes = [
           },
           {
             element: <AdminRoute permission="admin:users" />,
-            children: [{ path: '/admin/users', element: <AdminUsersPage /> }],
+            children: [
+              { path: '/admin/users', element: <AdminUsersPage /> },
+              { path: '/admin/registrations', element: <AdminRegistrationsPage /> },
+            ],
           },
           {
             element: <AdminRoute permission="legal:manage" />,
@@ -139,6 +144,7 @@ export const appRoutes = [
             children: [
               { path: '/admin/school', element: <AdminSchoolSettingsPage /> },
               { path: '/admin/registration-qr', element: <AdminRegistrationQrPage /> },
+              { path: '/admin/yclients', element: <AdminYclientsPage /> },
             ],
           },
           {

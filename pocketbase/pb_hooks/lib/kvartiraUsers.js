@@ -210,6 +210,9 @@ function assertUserUpdate(e) {
     if (!Object.prototype.hasOwnProperty.call(body, 'role')) {
       e.record.set('role', original.getString('role'));
     }
+    if (!Object.prototype.hasOwnProperty.call(body, 'accountStatus')) {
+      e.record.set('accountStatus', original.getString('accountStatus') || 'active');
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(body, 'phone')) {
@@ -217,6 +220,25 @@ function assertUserUpdate(e) {
     const newPhone = e.record.getString('phone');
     if (oldPhone !== newPhone) {
       throw new ApiError(400, 'Нельзя изменить номер телефона');
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'accountStatus')) {
+    const oldStatus = original ? original.getString('accountStatus') || 'active' : 'active';
+    const newStatus = e.record.getString('accountStatus') || 'active';
+    if (oldStatus !== newStatus) {
+      if (auth.getString('role') !== 'admin') {
+        throw new ApiError(403, 'Нельзя изменить статус аккаунта');
+      }
+      if (String(auth.id) === String(e.record.id)) {
+        throw new ApiError(400, 'Нельзя подтвердить собственный аккаунт');
+      }
+      if (e.record.getString('role') === 'admin') {
+        throw new ApiError(400, 'Администраторы не требуют подтверждения');
+      }
+      if (newStatus !== 'active' && newStatus !== 'pending') {
+        throw new ApiError(400, 'Недопустимый статус аккаунта');
+      }
     }
   }
 
@@ -237,6 +259,9 @@ function assertUserUpdate(e) {
   if (oldRole === 'admin' || !isStaffRole(newRole) || !isStaffRole(oldRole)) {
     throw new ApiError(400, 'Можно менять только роли ученика и преподавателя');
   }
+
+  // Admin staff actions imply trust → active.
+  e.record.set('accountStatus', 'active');
 }
 
 module.exports = {

@@ -455,7 +455,7 @@ describe('HomePage P1', () => {
 
     renderHome();
 
-    expect(await screen.findAllByText('Пока нет предстоящих занятий')).toHaveLength(2);
+    expect(await screen.findByText('Пока нет предстоящих занятий')).toBeInTheDocument();
   });
 
   it('shows ErrorState on lessons error in nearest lesson block', async () => {
@@ -524,7 +524,7 @@ describe('HomePage admin as teacher', () => {
     expect(await screen.findByRole('heading', { name: formatUserName(adminUser) })).toBeInTheDocument();
     expect(screen.getByText('Администратор')).toBeInTheDocument();
     expect(screen.getByText('Ближайшее занятие')).toBeInTheDocument();
-    expect(screen.getByText('Предстоящие занятия')).toBeInTheDocument();
+    expect(screen.queryByText('Предстоящие занятия')).not.toBeInTheDocument();
     expect(screen.queryByText('Занятий сегодня')).not.toBeInTheDocument();
     expect(screen.queryByText('Ближайшее занятие школы')).not.toBeInTheDocument();
     expect(screen.queryByText('Быстрые действия')).not.toBeInTheDocument();
@@ -532,7 +532,7 @@ describe('HomePage admin as teacher', () => {
     expect(screen.queryByText('Записаться на занятие')).not.toBeInTheDocument();
     const allLinks = screen.getAllByRole('link', { name: /^Все$/ });
     expect(allLinks.some((link) => link.getAttribute('href') === '/events')).toBe(true);
-    expect(allLinks.some((link) => link.getAttribute('href') === '/lessons')).toBe(true);
+    expect(allLinks.some((link) => link.getAttribute('href') === '/lessons')).toBe(false);
     expect(mockGetLessons).toHaveBeenCalledWith({
       requesterId: adminUser.id,
       teacherId: adminUser.id,

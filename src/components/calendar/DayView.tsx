@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { CalendarDays } from 'lucide-react';
 import { CalendarLessonItem } from './CalendarLessonItem';
 import { sortLessonsByTime } from '@/services/calendar/helpers';
-import { formatFullDate } from '@/utils/dates';
+import { normalizeLessonDate } from '@/utils/dates';
 import { can } from '@/permissions';
 
 interface DayViewProps {
@@ -27,7 +27,10 @@ export function DayView({
   viewer,
   showBookAction,
 }: DayViewProps) {
-  const dayLessons = sortLessonsByTime(lessons.filter((l) => l.date === date));
+  const dayKey = normalizeLessonDate(date) || date;
+  const dayLessons = sortLessonsByTime(
+    lessons.filter((l) => normalizeLessonDate(l.date) === dayKey),
+  );
 
   if (dayLessons.length === 0) {
     return (
@@ -47,20 +50,17 @@ export function DayView({
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-body-sm text-text-secondary capitalize">{formatFullDate(date)}</p>
-      <div className="space-y-2">
-        {dayLessons.map((lesson) => (
-          <CalendarLessonItem
-            key={lesson.id}
-            lesson={lesson}
-            directionName={directions.get(lesson.directionId) ?? ''}
-            viewerRole={viewer.role}
-            teacher={teachers.get(lesson.teacherId)}
-            student={students.get(lesson.studentId)}
-          />
-        ))}
-      </div>
+    <div className="relative space-y-2 border-l-2 border-brand/25 pl-3">
+      {dayLessons.map((lesson) => (
+        <CalendarLessonItem
+          key={lesson.id}
+          lesson={lesson}
+          directionName={directions.get(lesson.directionId) ?? ''}
+          viewerRole={viewer.role}
+          teacher={teachers.get(lesson.teacherId)}
+          student={students.get(lesson.studentId)}
+        />
+      ))}
     </div>
   );
 }

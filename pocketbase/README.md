@@ -26,8 +26,19 @@ npm run pb:up
 | `PB_HTTP_PORT` | Порт PocketBase | `8090` |
 | `VITE_API_URL` | URL для фронтенда | `http://127.0.0.1:8090` |
 | `VITE_API_MODE` | `mock` или `pocketbase` | `mock` |
+| `VITE_LESSONS_SOURCE` | `native` или `yclients` (занятия через YCLIENTS) | `native` |
+| `YCLIENTS_COMPANY_ID` | ID филиала YCLIENTS (server-only) | — |
+| `YCLIENTS_PARTNER_TOKEN` | Partner API token | — |
+| `YCLIENTS_USER_TOKEN` | User token для отмены записей | — |
 
-Пока `VITE_API_MODE=mock` — приложение не обращается к PocketBase (адаптер в фазе 2).
+Пока `VITE_API_MODE=mock` — приложение не обращается к PocketBase.
+
+### YCLIENTS (занятия)
+
+1. Задать `YCLIENTS_*` в `.env` (пробрасываются в docker-compose) и **перезапустить** PocketBase.
+2. Админ → `/admin/yclients` — связать направления↔услуги и staff↔преподаватели.
+3. Фронт: `VITE_API_MODE=pocketbase` + `VITE_LESSONS_SOURCE=yclients`.
+4. Без виджетов: запись/отмена/график через BFF `pb_hooks/yclients.pb.js`.
 
 ## Команды
 

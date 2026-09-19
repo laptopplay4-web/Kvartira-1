@@ -56,10 +56,12 @@ describe('router', () => {
     expect(paths).toContain('/admin/help/:id');
     expect(paths).toContain('/admin/schedule');
     expect(paths).toContain('/admin/users');
+    expect(paths).toContain('/admin/registrations');
     expect(paths).toContain('/admin/legal');
     expect(paths).toContain('/admin/events');
     expect(paths).toContain('/admin/school');
     expect(paths).toContain('/admin/registration-qr');
+    expect(paths).toContain('/admin/yclients');
     expect(paths).toContain('/admin/directions');
     expect(paths).toContain('/forgot-password');
     expect(paths).toContain('/reset-password');

@@ -40,9 +40,9 @@ Production-ready, когда выполнены **все** условия:
 | Production backend | ⏳ фазы 3.4–6 |
 | Frontend polish (фаза 0) | ✅ |
 | **Текущая фаза** | **6** — Deploy (после optional 3.4) |
-| **Следующий шаг** | Figma §126: следующий элемент → уточнения по одному → план → «можно внедрять»; или Deploy |
-| Тесты | 579 (46 files) |
-| Graphify | 2473 / 2635 / 372 — `stack.mdc` §126 |
+| **Следующий шаг** | Deploy: YCLIENTS smoke (book/cancel + график §201); или Figma §126 |
+| Тесты | 780 (53 files) — актуальные в `stack.mdc` §42 |
+| Graphify | 3157 / 3551 / 481 — `stack.mdc` §42 |
 
 Полный чеклист реализации — `stack.mdc` §16. РКН — `docs/ROSKOMNADZOR_CHECKLIST.md`.
 

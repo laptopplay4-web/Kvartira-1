@@ -85,6 +85,7 @@ describe('PocketBase RBAC rules (ROADMAP 1.4)', () => {
     expect(source).toContain('USER_DIRECTORY_ACCESS');
     expect(source).toMatch(/users:\s*\{\s*listRule: USER_DIRECTORY_ACCESS/);
     expect(source).toMatch(/viewRule: USER_DIRECTORY_ACCESS/);
+    expect(source).toContain('role != "admin"');
     // students may only reach people they share a group or a conversation with
     expect(source).toContain('@collection.assignment_groups.members ?= @request.auth.id');
     expect(source).toContain('@collection.conversations.participantIds ?~ @request.auth.id');

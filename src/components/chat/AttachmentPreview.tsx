@@ -1,6 +1,10 @@
 import { X, FileIcon } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
-import { formatFileSize, isVoiceAttachment } from '@/services/chat/attachments';
+import {
+  displayAttachmentFilename,
+  formatFileSize,
+  isVoiceAttachment,
+} from '@/services/chat/attachments';
 import { detectAttachmentType } from '@/services/chat/validation';
 import type { PendingAttachment } from './MessageComposer';
 
@@ -24,8 +28,7 @@ function previewLabel(att: PendingAttachment): string | null {
   })) {
     return 'Голосовое';
   }
-  if (type === 'audio') return att.filename;
-  return att.filename;
+  return displayAttachmentFilename(att.filename) || att.filename;
 }
 
 export function AttachmentPreview({ attachments, onRemove }: AttachmentPreviewProps) {
